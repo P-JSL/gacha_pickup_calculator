@@ -516,40 +516,21 @@ impl Calculator {
             }
         });
         ui.add_space(8.0);
-        section(ui, "05", "확률 그래프", "X축은 추가 뽑기 수, Y축은 목표까지의 누적 성공 확률(%)입니다.", |ui| {
-            let raw_end = stats.combined.pmf.len().saturating_sub(1);
-            let show_feedback = stats.feedback.is_some();
-            let end = if let Some(ref f) = stats.feedback {
-                raw_end.max(f.quantile(1.0))
-            } else { raw_end };
-            let step = (end / 280).max(1);
-            Plot::new("completion_chart").legend(Legend::default())
-                .height(345.0).include_y(0.0).include_y(100.0)
-                .include_x(0.0).include_x(end as f64)
-                .allow_drag(true).allow_zoom(true)
-                .show(ui, |plot| {
-                    for (name, dist, color) in [
-                        ("캐릭터 목표", &stats.character, PRIMARY),
-                        ("무기 목표", &stats.weapon, MINT),
-                        ("합산 · 환급 전", &stats.combined, GOLD),
-                    ] {
-                        let points = PlotPoints::from_iter((0..=end).step_by(step)
-                            .map(|x| [x as f64, dist.at(x) * 100.0]));
-                        plot.line(Line::new(points).name(name).color(color).width(2.0_f32));
-                    }
-                    if let Some(ref feedback) = stats.feedback {
-                        // No dedicated tickets: both curves have identical x-axis units.
-                        if self.setup.character_dedicated == 0 && self.setup.weapon_dedicated == 0 {
-                            let points = PlotPoints::from_iter((0..=end).step_by(step)
-                                .map(|x| [x as f64, feedback.probability(x).0 * 100.0]));
-                            plot.line(Line::new(points).name("환급 포함 · 초기 보유 N")
-                                .color(Color32::from_rgb(203, 158, 255)).width(3.5_f32));
-                        }
-                    }
-                });
-            if show_feedback && (self.setup.character_dedicated > 0 || self.setup.weapon_dedicated > 0) {
-                ui.label(RichText::new("전용권 사용 중: 환급 후 자유 재화와 전체 뽑기 수는 축 단위가 달라 별도 그래프 비교를 생략했습니다.")
-                    .color(GOLD).size(11.0));
+        section(ui, "05", "확률 그래프",
+                "X축: 소모 뽑기 수 · Y축: 목표 달성 누적 확률(%). 내부 계산 결과를 직접 그립니다.", |ui| {
+            // Use egui's painter rather than an egui_plot instance with persisted
+            // zoom / hidden-series state. This always draws visible curves for
+            // a valid PMF, even after changing games or revisiting this menu.
+            draw_probability_chart(
+                ui, &stats.character, &stats.weapon, &stats.combined,
+                stats.feedback.as_ref(),
+                self.setup.character_dedicated == 0 && self.setup.weapon_dedicated == 0,
+            );
+            if stats.feedback.is_some()
+                && (self.setup.character_dedicated > 0 || self.setup.weapon_dedicated > 0)
+            {
+                ui.colored_label(GOLD,
+                    "전용권 사용 중에는 환급 후 자유 재화와 원시 총 뽑기의 단위가 달라 환급 곡선을 겹치지 않습니다.");
             }
         });
         ui.add_space(10.0);
@@ -801,6 +782,149 @@ impl Calculator {
                 });
             ui.colored_label(GOLD, "주의: Greenwood 95% 구간은 최초 획득 이전(F=0)과 전원 획득 이후(F=1)의 경계에서 표시하지 않습니다. 독립적 기록 중단만 보정하며 임의 계정 업로드, 누락·혼합된 이력은 보정하지 않습니다.");
         });
+    }
+}
+
+/// Build a monotonic, endpoint-complete CDF curve for both paint and tests.
+/// The DP distribution remains the source of truth; sampling only reduces
+/// screen-level line geometry, not numerical probabilities.
+fn sampled_cdf(distribution: &Distribution, end: usize) -> Vec<(usize, f64)> {
+    let end = end.max(1);
+    let n = end.min(400);
+    (0..=n).map(|i| {
+        let x = i * end / n;
+        (x, distribution.at(x).clamp(0.0, 1.0))
+    }).collect()
+}
+
+/// Deterministic native egui Painter rendering avoids egui_plot zoom memory,
+/// axis auto-bounds and per-series visibility carrying across game switches.
+fn draw_probability_chart(
+    ui: &mut egui::Ui,
+    character: &Distribution,
+    weapon: &Distribution,
+    combined: &Distribution,
+    feedback: Option<&FeedbackEstimate>,
+    show_feedback: bool,
+) {
+    let raw_end = combined.pmf.len().saturating_sub(1);
+    let end = feedback.map_or(raw_end, |f| raw_end.max(f.quantile(1.0))).max(1);
+    let width = ui.available_width().max(590.0);
+    let (response, painter) = ui.allocate_painter(
+        egui::vec2(width, 340.0), egui::Sense::hover(),
+    );
+    let bounds = response.rect;
+    let graph = egui::Rect::from_min_max(
+        egui::pos2(bounds.left() + 58.0, bounds.top() + 12.0),
+        egui::pos2(bounds.right() - 14.0, bounds.bottom() - 37.0),
+    );
+    painter.rect_filled(bounds, 8.0, Color32::from_rgb(18, 28, 44));
+    for edge in [
+        [graph.left_top(), graph.right_top()],
+        [graph.left_bottom(), graph.right_bottom()],
+        [graph.left_top(), graph.left_bottom()],
+        [graph.right_top(), graph.right_bottom()],
+    ] {
+        painter.line_segment(edge, egui::Stroke::new(1.0, BORDER));
+    }
+
+    let project = |x: usize, probability: f64| {
+        egui::pos2(
+            graph.left() + (x as f32 / end as f32) * graph.width(),
+            graph.bottom() - probability.clamp(0.0, 1.0) as f32 * graph.height(),
+        )
+    };
+    for step in 0..=4 {
+        let p = step as f64 / 4.0;
+        let y = project(0, p).y;
+        painter.line_segment(
+            [egui::pos2(graph.left(), y), egui::pos2(graph.right(), y)],
+            egui::Stroke::new(1.0, BORDER),
+        );
+        painter.text(
+            egui::pos2(graph.left() - 7.0, y),
+            egui::Align2::RIGHT_CENTER, format!("{}%", step * 25),
+            egui::FontId::proportional(11.0), MUTED,
+        );
+    }
+    for step in 0..=5 {
+        let x = end * step / 5;
+        let px = project(x, 0.0).x;
+        painter.text(
+            egui::pos2(px, graph.bottom() + 10.0),
+            egui::Align2::CENTER_TOP, format!("{x}"),
+            egui::FontId::proportional(11.0), MUTED,
+        );
+    }
+    for (distribution, color) in [
+        (character, PRIMARY), (weapon, MINT), (combined, GOLD),
+    ] {
+        let points = sampled_cdf(distribution, end).into_iter()
+            .map(|(x, p)| project(x, p)).collect();
+        painter.add(egui::Shape::line(points, egui::Stroke::new(2.5, color)));
+    }
+    let refund_color = Color32::from_rgb(203, 158, 255);
+    if show_feedback {
+        if let Some(simulated) = feedback {
+            let n = end.min(400);
+            let points = (0..=n).map(|i| {
+                let x = i * end / n;
+                project(x, simulated.probability(x).0)
+            }).collect();
+            painter.add(egui::Shape::line(points, egui::Stroke::new(3.0, refund_color)));
+        }
+    }
+    if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
+        let fraction = (pointer.x - graph.left()) / graph.width();
+        let x = ((fraction * end as f32).round() as usize).min(end);
+        let px = project(x, 0.0).x;
+        painter.line_segment([
+            egui::pos2(px, graph.top()),
+            egui::pos2(px, graph.bottom()),
+        ], egui::Stroke::new(1.0, MUTED));
+        for (distribution, color) in [
+            (character, PRIMARY), (weapon, MINT), (combined, GOLD),
+        ] {
+            painter.circle_filled(project(x, distribution.at(x)), 3.5, color);
+        }
+        ui.label(format!(
+            "{x}뽑 내 성공 확률 | 캐릭터 {:.1}% · 무기 {:.1}% · 전체 {:.1}%",
+            character.at(x) * 100.0, weapon.at(x) * 100.0,
+            combined.at(x) * 100.0,
+        ));
+    }
+    ui.horizontal_wrapped(|ui| {
+        ui.colored_label(PRIMARY, "● 캐릭터 목표");
+        ui.colored_label(MINT, "● 무기·광추 목표");
+        ui.colored_label(GOLD, "● 합산 · 환급 전");
+        if show_feedback && feedback.is_some() {
+            ui.colored_label(refund_color, "● 환급 반영");
+        }
+    });
+}
+
+#[cfg(test)]
+mod chart_tests {
+    use super::*;
+    #[test]
+    fn sample_curve_has_endpoints_and_monotonic_probabilities() {
+        let dist = Distribution::new(vec![0.0, 0.2, 0.3, 0.5]);
+        let curve = sampled_cdf(&dist, 3);
+        assert_eq!(curve.first().copied(), Some((0, 0.0)));
+        assert_eq!(curve.last().copied(), Some((3, 1.0)));
+        assert!(curve.windows(2).all(|x| x[0].0 < x[1].0 && x[0].1 <= x[1].1));
+        let zero_goal = Distribution::new(vec![1.0]);
+        let immediate = sampled_cdf(&zero_goal, 0);
+        assert_eq!(immediate, vec![(0, 1.0), (1, 1.0)]);
+    }
+
+    #[test]
+    fn long_plot_curve_remains_bounded_and_includes_last_pity() {
+        let mut pmf = vec![0.0; 1600];
+        pmf[1599] = 1.0;
+        let curve = sampled_cdf(&Distribution::new(pmf), 1599);
+        assert_eq!(curve.len(), 401);
+        assert_eq!(curve.last(), Some(&(1599, 1.0)));
     }
 }
 
