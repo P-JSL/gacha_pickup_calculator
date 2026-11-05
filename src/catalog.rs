@@ -50,7 +50,7 @@ fn approved_icon_url(url: &str) -> bool {
     extension_ok && relative.split('/').all(|part|
         !part.is_empty() && part != "." && part != ".."
         && part.bytes().all(|byte|
-            byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b'%' | b'(' | b')')
+            byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b'(' | b')')
         )
     )
 }
@@ -177,6 +177,7 @@ impl CatalogUi {
         // cloud metadata services or an attacker-controlled HTTP endpoint.
         let agent = ureq::AgentBuilder::new()
             .redirects(0)
+            .timeout(Duration::from_secs(12))
             .timeout_connect(Duration::from_secs(3))
             .timeout_read(Duration::from_secs(5))
             .timeout_write(Duration::from_secs(3))
@@ -345,6 +346,7 @@ mod tests {
             "https://raw.githubusercontent.com/Mar-7th/StarRailRes/../private.png",
             "https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.png?token=1",
             "https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.svg",
+            "https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/%2e%2e/icon.png",
             "https://127.0.0.1/image.png",
         ] { assert!(!approved_icon_url(url), "{url}"); }
         assert!(!approved_icon_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
