@@ -83,7 +83,7 @@ impl Calculator {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // set_visuals alone changes only the current theme style. The system
         // preference could otherwise switch the UI back to Light on Windows.
-        cc.egui_ctx.set_theme(egui::Theme::Dark);
+        configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
@@ -106,14 +106,6 @@ impl Calculator {
                 repaint.request_repaint();
             }
         });
-        let mut visuals = egui::Visuals::dark();
-        visuals.panel_fill = BG;
-        visuals.window_fill = CARD;
-        visuals.extreme_bg_color = Color32::from_rgb(17, 25, 40);
-        visuals.widgets.inactive.bg_fill = CARD;
-        visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 58, 79);
-        visuals.selection.bg_fill = Color32::from_rgb(39, 102, 158);
-        cc.egui_ctx.set_visuals(visuals);
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
@@ -986,11 +978,15 @@ struct ChartSeries<'a> {
     color: Color32,
 }
 
+fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
+    series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1)
+}
+
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
-    let end = series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1);
+    let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
     let height = if width < 650.0 { 262.0 } else { 320.0 };
     let (response, painter) = ui.allocate_painter(
@@ -1189,6 +1185,38 @@ impl eframe::App for Calculator {
     }
 }
 
+/// One theme and logical-point typography for Windows and Linux.
+/// OS-level DPI still controls physical pixel density, but widget dimensions,
+/// colors and CDF Painter are identical in egui points.
+fn configure_dark_desktop(ctx: &egui::Context) {
+    ctx.set_theme(egui::Theme::Dark);
+    let mut visuals = egui::Visuals::dark();
+    visuals.panel_fill = BG;
+    visuals.window_fill = CARD;
+    visuals.extreme_bg_color = Color32::from_rgb(17, 25, 40);
+    visuals.override_text_color = Some(Color32::from_rgb(231, 239, 249));
+    visuals.widgets.noninteractive.fg_stroke.color = MUTED;
+    visuals.widgets.inactive.bg_fill = CARD;
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 58, 79);
+    visuals.widgets.active.bg_fill = Color32::from_rgb(43, 73, 99);
+    visuals.selection.bg_fill = Color32::from_rgb(39, 102, 158);
+    // Both dark visual slots and the current theme are explicitly set so a
+    // Windows light OS theme won't reintroduce light native widget styling.
+    ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
+    ctx.set_visuals(visuals);
+    ctx.style_mut(|style| {
+        style.spacing.item_spacing = egui::vec2(9.0, 8.0);
+        style.spacing.button_padding = egui::vec2(11.0, 6.0);
+        style.spacing.interact_size.y = 27.0;
+        style.text_styles.insert(egui::TextStyle::Body,
+            egui::FontId::proportional(14.0));
+        style.text_styles.insert(egui::TextStyle::Button,
+            egui::FontId::proportional(14.0));
+        style.text_styles.insert(egui::TextStyle::Small,
+            egui::FontId::proportional(11.0));
+    });
+}
+
 fn install_korean_font(ctx: &egui::Context) {
     let locations = [
         r"C:\Windows\Fonts\malgun.ttf",
@@ -1234,6 +1262,22 @@ mod chart_tests {
         let zero_goal = Distribution::new(vec![1.0]);
         let immediate = sampled_cdf(&zero_goal, 0);
         assert_eq!(immediate, vec![(0, 1.0), (1, 1.0)]);
+    }
+
+    #[test]
+    fn character_and_weapon_chart_ranges_are_independent() {
+        let character = Distribution::new(vec![0.0, 0.3, 0.7]);
+        let mut weapon_pmf = vec![0.0; 301];
+        weapon_pmf[300] = 1.0;
+        let weapon = Distribution::new(weapon_pmf);
+        let character_only = [ChartSeries {
+            label: "캐릭터", source: ChartSource::Exact(&character), color: PRIMARY,
+        }];
+        let weapon_only = [ChartSeries {
+            label: "무기", source: ChartSource::Exact(&weapon), color: MINT,
+        }];
+        assert_eq!(chart_domain_end(&character_only), 2);
+        assert_eq!(chart_domain_end(&weapon_only), 300);
     }
 
     #[test]
