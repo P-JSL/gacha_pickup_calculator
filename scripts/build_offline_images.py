@@ -24,8 +24,8 @@ ROOT = Path("dist/Image")
 GAME_DIR = {"hsr": "HSR", "wuwa": "WutheringWaves",
             "sora": "StellaSora", "nte": "Neverness"}
 MAX_INPUT_BYTES = 2 * 1024 * 1024
-MAX_PIXELS = 4_000_000
-MAX_EDGE = 2048
+MAX_PIXELS = 8_000_000
+MAX_EDGE = 4096
 EXPECTED_FORMATS = {"PNG", "JPEG"}
 HOSTS = {"raw.githubusercontent.com"}
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
@@ -123,13 +123,14 @@ def main():
     jobs = list(entries())
     completed = []
     failures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(fetch_and_normalize, job): job for job in jobs}
         for future in concurrent.futures.as_completed(futures):
             job = futures[future]
             try:
                 completed.append(future.result())
-            except (OSError, ValueError, UnidentifiedImageError, urllib.error.URLError) as exc:
+            except (OSError, ValueError, UnidentifiedImageError, urllib.error.URLError,
+                    Image.DecompressionBombWarning, Image.DecompressionBombError) as exc:
                 failures.append((str(job[1]), str(exc)))
     for path, reason in sorted(failures):
         print(f"IMAGE FAILED: {path}: {reason}")
