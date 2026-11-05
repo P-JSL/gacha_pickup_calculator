@@ -8,7 +8,8 @@ description = "Exact finite-state gacha probability calculator for four games"
 [dependencies]
 eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 egui_plot = "0.31.0"
-image = { version = "0.25", default-features = false, features = ["jpeg"] }
+ureq = { version = "2.12", default-features = false, features = ["tls"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [profile.release]
 lto = "thin"
