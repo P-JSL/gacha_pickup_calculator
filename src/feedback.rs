@@ -327,7 +327,7 @@ fn award_featured(wallet: &mut Wallet, model: &FeedbackConfig, owned: usize,
 
 fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
-                 (owned, dedicated): (usize, &mut usize), waveband_limit: usize) {
+                 (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
     let BannerRule::Standard { rarity, featured_share } = &rule.rule else { return; };
     let mut pity = rule.pity;
     let mut guaranteed = rule.guaranteed;
@@ -493,7 +493,7 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
                         model.wuwa_waveband_max
                     } else { 0 };
                     roll_standard(&mut rng, banner, kind, mode, model, &mut wallet,
-                        (owned, dedicated), max_wavebands);
+                        (owned, dedicated, max_wavebands));
                 }
                 BannerRule::FeaturedCounter { .. } => {
                     roll_featured(&mut rng, banner, kind, model, &mut wallet, owned, dedicated);
