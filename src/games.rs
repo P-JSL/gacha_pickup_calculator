@@ -74,6 +74,9 @@ pub struct GameSetup {
     pub character_dedicated: usize,
     pub weapon_dedicated: usize,
     pub flexible: usize,
+    /// Native premium-currency units (e.g. 성옥, 별의 소리, Annulith).
+    /// The remainder below one full ticket remains unspent.
+    pub premium_currency: usize,
 }
 
 impl GameSetup {
@@ -99,7 +102,22 @@ impl GameSetup {
                     pity: 0, guaranteed: false, target_copies: 5, spark: None, any_rare_pity: 0 },
             ),
         };
-        Self { game, character, weapon, character_owned: 0, weapon_owned: 0, character_dedicated: 0, weapon_dedicated: 0, flexible: 0 }
+        Self { game, character, weapon, character_owned: 0, weapon_owned: 0,
+            character_dedicated: 0, weapon_dedicated: 0, flexible: 0, premium_currency: 0 }
+    }
+
+    /// Ticket-equivalent flexible budget. Leftover native currency is not a
+    /// partial pull, and extra owned native units only finance whole pulls.
+    pub fn available_flexible(&self) -> usize {
+        self.flexible.saturating_add(self.premium_currency / self.game.cost_per_pull())
+    }
+
+    /// Exact native currency required to reach a given total flexible pull
+    /// capacity, after pre-owned flexible tickets and native currency.
+    pub fn additional_currency_for(&self, required_flexible: usize) -> usize {
+        let missing_pulls = required_flexible.saturating_sub(self.flexible);
+        missing_pulls.saturating_mul(self.game.cost_per_pull())
+            .saturating_sub(self.premium_currency)
     }
 
     pub fn set_targets(&mut self, character_total: usize, weapon_total: usize) {
@@ -111,4 +129,30 @@ impl GameSetup {
 fn regular(base: f64, hard: usize, soft: SoftPity, featured_share: f64, pity: usize, guaranteed: bool, target: usize) -> Banner {
     Banner { rule: BannerRule::Standard { rarity: RateSchedule { base, hard, soft }, featured_share },
         pity, guaranteed, target_copies: target, spark: None, any_rare_pity: 0 }
+}
+#[cfg(test)]
+mod currency_tests {
+    use super::*;
+    #[test]
+    fn native_currency_converts_only_in_complete_pulls_for_all_games() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            let price = game.cost_per_pull();
+            setup.flexible = 3;
+            setup.premium_currency = 2 * price + price - 1;
+            assert_eq!(setup.available_flexible(), 5);
+            assert_eq!(setup.additional_currency_for(6), 1);
+            assert_eq!(setup.additional_currency_for(5), 0);
+        }
+    }
+
+    #[test]
+    fn default_starting_goals_are_one_each() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            setup.set_targets(1, 1);
+            assert_eq!(setup.character.target_copies, 1);
+            assert_eq!(setup.weapon.target_copies, 1);
+        }
+    }
 }
