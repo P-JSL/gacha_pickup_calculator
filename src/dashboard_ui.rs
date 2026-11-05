@@ -197,7 +197,7 @@ impl Calculator {
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
                 overview_metric(&mut columns[2], 2, "Expected Pulls",
                     format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK);
-                overview_metric(&mut columns[3], 3, "Premium Currency",
+                overview_metric(&mut columns[3], 3, "Remaining Currency",
                     self.setup.premium_currency.to_string(),
                     format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
                         self.setup.game.currency_name()), CYAN);
@@ -221,7 +221,7 @@ impl Calculator {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
                         format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN);
-                    probability_card(&mut columns[1], &format!("{banner_name} Probability"),
+                    probability_card(&mut columns[1], "Weapon Probability",
                         format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW);
                     probability_card(&mut columns[2], "Overall Result",
                         format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK);
@@ -230,7 +230,7 @@ impl Calculator {
                 probability_card(ui, "Character Probability",
                     format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN);
                 ui.add_space(8.0);
-                probability_card(ui, &format!("{banner_name} Probability"),
+                probability_card(ui, "Weapon Probability",
                     format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW);
                 ui.add_space(8.0);
                 probability_card(ui, "Overall Result",
