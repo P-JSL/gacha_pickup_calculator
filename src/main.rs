@@ -986,25 +986,25 @@ impl Calculator {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                    }]);
+                    }], self.ui_preferences);
                 });
                 section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                    }]);
+                    }], self.ui_preferences);
                 });
             });
         } else {
             section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                }]);
+                }], self.ui_preferences);
             });
             ui.add_space(8.0);
             section(ui, "05-B", &secondary_heading, single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                }]);
+                }], self.ui_preferences);
             });
         }
         ui.add_space(10.0);
@@ -1025,7 +1025,7 @@ impl Calculator {
                     });
                 }
             }
-            draw_probability_chart(ui, &curves);
+            draw_probability_chart(ui, &curves, self.ui_preferences);
             if stats.feedback.is_some() && !comparable {
                 ui.colored_label(GOLD,
                     "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
@@ -1393,7 +1393,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
-fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
+fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -1455,7 +1455,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
             }
         };
         // Area-gradient mesh: brighter at the CDF line, transparent at the baseline.
-        if points.len() >= 2 {
+        if appearance.show_chart_fill && points.len() >= 2 {
             let mut fill = egui::Mesh::default();
             for point in &points {
                 fill.vertices.push(egui::epaint::Vertex {
@@ -1484,6 +1484,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         ));
     }
     if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
+        if appearance.show_hover_guides {
         let fraction = (pointer.x - graph.left()) / graph.width();
         let x = ((fraction * end as f32).round() as usize).min(end);
         let px = project(x, 0.0).x;
@@ -1501,6 +1502,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
         response.clone().on_hover_text(tooltip);
+        }
     }
     // The compact dashboard uses one line per card. Keep legends only where
     // multiple curves must be distinguished in the detailed analytics view.
