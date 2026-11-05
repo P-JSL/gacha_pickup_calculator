@@ -65,10 +65,10 @@ jobs:
             scrot -q 90 ci-artifacts/initial.png
             # Settings is the second entry in the persistent navigation rail.
             # Capture its compact 2x2 editor layout before returning to charts.
-            xdotool mousemove 95 183 click 1
+            xdotool mousemove 95 225 click 1
             sleep 2
             scrot -q 90 ci-artifacts/settings.png
-            xdotool mousemove 95 139 click 1
+            xdotool mousemove 95 167 click 1
             sleep 2
             xdotool mousemove 850 700
             xdotool click --repeat 7 --delay 125 5
