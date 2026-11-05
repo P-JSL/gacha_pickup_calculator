@@ -20,6 +20,14 @@ pub struct Entry {
     pub name: String,
     pub rarity: u8,
     pub icon_url: String,
+    pub availability: Availability,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Availability { Released, Announced, Beta, Unverified }
+impl Availability {
+    pub fn label(self) -> &'static str {
+        match self { Self::Released => "출시", Self::Announced => "출시 예정 · 공식", Self::Beta => "베타 확인", Self::Unverified => "미확인" }
+    }
 }
 impl Entry {
     pub fn has_verified_image(&self) -> bool { self.icon_url.starts_with("https://") }
@@ -34,10 +42,11 @@ fn game_code(game: Game) -> &'static str {
 }
 fn parse() -> Vec<Entry> {
     let mut out = Vec::new();
-    for line in include_str!("catalog_data.tsv").lines() {
+    for line in include_str!("catalog_data.tsv").lines()
+        .chain(include_str!("catalog_future.tsv").lines()) {
         if line.starts_with('#') { continue; }
         let fields: Vec<&str> = line.split('\t').collect();
-        if fields.len() != 6 { continue; }
+        if fields.len() != 6 && fields.len() != 7 { continue; }
         let game = match fields[0] {
             "hsr" => Game::StarRail,
             "wuwa" => Game::WutheringWaves,
@@ -50,6 +59,12 @@ fn parse() -> Vec<Entry> {
             game, kind, id: fields[2].to_owned(), name: fields[3].to_owned(),
             rarity: fields[4].parse().unwrap_or(5),
             icon_url: fields[5].to_owned(),
+            availability: match fields.get(6).copied().unwrap_or("released") {
+                "announced" => Availability::Announced,
+                "beta" => Availability::Beta,
+                "unverified" => Availability::Unverified,
+                _ => Availability::Released,
+            },
         });
     }
     out.sort_by(|a, b| {
@@ -82,6 +97,7 @@ pub struct CatalogUi {
     send_url: Sender<String>,
     recv_image: Receiver<ImageResult>,
     rarity_filter: u8,
+    availability_filter: u8,
 }
 
 impl CatalogUi {
@@ -112,7 +128,7 @@ impl CatalogUi {
         }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
-            send_url, recv_image, rarity_filter: 0,
+            send_url, recv_image, rarity_filter: 0, availability_filter: 0,
         }
     }
 
@@ -242,14 +258,27 @@ pub fn picker(
                     ui.selectable_value(&mut art.rarity_filter, rarity, title);
                 }
             });
+            ui.horizontal_wrapped(|ui| {
+                ui.label(egui::RichText::new("출시 상태").color(egui::Color32::GRAY).size(11.0));
+                for (value, label) in [(0, "전체"), (1, "출시"), (2, "공식 예고"), (3, "베타"), (4, "미확인")] {
+                    ui.selectable_value(&mut art.availability_filter, value, label);
+                }
+            });
             ui.label(egui::RichText::new(
-                "이미지는 최초 열람 시 비동기로 불러오고 로컬에 저장합니다. 현재 모델은 ★5 픽업만 계산하므로 ★3/★4 항목은 조회 전용입니다."
+                "이미지는 최초 열람 시 비동기로 불러오고 로컬에 저장합니다. 출시 전 항목은 공식/베타 상태를 구분하며, ★3/★4는 조회 전용입니다."
             ).color(egui::Color32::from_rgb(166, 194, 209)).size(11.0));
             ui.separator();
             let needle = filter.trim().to_lowercase();
             let items: Vec<&Entry> = entries().iter().filter(|entry| {
                 entry.game == game && entry.kind == kind
                     && (art.rarity_filter == 0 || entry.rarity == art.rarity_filter)
+                    && (art.availability_filter == 0 || match art.availability_filter {
+                        1 => entry.availability == Availability::Released,
+                        2 => entry.availability == Availability::Announced,
+                        3 => entry.availability == Availability::Beta,
+                        4 => entry.availability == Availability::Unverified,
+                        _ => true,
+                    })
                     && (needle.is_empty() || entry.name.to_lowercase().contains(&needle)
                         || entry.id.to_lowercase().contains(&needle))
             }).collect();
@@ -268,7 +297,7 @@ pub fn picker(
                                     art.image(ui, item, 47.0);
                                     ui.vertical(|ui| {
                                         ui.label(egui::RichText::new(
-                                            format!("★{}", item.rarity)
+                                            format!("★{} · {}", item.rarity, item.availability.label())
                                         ).color(if item.rarity >= 5 {
                                             egui::Color32::from_rgb(244, 210, 75)
                                         } else {
@@ -309,8 +338,8 @@ mod tests {
         }
         for item in entries() {
             assert!(!item.name.trim().is_empty());
-            assert!(item.has_verified_image(),
-                "{} {} must have an existing image source", item.id, item.name);
+            assert!(item.has_verified_image() || item.availability != Availability::Released,
+                "released {} {} must have an existing image source", item.id, item.name);
             assert!(unique.insert((game_code(item.game), item.kind as u8, item.id.clone())),
                 "duplicate catalog id: {}", item.id);
         }
