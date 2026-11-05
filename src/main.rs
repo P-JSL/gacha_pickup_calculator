@@ -10,16 +10,18 @@ use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDa
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-const BG: Color32 = Color32::from_rgb(13, 19, 33);
-const CARD: Color32 = Color32::from_rgb(24, 34, 51);
-const MUTED: Color32 = Color32::from_rgb(154, 171, 193);
-const PRIMARY: Color32 = Color32::from_rgb(108, 187, 255);
-const MINT: Color32 = Color32::from_rgb(98, 223, 176);
-const GOLD: Color32 = Color32::from_rgb(255, 183, 102);
-const BORDER: Color32 = Color32::from_rgb(45, 57, 76);
-const SIDEBAR: Color32 = Color32::from_rgb(14, 21, 35);
-const SELECTED_NAV: Color32 = Color32::from_rgb(33, 53, 76);
-const SURFACE: Color32 = Color32::from_rgb(18, 28, 44);
+mod dashboard_ui;
+
+const BG: Color32 = Color32::from_rgb(5, 23, 34);
+const CARD: Color32 = Color32::from_rgb(17, 42, 63);
+const MUTED: Color32 = Color32::from_rgb(166, 194, 209);
+const PRIMARY: Color32 = Color32::from_rgb(60, 207, 242);
+const MINT: Color32 = Color32::from_rgb(142, 234, 171);
+const GOLD: Color32 = Color32::from_rgb(244, 210, 75);
+const BORDER: Color32 = Color32::from_rgb(43, 80, 107);
+const SIDEBAR: Color32 = Color32::from_rgb(3, 20, 30);
+const SELECTED_NAV: Color32 = Color32::from_rgb(30, 77, 112);
+const SURFACE: Color32 = Color32::from_rgb(12, 35, 54);
 
 struct Computed {
     character: Distribution,
@@ -56,7 +58,14 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, Settings, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Analytics, Settings, TrackerSources, ObservedDistribution }
+
+struct HistoryEntry {
+    game: Game,
+    eid: usize,
+    refine: usize,
+    chance: f64,
+}
 
 struct Calculator {
     setup: GameSetup,
@@ -80,6 +89,7 @@ struct Calculator {
     observation_data: Option<ObservationDataset>,
     observation_banner: TrackedBanner,
     observation_message: String,
+    history: Vec<HistoryEntry>,
 }
 
 impl Calculator {
@@ -131,6 +141,7 @@ impl Calculator {
             observation_data: None,
             observation_banner: TrackedBanner::Character,
             observation_message: String::new(),
+            history: Vec::new(),
         };
         app.recalculate();
         app
@@ -172,7 +183,23 @@ impl Calculator {
             }
             self.calculating = false;
             match response.result {
-                Ok(stats) => { self.stats = Some(stats); self.error = None; }
+                Ok(stats) => {
+                    let available = self.setup.available_flexible();
+                    let raw = optimal_allocation(
+                        &stats.character, &stats.weapon,
+                        self.setup.character_dedicated, self.setup.weapon_dedicated, available,
+                    );
+                    let chance = stats.feedback.as_ref()
+                        .map(|f| f.probability(available).0)
+                        .unwrap_or(raw.success_probability);
+                    self.history.insert(0, HistoryEntry {
+                        game: self.setup.game, eid: self.target_eid,
+                        refine: self.target_refine, chance,
+                    });
+                    self.history.truncate(5);
+                    self.stats = Some(stats);
+                    self.error = None;
+                }
                 Err(message) => { self.stats = None; self.error = Some(message); }
             }
         }
@@ -1093,8 +1120,8 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 /// and Linux. No OS-native chart controls or persistence are involved.
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
-    let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 205.0 } else { 232.0 };
+    let width = ui.available_width().max(190.0);
+    let height = if width < 650.0 { 194.0 } else { 242.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1152,8 +1179,33 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
                 }).collect()
             }
         };
+        // Area-gradient mesh: brighter at the CDF line, transparent at the baseline.
+        if points.len() >= 2 {
+            let mut fill = egui::Mesh::default();
+            for point in &points {
+                fill.vertices.push(egui::epaint::Vertex {
+                    pos: *point, uv: egui::epaint::WHITE_UV,
+                    color: line.color.linear_multiply(0.36),
+                });
+                fill.vertices.push(egui::epaint::Vertex {
+                    pos: egui::pos2(point.x, graph.bottom()),
+                    uv: egui::epaint::WHITE_UV, color: Color32::TRANSPARENT,
+                });
+            }
+            for index in 0..points.len() - 1 {
+                let start = (index * 2) as u32;
+                fill.indices.extend_from_slice(&[
+                    start, start + 1, start + 2,
+                    start + 1, start + 3, start + 2,
+                ]);
+            }
+            painter.add(egui::Shape::mesh(fill));
+        }
+        if let Some(end_point) = points.last() {
+            painter.circle_filled(*end_point, 4.0, line.color);
+        }
         painter.add(egui::Shape::line(
-            points, egui::Stroke::new(2.8_f32, line.color),
+            points, egui::Stroke::new(2.6_f32, line.color),
         ));
     }
     if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
@@ -1234,12 +1286,14 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
-        // Input edits occur only on the Settings page; game / model selection
-        // is global and invalidates the calculation regardless of current view.
+        // Compact dashboard edits and detailed settings use the same worker generation.
         if self.header(ctx) {
             self.schedule_recalculation();
         }
         self.sidebar(ctx);
+        if self.view_mode == ViewMode::Calculator {
+            self.workspace_results_panel(ctx);
+        }
         let mut settings_changed = false;
         egui::CentralPanel::default()
             .frame(egui::Frame::default().fill(BG).inner_margin(8))
@@ -1250,6 +1304,9 @@ impl eframe::App for Calculator {
                         ui.add_space(5.0);
                         match self.view_mode {
                             ViewMode::Calculator => {
+                                settings_changed |= self.workspace_dashboard(ui);
+                            }
+                            ViewMode::Analytics => {
                                 self.dashboard(ui);
                             }
                             ViewMode::Settings => {
@@ -1394,9 +1451,9 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1240.0, 800.0])
-            .with_min_inner_size([820.0, 620.0])
-            .with_title("Gacha Lab — Rust 확률 분석기"),
+            .with_inner_size([1600.0, 940.0])
+            .with_min_inner_size([1050.0, 700.0])
+            .with_title("Gacha Pickup Calculator"),
         ..Default::default()
     };
     eframe::run_native("Gacha Lab", options,
