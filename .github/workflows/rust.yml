@@ -201,6 +201,11 @@ jobs:
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
+      - name: Check release notes
+        if: steps.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: test -s "RELEASE_NOTES_v${VERSION}.md"
       - name: Prepare and verify release assets
         if: steps.version.outputs.publish == 'true'
         env:
@@ -247,7 +252,7 @@ jobs:
             dist/SHA256SUMS.txt \
             --target "$GITHUB_SHA" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
-            --notes "Windows x64 executable and portable ZIP; Rust source archive and SHA-256 checksums. Windows GUI interactive startup has not been tested in CI."
+            --notes-file "RELEASE_NOTES_v$VERSION.md"
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           for asset in gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
