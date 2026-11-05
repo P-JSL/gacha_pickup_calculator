@@ -256,7 +256,7 @@ struct UiPreferences {
 impl Default for UiPreferences {
     fn default() -> Self {
         Self {
-            auto_recalculate: true,
+            auto_recalculate: false,
             debounce_ms: 350,
             show_result_panel: true,
             show_chart_fill: true,
@@ -775,6 +775,73 @@ impl Calculator {
                         .range(0..=5).speed(1).suffix("장")).changed();
                 });
             });
+        });
+        dirty
+    }
+
+    /// Independent banner pages share their input state with the dashboard.
+    fn single_banner_page(&mut self, ui: &mut egui::Ui, weapon: bool) -> bool {
+        let mut dirty = false;
+        let title = if weapon { self.setup.game.secondary_banner_name() } else { "캐릭터" };
+        section(ui, "01", &format!("{title} 목표와 보유"), "선택한 배너만 수정합니다.", |ui| {
+            if weapon {
+                self.catalog_selector(ui, catalog::Kind::Weapon);
+                egui::ComboBox::from_id_salt("weapon_only_goal")
+                    .selected_text(if self.target_refine == 0 { "필요 없음".into() }
+                        else { format!("S{} · {}장", self.target_refine, self.target_refine) })
+                    .show_ui(ui, |ui| {
+                        for count in 0..=5 {
+                            dirty |= ui.selectable_value(&mut self.target_refine, count,
+                                if count == 0 { "필요 없음".into() }
+                                else { format!("S{count} / {count}장") }).changed();
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    ui.label("기보유");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
+                        .range(0..=5).suffix("장")).changed();
+                });
+            } else {
+                self.catalog_selector(ui, catalog::Kind::Character);
+                egui::ComboBox::from_id_salt("character_only_goal")
+                    .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
+                    .show_ui(ui, |ui| {
+                        for level in 0..=6 {
+                            dirty |= ui.selectable_value(&mut self.target_eid, level,
+                                format!("E{level} / {}장", level + 1)).changed();
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    ui.label("기보유");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
+                        .range(0..=7).suffix("장")).changed();
+                });
+            }
+        });
+        ui.add_space(10.0);
+        section(ui, "02", &format!("{title} 천장"), "", |ui| {
+            if weapon {
+                dirty |= Self::banner_controls(ui, title, &mut self.setup.weapon.rule,
+                    &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                    &mut self.setup.weapon.any_rare_pity);
+            } else {
+                dirty |= Self::banner_controls(ui, title, &mut self.setup.character.rule,
+                    &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                    &mut self.setup.character.any_rare_pity);
+                if let Some(spark) = self.setup.character.spark.as_mut() {
+                    ui.separator();
+                    let mut available = !spark.used;
+                    if ui.checkbox(&mut available, "120회 보너스 미사용").changed() {
+                        spark.used = !available;
+                        dirty = true;
+                    }
+                    ui.horizontal(|ui| {
+                        ui.label("배너 진행도");
+                        dirty |= ui.add(egui::DragValue::new(&mut spark.progress)
+                            .range(0..=120)).changed();
+                    });
+                }
+            }
         });
         dirty
     }
@@ -1795,10 +1862,9 @@ impl eframe::App for Calculator {
                                     } else {
                                         "무기 · 광추 · 레코드 · Arc 목표 관리"
                                     },
-                                    "캐릭터와 보조 배너의 목표 및 천장 상태는 서로 독립적입니다.");
-                                settings_changed |= self.targets(ui);
-                                ui.add_space(10.0);
-                                settings_changed |= self.pity(ui);
+                                    "선택한 배너만 편집하며, 입력값은 대시보드·시뮬레이터와 공유합니다.");
+                                settings_changed |= self.single_banner_page(ui,
+                                    self.view_mode == ViewMode::Weapons);
                             }
                             ViewMode::Preferences => {
                                 self.desktop_settings(ui);
@@ -1867,10 +1933,18 @@ impl eframe::App for Calculator {
             });
         if settings_changed {
             self.input_needs_calculation = true;
+            if !self.ui_preferences.auto_recalculate {
+                // An edit invalidates any in-flight response, without starting
+                // heavy computations or changing focus on each keystroke.
+                self.generation = self.generation.wrapping_add(1);
+                self.pending_since = None;
+                self.calculating = false;
+            }
         }
         if self.manual_calculation_requested {
             self.manual_calculation_requested = false;
-            self.schedule_recalculation();
+            self.pending_since = None;
+            self.recalculate();
         } else if settings_changed && self.ui_preferences.auto_recalculate {
             self.schedule_recalculation();
         }
