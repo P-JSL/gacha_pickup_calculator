@@ -35,7 +35,7 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
             painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
             painter.line_segment([p(6.0, 7.0), p(6.0, -1.0)], stroke);
         }
-        ViewMode::Settings => {
+        ViewMode::Settings | ViewMode::Preferences => {
             for (y, x) in [(-6.0, -3.0), (0.0, 5.0), (6.0, -1.0)] {
                 painter.line_segment([p(-8.0, y), p(8.0, y)], stroke);
                 painter.circle_filled(p(x, y), 2.6, color);
@@ -146,7 +146,30 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, Analytics, Settings, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Analytics, Settings, Preferences, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
+
+/// Desktop display and interaction options. These never change the probability model.
+#[derive(Clone, Copy)]
+struct UiPreferences {
+    auto_recalculate: bool,
+    debounce_ms: u64,
+    show_result_panel: bool,
+    show_chart_fill: bool,
+    show_hover_guides: bool,
+    compact_spacing: bool,
+}
+impl Default for UiPreferences {
+    fn default() -> Self {
+        Self {
+            auto_recalculate: true,
+            debounce_ms: 350,
+            show_result_panel: true,
+            show_chart_fill: true,
+            show_hover_guides: true,
+            compact_spacing: true,
+        }
+    }
+}
 
 struct HistoryEntry {
     game: Game,
@@ -165,6 +188,10 @@ struct Calculator {
     n_query: usize,
     feedback_cfg: FeedbackConfig,
     stats: Option<Computed>,
+    stats_game: Option<Game>,
+    input_needs_calculation: bool,
+    manual_calculation_requested: bool,
+    ui_preferences: UiPreferences,
     error: Option<String>,
     show_help: bool,
     view_mode: ViewMode,
@@ -243,6 +270,10 @@ impl Calculator {
             n_query: 1_000,
             feedback_cfg: FeedbackConfig::for_game(Game::StarRail),
             stats: None,
+            stats_game: None,
+            input_needs_calculation: false,
+            manual_calculation_requested: false,
+            ui_preferences: UiPreferences::default(),
             error: None,
             show_help: false,
             view_mode: ViewMode::Calculator,
@@ -279,7 +310,8 @@ impl Calculator {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
         self.generation = self.generation.wrapping_add(1);
         self.calculating = true;
-        self.stats = None;
+        // Keep the last completed image on screen during background calculation.
+        self.input_needs_calculation = false;
         self.error = None;
         let request = CalculationRequest {
             generation: self.generation,
@@ -316,18 +348,20 @@ impl Calculator {
                     });
                     self.history.truncate(5);
                     self.stats = Some(stats);
+                    self.stats_game = Some(self.setup.game);
+                    self.input_needs_calculation = false;
                     self.error = None;
                 }
-                Err(message) => { self.stats = None; self.error = Some(message); }
+                Err(message) => { self.error = Some(message); }
             }
         }
     }
 
     fn schedule_recalculation(&mut self) {
         self.pending_since = Some(Instant::now());
-        self.stats = None;
         self.error = None;
         self.calculating = true;
+        self.input_needs_calculation = true;
     }
 
     /// Enter-driven navigation search; only actual sections and supported games are matched.
@@ -367,7 +401,9 @@ impl Calculator {
             self.view_mode = ViewMode::ObservedDistribution;
         } else if query.contains("analytics") || query.contains("분석") {
             self.view_mode = ViewMode::Analytics;
-        } else if query.contains("simulator") || query.contains("설정") {
+        } else if query.contains("settings") || query.contains("환경") || query.contains("화면 설정") {
+            self.view_mode = ViewMode::Preferences;
+        } else if query.contains("simulator") || query.contains("시뮬레이션") {
             self.view_mode = ViewMode::Settings;
         } else if query.contains("dashboard") || query.contains("대시보드") {
             self.view_mode = ViewMode::Calculator;
@@ -493,7 +529,7 @@ impl Calculator {
                 ui.add_space(6.0);
                 ui.separator();
                 ui.add_space(13.0);
-                sidebar_nav(ui, &mut self.view_mode, ViewMode::Settings, "Settings");
+                sidebar_nav(ui, &mut self.view_mode, ViewMode::Preferences, "Settings");
             });
     }
 
@@ -1490,7 +1526,7 @@ impl eframe::App for Calculator {
         if self.header(ctx) {
             self.schedule_recalculation();
         }
-        if self.view_mode == ViewMode::Calculator {
+        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel {
             self.workspace_results_panel(ctx);
         }
         let mut settings_changed = false;
@@ -1591,10 +1627,16 @@ impl eframe::App for Calculator {
                     });
             });
         if settings_changed {
+            self.input_needs_calculation = true;
+        }
+        if self.manual_calculation_requested {
+            self.manual_calculation_requested = false;
+            self.schedule_recalculation();
+        } else if settings_changed && self.ui_preferences.auto_recalculate {
             self.schedule_recalculation();
         }
         if let Some(edited_at) = self.pending_since {
-            if edited_at.elapsed() >= Duration::from_millis(300) {
+            if edited_at.elapsed() >= Duration::from_millis(self.ui_preferences.debounce_ms) {
                 self.pending_since = None;
                 self.recalculate();
             } else {
