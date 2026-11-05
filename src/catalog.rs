@@ -4,6 +4,7 @@ use eframe::egui;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -80,6 +81,7 @@ pub struct CatalogUi {
     queued: HashSet<String>,
     send_url: Sender<String>,
     recv_image: Receiver<ImageResult>,
+    rarity_filter: u8,
 }
 
 impl CatalogUi {
@@ -110,22 +112,59 @@ impl CatalogUi {
         }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
-            send_url, recv_image,
+            send_url, recv_image, rarity_filter: 0,
         }
+    }
+
+    /// On-disk cache avoids repeatedly downloading the full image gallery after restart.
+    /// The key is a stable digest of the verified source URL, never a user-supplied path.
+    fn cache_file(url: &str) -> Option<PathBuf> {
+        let root = std::env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from))
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))?;
+        let mut hash = 0xcbf29ce484222325_u64;
+        for byte in url.as_bytes() {
+            hash = (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3);
+        }
+        Some(root.join("gacha_pickup_calculator").join("catalog_icons")
+            .join(format!("{hash:016x}.img")))
+    }
+
+    fn decode_icon(bytes: &[u8]) -> Option<egui::ColorImage> {
+        let image = image::load_from_memory(bytes).ok()?.thumbnail(112, 112).to_rgba8();
+        Some(egui::ColorImage::from_rgba_unmultiplied(
+            [image.width() as usize, image.height() as usize], image.as_raw(),
+        ))
     }
 
     fn fetch_icon(url: &str) -> Option<egui::ColorImage> {
         if !url.starts_with("https://") { return None }
+        let cache = Self::cache_file(url);
+        if let Some(file) = &cache {
+            if let Ok(bytes) = std::fs::read(file) {
+                if bytes.len() <= 3_000_000 {
+                    if let Some(image) = Self::decode_icon(&bytes) { return Some(image); }
+                }
+                let _ = std::fs::remove_file(file);
+            }
+        }
         let response = ureq::get(url)
             .timeout(Duration::from_secs(6))
             .set("User-Agent", "gacha-pickup-calculator/desktop")
             .call().ok()?;
         let mut bytes = Vec::new();
-        response.into_reader().take(3_000_000).read_to_end(&mut bytes).ok()?;
-        let image = image::load_from_memory(&bytes).ok()?.thumbnail(112, 112).to_rgba8();
-        Some(egui::ColorImage::from_rgba_unmultiplied(
-            [image.width() as usize, image.height() as usize], image.as_raw(),
-        ))
+        response.into_reader().take(3_000_001).read_to_end(&mut bytes).ok()?;
+        if bytes.len() > 3_000_000 { return None }
+        let decoded = Self::decode_icon(&bytes)?;
+        if let Some(file) = cache {
+            if let Some(parent) = file.parent() {
+                if std::fs::create_dir_all(parent).is_ok() {
+                    let _ = std::fs::write(file, &bytes);
+                }
+            }
+        }
+        Some(decoded)
     }
 
     pub fn pump(&mut self, ctx: &egui::Context) {
@@ -169,6 +208,8 @@ impl CatalogUi {
 
 /// Select from the entire catalog. Items below five stars are displayed but not
 /// selectable in the current featured-five-star probability model.
+/// Searchable illustrated gallery for every indexed character or banner equipment.
+/// Four-star items appear in the library but cannot be treated as five-star pickup targets.
 pub fn picker(
     ctx: &egui::Context, art: &mut CatalogUi, game: Game, kind: Kind,
     open: &mut bool, filter: &mut String, current_id: &str,
@@ -184,47 +225,72 @@ pub fn picker(
         },
     };
     egui::Window::new(title).open(open)
-        .default_size(egui::vec2(510.0, 510.0))
+        .default_size(egui::vec2(620.0, 570.0))
+        .min_width(430.0)
         .resizable(true)
         .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("등록 {}개", count(game, kind)));
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("총 {}종", count(game, kind)));
                 ui.add(egui::TextEdit::singleline(filter)
-                    .hint_text("캐릭터/광추/무기/아크/레코드 검색")
-                    .desired_width(245.0));
-                if ui.button("이미지 재시도").clicked() {
-                    art.retry_failed();
+                    .hint_text("이름 또는 ID 검색")
+                    .desired_width(225.0));
+                if ui.button("이미지 다시 불러오기").clicked() { art.retry_failed(); }
+            });
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("등급").color(egui::Color32::GRAY).size(11.0));
+                for (rarity, title) in [(0, "전체"), (5, "★5"), (4, "★4"), (3, "★3")] {
+                    ui.selectable_value(&mut art.rarity_filter, rarity, title);
                 }
             });
             ui.label(egui::RichText::new(
-                "★5 목표 기준 확률입니다. ★4 목록은 표시되지만 확률 계산 대상은 아닙니다."
-            ).color(egui::Color32::from_rgb(165, 190, 208)).size(11.0));
+                "이미지는 최초 열람 시 비동기로 불러오고 로컬에 저장합니다. 현재 모델은 ★5 픽업만 계산하므로 ★3/★4 항목은 조회 전용입니다."
+            ).color(egui::Color32::from_rgb(166, 194, 209)).size(11.0));
             ui.separator();
             let needle = filter.trim().to_lowercase();
             let items: Vec<&Entry> = entries().iter().filter(|entry| {
                 entry.game == game && entry.kind == kind
+                    && (art.rarity_filter == 0 || entry.rarity == art.rarity_filter)
                     && (needle.is_empty() || entry.name.to_lowercase().contains(&needle)
-                        || entry.id.contains(&needle))
+                        || entry.id.to_lowercase().contains(&needle))
             }).collect();
+            ui.label(format!("검색 결과 {}종", items.len()));
+            let columns = if ui.available_width() < 500.0 { 2 } else { 3 };
+            let rows = items.len().div_ceil(columns);
             egui::ScrollArea::vertical().max_height(440.0)
-                .show_rows(ui, 43.0, items.len(), |ui, range| {
-                    for index in range {
-                        let item = items[index];
-                        ui.horizontal(|ui| {
-                            art.image(ui, item, 31.0);
-                            let display = format!("{}   ★{}", item.name, item.rarity);
-                            let enabled = item.rarity >= 5;
-                            if ui.add_enabled(enabled, egui::Button::new(display)
-                                .selected(current_id == item.id)).clicked() {
-                                selected = Some(item.id.clone());
-                            }
-                            if !item.has_verified_image() {
-                                ui.label(egui::RichText::new("이미지 미확보")
-                                    .color(egui::Color32::GRAY).size(9.0));
+                .show_rows(ui, 79.0, rows, |ui, visible| {
+                    for row in visible {
+                        ui.columns(columns, |cols| {
+                            for column in 0..columns {
+                                let Some(item) = items.get(row * columns + column).copied() else {
+                                    continue;
+                                };
+                                cols[column].horizontal(|ui| {
+                                    art.image(ui, item, 47.0);
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(
+                                            format!("★{}", item.rarity)
+                                        ).color(if item.rarity >= 5 {
+                                            egui::Color32::from_rgb(244, 210, 75)
+                                        } else {
+                                            egui::Color32::from_rgb(166, 194, 209)
+                                        }).size(10.0));
+                                        let enabled = item.rarity >= 5;
+                                        let display = egui::RichText::new(&item.name).size(11.0);
+                                        if ui.add_enabled(enabled,
+                                            egui::Button::new(display)
+                                                .selected(current_id == item.id)
+                                        ).on_hover_text(&item.name).clicked() {
+                                            selected = Some(item.id.clone());
+                                        }
+                                    });
+                                });
                             }
                         });
                     }
                 });
+            if items.is_empty() {
+                ui.label("일치하는 항목이 없습니다.");
+            }
         });
     selected
 }
