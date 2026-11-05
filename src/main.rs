@@ -761,10 +761,10 @@ impl Calculator {
                     });
                     ui.horizontal(|ui| {
                         ui.label("캐릭터 전용권");
-                        dirty |= edit_ticket_inventory(ui, &mut self.setup,
-                            if self.setup.game.shares_featured_ticket() {
-                                TicketRole::Shared
-                            } else { TicketRole::Character });
+                        let role = if self.setup.game.shares_featured_ticket() {
+                            TicketRole::Shared
+                        } else { TicketRole::Character };
+                        dirty |= edit_ticket_inventory(ui, &mut self.setup, role);
                     });
                 } else {
                     egui::ComboBox::from_id_salt("weapon_tab_goal")
