@@ -608,6 +608,28 @@ impl Calculator {
                     });
                     ui.with_layout(
                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // Native vector settings button replaces the removed avatar.
+                            let (rect, response) = ui.allocate_exact_size(
+                                egui::vec2(39.0, 39.0), egui::Sense::click(),
+                            );
+                            ui.painter().rect_filled(rect, 10.0,
+                                if response.hovered() { SELECTED_NAV } else { CARD });
+                            let center = rect.center();
+                            let stroke = egui::Stroke::new(1.8_f32, Color32::WHITE);
+                            ui.painter().circle_stroke(center, 6.0, stroke);
+                            ui.painter().circle_stroke(center, 2.5, stroke);
+                            for i in 0..8 {
+                                let angle = i as f32 * std::f32::consts::TAU / 8.0;
+                                let direction = egui::vec2(angle.cos(), angle.sin());
+                                ui.painter().line_segment(
+                                    [center + direction * 9.0, center + direction * 12.0],
+                                    stroke,
+                                );
+                            }
+                            if response.on_hover_text("화면 및 동작 설정").clicked() {
+                                self.view_mode = ViewMode::Preferences;
+                            }
+
                             if ui.add(egui::Button::new("?")
                                 .fill(CARD).corner_radius(10)
                                 .min_size(egui::vec2(39.0, 39.0))).clicked() {
