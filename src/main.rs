@@ -440,7 +440,7 @@ impl Calculator {
                 ui.hyperlink_to("GitHub / Source",
                     "https://github.com/P-JSL/gacha_pickup_calculator");
                 ui.add_space(5.0);
-                ui.label(RichText::new("v0.1.9 · DESKTOP").color(MUTED).size(10.0));
+                ui.label(RichText::new(format!("v{} · DESKTOP", env!("CARGO_PKG_VERSION"))).color(MUTED).size(10.0));
             });
     }
 
