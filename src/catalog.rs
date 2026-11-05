@@ -72,6 +72,7 @@ fn game_code(game: Game) -> &'static str {
 /// Other roster entries remain available below these; unverified leaks are excluded.
 fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
     match (game, id) {
+        (Game::StarRail, "upcoming_aeon_aha") => (20261111, "4.7 공식 발표"),
         (Game::StarRail, "1503") => (20261015, "최신 4.6"),
         (Game::WutheringWaves, "1312") => (20261022, "최신 3.7"),
         (Game::WutheringWaves, "1311") => (20260930, "신규 3.7"),
@@ -330,7 +331,7 @@ mod tests {
     use super::*;
     #[test]
     fn upcoming_and_released_characters_are_prioritized() {
-        assert_eq!(first(Game::StarRail, Kind::Character), "1503");
+        assert_eq!(first(Game::StarRail, Kind::Character), "upcoming_aeon_aha");
         assert_eq!(first(Game::Neverness, Kind::Character), "upcoming_exe");
         assert_eq!(first(Game::StellaSora, Kind::Character), "firstlight_noya");
         assert_eq!(first(Game::WutheringWaves, Kind::Character), "1312");
