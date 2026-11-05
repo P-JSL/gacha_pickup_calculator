@@ -147,20 +147,6 @@ impl Calculator {
     /// Reference-style overview. All visible values come from the active model, never from demo data.
     pub(super) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.heading(RichText::new("Dashboard").size(25.0).strong());
-                ui.label(RichText::new("뽑기 확률 · 재화 · 환급 시뮬레이션").color(MUTED).size(12.0));
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("상세 분석  →").clicked() {
-                    self.view_mode = ViewMode::Analytics;
-                }
-                ui.label(RichText::new(self.setup.game.label()).color(CYAN).size(12.0));
-            });
-        });
-        ui.add_space(11.0);
-
         if let Some(stats) = &self.stats {
             let free_pulls = self.setup.available_flexible();
             let ticket_count = self.setup.character_dedicated
@@ -179,20 +165,20 @@ impl Calculator {
                 .unwrap_or(stats.combined.mean);
             let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
             ui.columns(4, |columns| {
-                overview_metric(&mut columns[0], "◇", "Owned Pulls",
+                overview_metric(&mut columns[0], 0, "Owned Pulls",
                     format!("{ticket_count}"),
                     format!("전용권 {} · 자유 {}",
                         self.setup.character_dedicated + self.setup.weapon_dedicated, free_pulls), CYAN);
-                overview_metric(&mut columns[1], "◎", "Target Success Rate",
+                overview_metric(&mut columns[1], 1, "Target Success Rate",
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
-                overview_metric(&mut columns[2], "⬡", "Expected Pulls",
+                overview_metric(&mut columns[2], 2, "Expected Pulls",
                     format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK);
-                overview_metric(&mut columns[3], "◆", "Premium Currency",
+                overview_metric(&mut columns[3], 3, "Premium Currency",
                     self.setup.premium_currency.to_string(),
                     format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
                         self.setup.game.currency_name()), CYAN);
             });
-            ui.add_space(9.0);
+            ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
             let char_rate = stats.character.at(character_budget) * 100.0;
@@ -210,11 +196,11 @@ impl Calculator {
             if ui.available_width() >= 720.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
-                        format!("전량 단독 배분 시  {char_rate:.2}%"), &chart_char, CYAN);
+                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN);
                     probability_card(&mut columns[1], &format!("{banner_name} Probability"),
-                        format!("전량 단독 배분 시  {weapon_rate:.2}%"), &chart_weapon, YELLOW);
+                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW);
                     probability_card(&mut columns[2], "Overall Result",
-                        format!("현재 동시 달성  {:.2}%", chance * 100.0), &chart_total, PINK);
+                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK);
                 });
             } else {
                 probability_card(ui, "Character Probability",
@@ -226,9 +212,7 @@ impl Calculator {
                 probability_card(ui, "Overall Result",
                     format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK);
             }
-            ui.add_space(3.0);
-            ui.label(RichText::new("캐릭터/무기 개별 수치는 각각 자유 재화를 전량 배분한 가정입니다. 두 수치를 곱한 값은 동시 달성 확률이 아닙니다.")
-                .color(MUTED).size(10.0));
+
         } else if self.calculating {
             dashboard_card(ui, "Probability Overview", |ui| {
                 ui.horizontal(|ui| { ui.spinner(); ui.label("게임별 확률과 환급을 계산하고 있습니다."); });
