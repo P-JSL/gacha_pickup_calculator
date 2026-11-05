@@ -11,6 +11,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 mod dashboard_ui;
+mod catalog;
 
 const BG: Color32 = Color32::from_rgb(5, 23, 34);
 const CARD: Color32 = Color32::from_rgb(17, 42, 63);
@@ -237,6 +238,11 @@ struct Calculator {
     search_query: String,
     sidebar_decor: Option<egui::TextureHandle>,
     header_avatar: Option<egui::TextureHandle>,
+    catalog_ui: catalog::CatalogUi,
+    picker_kind: Option<catalog::Kind>,
+    picker_filter: String,
+    selected_character_id: String,
+    selected_weapon_id: String,
 }
 
 impl Calculator {
@@ -319,6 +325,11 @@ impl Calculator {
             search_query: String::new(),
             sidebar_decor,
             header_avatar,
+            catalog_ui: catalog::CatalogUi::new(&cc.egui_ctx),
+            picker_kind: None,
+            picker_filter: String::new(),
+            selected_character_id: catalog::first(Game::StarRail, catalog::Kind::Character),
+            selected_weapon_id: catalog::first(Game::StarRail, catalog::Kind::Weapon),
         };
         app.recalculate();
         app
@@ -330,8 +341,53 @@ impl Calculator {
         if self.stats_game == Some(self.setup.game) { self.stats.as_ref() } else { None }
     }
 
+    /// Selection controls all reuse the catalog; target rarity remains a five-star model.
+    fn catalog_selector(&mut self, ui: &mut egui::Ui, kind: catalog::Kind) {
+        let game = self.setup.game;
+        let id = match kind {
+            catalog::Kind::Character => self.selected_character_id.clone(),
+            catalog::Kind::Weapon => self.selected_weapon_id.clone(),
+        };
+        let item = catalog::by_id(game, kind, &id);
+        ui.horizontal(|ui| {
+            if let Some(item) = item {
+                self.catalog_ui.image(ui, item, 30.0);
+            }
+            let name = item.map(|x| x.name.as_str()).unwrap_or("대상 선택");
+            if ui.add(egui::Button::new(format!("{name}  ▾"))
+                .min_size(egui::vec2(108.0, 27.0))).clicked() {
+                self.picker_kind = Some(kind);
+                self.picker_filter.clear();
+            }
+        });
+    }
+
+    fn show_catalog_picker(&mut self, ctx: &egui::Context) {
+        let Some(kind) = self.picker_kind else { return; };
+        let mut open = true;
+        let current = match kind {
+            catalog::Kind::Character => &self.selected_character_id,
+            catalog::Kind::Weapon => &self.selected_weapon_id,
+        }.clone();
+        let choice = catalog::picker(ctx, &mut self.catalog_ui, self.setup.game, kind,
+            &mut open, &mut self.picker_filter, &current);
+        if let Some(id) = choice {
+            match kind {
+                catalog::Kind::Character => self.selected_character_id = id,
+                catalog::Kind::Weapon => self.selected_weapon_id = id,
+            }
+            self.picker_kind = None;
+        } else if !open {
+            self.picker_kind = None;
+        }
+    }
+
     fn change_game(&mut self, game: Game) {
         self.setup = GameSetup::new(game);
+        self.selected_character_id = catalog::first(game, catalog::Kind::Character);
+        self.selected_weapon_id = catalog::first(game, catalog::Kind::Weapon);
+        self.picker_kind = None;
+        self.picker_filter.clear();
         self.feedback_cfg = FeedbackConfig::for_game(game);
         self.target_eid = 0;
         self.target_refine = 1;
@@ -1615,6 +1671,7 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
+        self.catalog_ui.pump(ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
@@ -1749,6 +1806,7 @@ impl eframe::App for Calculator {
         if self.calculating {
             ctx.request_repaint_after(Duration::from_millis(120));
         }
+        self.show_catalog_picker(ctx);
         if self.show_history {
             egui::Window::new("Simulation History")
                 .open(&mut self.show_history)
