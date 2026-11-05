@@ -94,6 +94,11 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         && find("censored").is_some();
     let has_completed = find("pity").is_some()
         && (find("count").is_some() || find("events").is_some());
+    // A partial aggregate header is not a completed-only histogram:
+    // silently dropping a provided risk set would produce a biased result.
+    if find("at_risk").is_some() && !has_risk {
+        return Err("위험집합 자료는 pity,at_risk,events,censored 네 개 열이 모두 필요합니다.".into());
+    }
     let quality = if has_duration {
         ObservationQuality::IndividualRightCensored
     } else if has_risk {
@@ -355,6 +360,28 @@ mod tests {
         let report = d.compare(&constant_model(5, 0.5), RateMode::PublishedOnly).unwrap();
         assert!(report.restricted_observed_mean > 0.0);
         assert_eq!(report.reliable_risk_bins, 0);
+    }
+
+
+    #[test]
+    fn complete_known_hazard_matches_kaplan_meier_with_no_censoring() {
+        let csv = "pity,at_risk,events,censored\n1,100,50,0\n2,50,25,0\n3,25,25,0\n";
+        let data = parse_observation_csv(csv, 3).unwrap();
+        let c = data.compare(&constant_model(3, 0.5), RateMode::PublishedOnly).unwrap();
+        assert_eq!(data.observations, 100);
+        assert_eq!(data.events, 100);
+        assert_eq!(data.censored, 0);
+        assert_eq!(c.reliable_risk_bins, 3);
+        assert!(c.max_cdf_delta < 1e-12);
+        assert!(c.mean_abs_hazard_delta < 1e-12);
+        assert!(data.rows[1].cdf_low_95 <= 0.75);
+        assert!(data.rows[1].cdf_high_95 >= 0.75);
+    }
+
+    #[test]
+    fn partial_risk_set_header_cannot_be_interpreted_as_completed_only() {
+        let csv = "pity,at_risk,events\n1,100,5\n2,95,6\n";
+        assert!(parse_observation_csv(csv, 90).is_err());
     }
 
     #[test]
