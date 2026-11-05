@@ -138,6 +138,7 @@ fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketR
     }
 }
 
+#[derive(Clone)]
 struct Computed {
     character: Distribution,
     weapon: Distribution,
