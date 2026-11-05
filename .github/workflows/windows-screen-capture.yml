@@ -1,0 +1,78 @@
+name: Windows native UI screenshot investigation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-screen-capture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - name: Download released v0.1.11 Windows application
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -Type Directory -Force screenshots | Out-Null
+          gh release download v0.1.11 --repo P-JSL/gacha_pickup_calculator --pattern gacha_pickup_calculator.exe --dir .
+          if (!(Test-Path gacha_pickup_calculator.exe)) { throw "Released EXE missing" }
+
+      - name: Install software OpenGL (Mesa llvmpipe) next to executable
+        uses: f3d-app/install-mesa-windows-action@v1
+        with:
+          path: ${{ github.workspace }}
+
+      - name: Launch native Windows EXE and capture display
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:GALLIUM_DRIVER = "llvmpipe"
+          $env:RUST_BACKTRACE = "1"
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          Write-Host "User: $env:USERNAME / Session: $([System.Diagnostics.Process]::GetCurrentProcess().SessionId)"
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host "Screen: $bounds"
+          $exe = Join-Path $pwd "gacha_pickup_calculator.exe"
+          $stdout = Join-Path $pwd "screenshots\stdout.txt"
+          $stderr = Join-Path $pwd "screenshots\stderr.txt"
+          $app = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            Start-Sleep -Seconds 9
+            $app.Refresh()
+            Write-Host "App pid $($app.Id), session $($app.SessionId), window $($app.MainWindowHandle), alive $(!$app.HasExited)"
+            if ($app.HasExited) {
+              Write-Host "Exit code: $($app.ExitCode)"
+              if (Test-Path $stderr) { Get-Content $stderr -Tail 70 }
+              throw "Windows UI process terminated before screenshot"
+            }
+            $image = New-Object System.Drawing.Bitmap($bounds.Width,$bounds.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($image)
+            try {
+              $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
+              $output = Join-Path $pwd "screenshots\windows-main.png"
+              $image.Save($output,[System.Drawing.Imaging.ImageFormat]::Png)
+              Write-Host "Saved actual Windows display to $output"
+            } finally {
+              $graphics.Dispose()
+              $image.Dispose()
+            }
+          } finally {
+            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload Windows capture and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-ui-investigation
+          path: screenshots/
+          if-no-files-found: warn
+          retention-days: 7
