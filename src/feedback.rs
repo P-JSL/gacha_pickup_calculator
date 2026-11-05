@@ -26,6 +26,9 @@ pub struct FeedbackConfig {
     pub weapon_four_star_reward: usize,
     pub character_four_star_rate: f64,
     pub weapon_four_star_rate: f64,
+    /// Unconditional off-featured 5★ rate for featured-counter banners.
+    pub character_other_five_star_rate: f64,
+    pub weapon_other_five_star_rate: f64,
     pub four_star_hard: usize,
     /// Current 4★ or higher pity on the character banner.
     pub character_four_star_pity: usize,
@@ -42,7 +45,9 @@ impl FeedbackConfig {
                 featured_first: 0, featured_duplicate: 40,
                 off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 8, weapon_four_star_reward: 8, character_four_star_rate: 0.051,
-                weapon_four_star_rate: 0.066, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
+                weapon_four_star_rate: 0.066,
+                character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
+                four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000,
             },
             Game::WutheringWaves => Self {
@@ -50,7 +55,9 @@ impl FeedbackConfig {
                 featured_first: 15, featured_duplicate: 15,
                 off_banner_rare: 15, weapon_first: 15, weapon_rare: 15,
                 four_star_reward: 3, weapon_four_star_reward: 3, character_four_star_rate: 0.06,
-                weapon_four_star_rate: 0.06, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
+                weapon_four_star_rate: 0.06,
+                character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
+                four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000,
             },
             Game::Neverness => Self {
@@ -61,6 +68,7 @@ impl FeedbackConfig {
                 off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 6, weapon_four_star_reward: 4,
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
+                character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000,
             },
@@ -74,6 +82,7 @@ impl FeedbackConfig {
                 off_banner_rare: 200, weapon_first: 0, weapon_rare: 200,
                 four_star_reward: 40, weapon_four_star_reward: 40,
                 character_four_star_rate: 0.08, weapon_four_star_rate: 0.08,
+                character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000,
             },
@@ -86,7 +95,9 @@ impl FeedbackConfig {
             || self.character_four_star_pity >= self.four_star_hard
             || self.weapon_four_star_pity >= self.four_star_hard
             || !valid_probability(self.character_four_star_rate)
-            || !valid_probability(self.weapon_four_star_rate) {
+            || !valid_probability(self.weapon_four_star_rate)
+            || !valid_probability(self.character_other_five_star_rate)
+            || !valid_probability(self.weapon_other_five_star_rate) {
             return Err("환급 설정의 가격·확률·표본 수가 허용 범위를 벗어났습니다.".to_owned());
         }
         Ok(())
@@ -327,7 +338,15 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     while won < rule.target_copies {
         wallet.pay(dedicated);
         let success = rng.hits(if pity + 1 >= *hard_featured { 1.0 } else { *featured_rate });
-        if maybe_four_star(rng, model, kind, &mut four_pity, success) {
+        // Sampling the nonfeatured rate conditional on a featured miss retains
+        // the desired unconditional rarity rate. Nonfeatured Stella Sora
+        // 5-star drops do not reset the featured-only pity counter.
+        let off_rate = match kind {
+            BannerKind::Character => model.character_other_five_star_rate,
+            BannerKind::Weapon => model.weapon_other_five_star_rate,
+        };
+        let off_rare = !success && rng.hits((off_rate / (1.0 - featured_rate).max(f64::EPSILON)).min(1.0));
+        if maybe_four_star(rng, model, kind, &mut four_pity, success || off_rare) {
             wallet.refund(match kind {
                 BannerKind::Character => model.four_star_reward,
                 BannerKind::Weapon => model.weapon_four_star_reward,
@@ -337,7 +356,13 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
             pity = 0;
             award_featured(wallet, model, owned, won, kind);
             won += 1;
-        } else { pity += 1; }
+        } else {
+            pity += 1;
+            if off_rare {
+                // Assumes the nonfeatured 5-star is owned (the reward is editable).
+                wallet.refund(model.off_banner_rare);
+            }
+        }
         progress += 1;
         if rule.spark.as_ref().is_some_and(|s| !s.used && !already_unclaimed && progress == s.at) {
             // Free exchange reward: not an additional RNG 5★ draw.
@@ -443,7 +468,8 @@ mod tests {
             featured_first: 1, featured_duplicate: 1, off_banner_rare: 0,
             weapon_first: 1, weapon_rare: 1, four_star_reward: 0,
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
-            weapon_four_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10 };
+            weapon_four_star_rate: 0.0, character_other_five_star_rate: 0.0,
+            weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10 };
         let mut w = Wallet::new(&conf);
         let mut d = 0;
         w.pay(&mut d);
@@ -576,6 +602,29 @@ mod tests {
                  (means.average_dedicated + means.average_points_funded + means.average_flexible))
             .abs() < 1e-10);
     }
+
+    #[test]
+    fn stella_sora_nonfeatured_five_star_refunds_without_resetting_featured_counter() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.character = Banner {
+            rule: BannerRule::FeaturedCounter { featured_rate: 0.0, hard_featured: 3 },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.samples = 10;
+        cfg.character_other_five_star_rate = 1.0;
+        cfg.character_four_star_rate = 0.0;
+        cfg.four_star_reward = 0;
+        let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let path = result.scenario_at_quantile(0.5).unwrap();
+        assert_eq!(path.raw_pulls, 3);
+        assert_eq!(path.initial_flexible_required, 1);
+        assert_eq!(path.points_funded_pulls, 2);
+        assert_eq!(path.earned_points, 400);
+    }
+
     #[test]
     fn stella_sora_expert_permits_apply_to_trekker_and_record_duplicates() {
         let cfg = FeedbackConfig::for_game(Game::StellaSora);
