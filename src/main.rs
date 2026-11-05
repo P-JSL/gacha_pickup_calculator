@@ -83,7 +83,7 @@ impl Calculator {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // set_visuals alone changes only the current theme style. The system
         // preference could otherwise switch the UI back to Light on Windows.
-        cc.egui_ctx.set_theme(egui::Theme::Dark);
+        configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
@@ -106,14 +106,6 @@ impl Calculator {
                 repaint.request_repaint();
             }
         });
-        let mut visuals = egui::Visuals::dark();
-        visuals.panel_fill = BG;
-        visuals.window_fill = CARD;
-        visuals.extreme_bg_color = Color32::from_rgb(17, 25, 40);
-        visuals.widgets.inactive.bg_fill = CARD;
-        visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 58, 79);
-        visuals.selection.bg_fill = Color32::from_rgb(39, 102, 158);
-        cc.egui_ctx.set_visuals(visuals);
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
@@ -629,22 +621,61 @@ impl Calculator {
             });
         }
         ui.add_space(8.0);
-        section(ui, "05", "확률 그래프",
-                "X축: 소모 뽑기 수 · Y축: 목표 달성 누적 확률(%). 내부 계산 결과를 직접 그립니다.", |ui| {
-            // Use egui's painter rather than an egui_plot instance with persisted
-            // zoom / hidden-series state. This always draws visible curves for
-            // a valid PMF, even after changing games or revisiting this menu.
-            draw_probability_chart(
-                ui, &stats.character, &stats.weapon, &stats.combined,
-                stats.feedback.as_ref(),
-                self.setup.character_dedicated == 0 && self.setup.weapon_dedicated == 0,
-                self.setup.game.secondary_banner_name(),
-            );
-            if stats.feedback.is_some()
-                && (self.setup.character_dedicated > 0 || self.setup.weapon_dedicated > 0)
-            {
+        let secondary_name = self.setup.game.secondary_banner_name();
+        let secondary_heading = format!("{secondary_name} 목표 확률");
+        let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
+        ui.add_space(10.0);
+        // On a wide display the two independent banners are displayed next
+        // to each other. On narrow/HiDPI Windows viewports they stack, so no
+        // graph extends beyond the available logical width.
+        if ui.available_width() >= 1080.0 {
+            ui.columns(2, |cols| {
+                section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
+                    draw_probability_chart(ui, &[ChartSeries {
+                        label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
+                    }]);
+                });
+                section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
+                    draw_probability_chart(ui, &[ChartSeries {
+                        label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
+                    }]);
+                });
+            });
+        } else {
+            section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
+                draw_probability_chart(ui, &[ChartSeries {
+                    label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
+                }]);
+            });
+            ui.add_space(8.0);
+            section(ui, "05-B", &secondary_heading, single_description, |ui| {
+                draw_probability_chart(ui, &[ChartSeries {
+                    label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
+                }]);
+            });
+        }
+        ui.add_space(10.0);
+        section(ui, "05-C", "전체 목표 합산 및 환급 확률",
+            "합산: 전체 두 목표를 달성할 누적 확률 · 환급: 최초 필요한 자유 배분권 기준 (서로 다른 비용 축).", |ui| {
+            let mut curves = vec![ChartSeries {
+                label: "전체 · 환급 전",
+                source: ChartSource::Exact(&stats.combined), color: GOLD,
+            }];
+            let comparable = self.setup.character_dedicated == 0
+                && self.setup.weapon_dedicated == 0;
+            if comparable {
+                if let Some(ref feedback) = stats.feedback {
+                    curves.push(ChartSeries {
+                        label: "환급 반영 · 자유 재화",
+                        source: ChartSource::Refund(feedback),
+                        color: Color32::from_rgb(203, 158, 255),
+                    });
+                }
+            }
+            draw_probability_chart(ui, &curves);
+            if stats.feedback.is_some() && !comparable {
                 ui.colored_label(GOLD,
-                    "전용권 사용 중에는 환급 후 자유 재화와 원시 총 뽑기의 단위가 달라 환급 곡선을 겹치지 않습니다.");
+                    "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
             }
         });
         ui.add_space(10.0);
@@ -917,27 +948,54 @@ fn sampled_cdf(distribution: &Distribution, end: usize) -> Vec<(usize, f64)> {
     }).collect()
 }
 
-/// Deterministic native egui Painter rendering avoids egui_plot zoom memory,
-/// axis auto-bounds and per-series visibility carrying across game switches.
-fn draw_probability_chart(
-    ui: &mut egui::Ui,
-    character: &Distribution,
-    weapon: &Distribution,
-    combined: &Distribution,
-    feedback: Option<&FeedbackEstimate>,
-    show_feedback: bool,
-    secondary_label: &str,
-) {
-    let raw_end = combined.pmf.len().saturating_sub(1);
-    let end = feedback.map_or(raw_end, |f| raw_end.max(f.quantile(1.0))).max(1);
-    let width = ui.available_width().max(590.0);
+/// Each chart has its own X-range. Character and secondary-banner curves
+/// therefore cannot be compressed into a shared 2000-pull wide axis.
+#[derive(Clone, Copy)]
+enum ChartSource<'a> {
+    Exact(&'a Distribution),
+    Refund(&'a FeedbackEstimate),
+}
+
+impl ChartSource<'_> {
+    fn last_pull(self) -> usize {
+        match self {
+            Self::Exact(d) => d.pmf.len().saturating_sub(1),
+            Self::Refund(f) => f.quantile(1.0),
+        }
+    }
+
+    fn probability(self, n: usize) -> f64 {
+        match self {
+            Self::Exact(d) => d.at(n),
+            Self::Refund(f) => f.probability(n).0,
+        }
+    }
+}
+
+struct ChartSeries<'a> {
+    label: &'a str,
+    source: ChartSource<'a>,
+    color: Color32,
+}
+
+fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
+    series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1)
+}
+
+/// Common Painter plot for all desktop OSs; it uses only egui logical points.
+/// The same fill, grid, axes, scaling and series colors are used on Windows
+/// and Linux. No OS-native chart controls or persistence are involved.
+fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
+    let end = chart_domain_end(series);
+    let width = ui.available_width().max(270.0);
+    let height = if width < 650.0 { 262.0 } else { 320.0 };
     let (response, painter) = ui.allocate_painter(
-        egui::vec2(width, 340.0), egui::Sense::hover(),
+        egui::vec2(width, height), egui::Sense::hover(),
     );
     let bounds = response.rect;
     let graph = egui::Rect::from_min_max(
-        egui::pos2(bounds.left() + 58.0, bounds.top() + 12.0),
-        egui::pos2(bounds.right() - 14.0, bounds.bottom() - 37.0),
+        egui::pos2(bounds.left() + 49.0, bounds.top() + 12.0),
+        egui::pos2(bounds.right() - 10.0, bounds.bottom() - 34.0),
     );
     painter.rect_filled(bounds, 8.0, Color32::from_rgb(18, 28, 44));
     for edge in [
@@ -949,15 +1007,15 @@ fn draw_probability_chart(
         painter.line_segment(edge, egui::Stroke::new(1.0_f32, BORDER));
     }
 
-    let project = |x: usize, probability: f64| {
+    let project = |x: usize, probability: f64| -> egui::Pos2 {
         egui::pos2(
             graph.left() + (x as f32 / end as f32) * graph.width(),
             graph.bottom() - probability.clamp(0.0, 1.0) as f32 * graph.height(),
         )
     };
     for step in 0..=4 {
-        let p = step as f64 / 4.0;
-        let y = project(0, p).y;
+        let probability = step as f64 / 4.0;
+        let y = project(0, probability).y;
         painter.line_segment(
             [egui::pos2(graph.left(), y), egui::pos2(graph.right(), y)],
             egui::Stroke::new(1.0_f32, BORDER),
@@ -970,56 +1028,51 @@ fn draw_probability_chart(
     }
     for step in 0..=5 {
         let x = end * step / 5;
-        let px = project(x, 0.0).x;
         painter.text(
-            egui::pos2(px, graph.bottom() + 10.0),
+            egui::pos2(project(x, 0.0).x, graph.bottom() + 10.0),
             egui::Align2::CENTER_TOP, format!("{x}"),
             egui::FontId::proportional(11.0), MUTED,
         );
     }
-    for (distribution, color) in [
-        (character, PRIMARY), (weapon, MINT), (combined, GOLD),
-    ] {
-        let points = sampled_cdf(distribution, end).into_iter()
-            .map(|(x, p)| project(x, p)).collect();
-        painter.add(egui::Shape::line(points, egui::Stroke::new(2.5_f32, color)));
-    }
-    let refund_color = Color32::from_rgb(203, 158, 255);
-    if show_feedback {
-        if let Some(simulated) = feedback {
-            let n = end.min(400);
-            let points = (0..=n).map(|i| {
-                let x = i * end / n;
-                project(x, simulated.probability(x).0)
-            }).collect();
-            painter.add(egui::Shape::line(points, egui::Stroke::new(3.0_f32, refund_color)));
-        }
+    for line in series {
+        let points: Vec<egui::Pos2> = match line.source {
+            ChartSource::Exact(d) => sampled_cdf(d, end).into_iter()
+                .map(|(x, p)| project(x, p)).collect(),
+            ChartSource::Refund(f) => {
+                let n = end.min(400);
+                (0..=n).map(|i| {
+                    let x = i * end / n;
+                    project(x, f.probability(x).0)
+                }).collect()
+            }
+        };
+        painter.add(egui::Shape::line(
+            points, egui::Stroke::new(2.8_f32, line.color),
+        ));
     }
     if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
         let fraction = (pointer.x - graph.left()) / graph.width();
         let x = ((fraction * end as f32).round() as usize).min(end);
         let px = project(x, 0.0).x;
         painter.line_segment([
-            egui::pos2(px, graph.top()),
-            egui::pos2(px, graph.bottom()),
+            egui::pos2(px, graph.top()), egui::pos2(px, graph.bottom()),
         ], egui::Stroke::new(1.0_f32, MUTED));
-        for (distribution, color) in [
-            (character, PRIMARY), (weapon, MINT), (combined, GOLD),
-        ] {
-            painter.circle_filled(project(x, distribution.at(x)), 3.5, color);
+        for line in series {
+            painter.circle_filled(
+                project(x, line.source.probability(x)), 3.5, line.color,
+            );
         }
-        ui.label(format!(
-            "{x}뽑 내 성공 확률 | 캐릭터 {:.1}% · 무기 {:.1}% · 전체 {:.1}%",
-            character.at(x) * 100.0, weapon.at(x) * 100.0,
-            combined.at(x) * 100.0,
-        ));
+        ui.horizontal_wrapped(|ui| {
+            ui.strong(format!("{x}뽑 이내"));
+            for line in series {
+                ui.colored_label(line.color,
+                    format!("{} {:.1}%", line.label, line.source.probability(x) * 100.0));
+            }
+        });
     }
     ui.horizontal_wrapped(|ui| {
-        ui.colored_label(PRIMARY, "● 캐릭터 목표");
-        ui.colored_label(MINT, format!("● {secondary_label} 목표"));
-        ui.colored_label(GOLD, "● 합산 · 환급 전");
-        if show_feedback && feedback.is_some() {
-            ui.colored_label(refund_color, "● 환급 반영");
+        for line in series {
+            ui.colored_label(line.color, format!("● {}", line.label));
         }
     });
 }
@@ -1132,6 +1185,38 @@ impl eframe::App for Calculator {
     }
 }
 
+/// One theme and logical-point typography for Windows and Linux.
+/// OS-level DPI still controls physical pixel density, but widget dimensions,
+/// colors and CDF Painter are identical in egui points.
+fn configure_dark_desktop(ctx: &egui::Context) {
+    ctx.set_theme(egui::Theme::Dark);
+    let mut visuals = egui::Visuals::dark();
+    visuals.panel_fill = BG;
+    visuals.window_fill = CARD;
+    visuals.extreme_bg_color = Color32::from_rgb(17, 25, 40);
+    visuals.override_text_color = Some(Color32::from_rgb(231, 239, 249));
+    visuals.widgets.noninteractive.fg_stroke.color = MUTED;
+    visuals.widgets.inactive.bg_fill = CARD;
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 58, 79);
+    visuals.widgets.active.bg_fill = Color32::from_rgb(43, 73, 99);
+    visuals.selection.bg_fill = Color32::from_rgb(39, 102, 158);
+    // Both dark visual slots and the current theme are explicitly set so a
+    // Windows light OS theme won't reintroduce light native widget styling.
+    ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
+    ctx.set_visuals(visuals);
+    ctx.style_mut(|style| {
+        style.spacing.item_spacing = egui::vec2(9.0, 8.0);
+        style.spacing.button_padding = egui::vec2(11.0, 6.0);
+        style.spacing.interact_size.y = 27.0;
+        style.text_styles.insert(egui::TextStyle::Body,
+            egui::FontId::proportional(14.0));
+        style.text_styles.insert(egui::TextStyle::Button,
+            egui::FontId::proportional(14.0));
+        style.text_styles.insert(egui::TextStyle::Small,
+            egui::FontId::proportional(11.0));
+    });
+}
+
 fn install_korean_font(ctx: &egui::Context) {
     let locations = [
         r"C:\Windows\Fonts\malgun.ttf",
@@ -1177,6 +1262,22 @@ mod chart_tests {
         let zero_goal = Distribution::new(vec![1.0]);
         let immediate = sampled_cdf(&zero_goal, 0);
         assert_eq!(immediate, vec![(0, 1.0), (1, 1.0)]);
+    }
+
+    #[test]
+    fn character_and_weapon_chart_ranges_are_independent() {
+        let character = Distribution::new(vec![0.0, 0.3, 0.7]);
+        let mut weapon_pmf = vec![0.0; 301];
+        weapon_pmf[300] = 1.0;
+        let weapon = Distribution::new(weapon_pmf);
+        let character_only = [ChartSeries {
+            label: "캐릭터", source: ChartSource::Exact(&character), color: PRIMARY,
+        }];
+        let weapon_only = [ChartSeries {
+            label: "무기", source: ChartSource::Exact(&weapon), color: MINT,
+        }];
+        assert_eq!(chart_domain_end(&character_only), 2);
+        assert_eq!(chart_domain_end(&weapon_only), 300);
     }
 
     #[test]

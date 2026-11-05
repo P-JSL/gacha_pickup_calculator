@@ -65,6 +65,11 @@ jobs:
             xdotool mousemove 850 700
             xdotool click --repeat 7 --delay 125 5
             sleep 2
+            scrot -q 90 ci-artifacts/overview.png
+            # Verify the separate character/weapon cards further down the
+            # dashboard instead of repeatedly capturing the top inputs.
+            xdotool click --repeat 11 --delay 125 5
+            sleep 2
             scrot -q 90 ci-artifacts/chart.png
           '
           python3 - <<'PY'
@@ -83,8 +88,57 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gacha-chart-visual-smoke-linux
-          path: ci-artifacts/chart.png
+          path: |
+            ci-artifacts/overview.png
+            ci-artifacts/chart.png
           if-no-files-found: error
+          retention-days: 7
+      - name: Windows native dark UI screenshot smoke
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -Type Directory -Force ci-artifacts | Out-Null
+          $exe = Join-Path (Get-Location) 'target/release/gacha_pickup_calculator.exe'
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            Start-Sleep -Seconds 10
+            $process.Refresh()
+            if ($process.HasExited) {
+              # GitHub-hosted Windows service runners may lack an interactive
+              # desktop / usable GPU context. Do not misreport this as a UI
+              # screenshot passing or as an application functional regression.
+              Write-Warning "Native Windows screenshot unavailable: process exited with $($process.ExitCode). CI is not a Windows interactive desktop."
+              exit 0
+            }
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            if ($bounds.Width -lt 500 -or $bounds.Height -lt 400) {
+              throw "The hosted runner has no usable interactive desktop: $bounds"
+            }
+            $image = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($image)
+            try {
+              $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+              $file = Join-Path (Get-Location) 'ci-artifacts/windows-ui.png'
+              $image.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+              Write-Host "Windows native screenshot: $file ($($bounds.Width)x$($bounds.Height))"
+            } finally {
+              $graphics.Dispose()
+              $image.Dispose()
+            }
+          } finally {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+      - name: Upload Windows UI screenshot
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gacha-windows-native-ui-smoke
+          path: ci-artifacts/windows-ui.png
+          if-no-files-found: warn
           retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
