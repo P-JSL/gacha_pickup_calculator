@@ -1,0 +1,676 @@
+# game\trole\tid\tname\trarity\timage_url
+# generated from named fan data snapshots (non-official); filters UI only, no probability rules
+hsr	c	1001	Mar. 7th	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1001.png
+hsr	c	1002	단항	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1002.png
+hsr	c	1003	히메코	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1003.png
+hsr	c	1004	웰트	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1004.png
+hsr	c	1005	카프카	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1005.png
+hsr	c	1006	은랑	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1006.png
+hsr	c	1008	아를란	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1008.png
+hsr	c	1009	아스타	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1009.png
+hsr	c	1013	헤르타	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1013.png
+hsr	c	1014	세이버	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1014.png
+hsr	c	1015	아처	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1015.png
+hsr	c	1101	브로냐	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1101.png
+hsr	c	1102	제레	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1102.png
+hsr	c	1103	서벌	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1103.png
+hsr	c	1104	게파드	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1104.png
+hsr	c	1105	나타샤	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1105.png
+hsr	c	1106	페라	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1106.png
+hsr	c	1107	클라라	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1107.png
+hsr	c	1108	삼포	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1108.png
+hsr	c	1109	후크	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1109.png
+hsr	c	1110	링스	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1110.png
+hsr	c	1111	루카	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1111.png
+hsr	c	1112	토파즈&복순이	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1112.png
+hsr	c	1201	청작	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1201.png
+hsr	c	1202	정운	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1202.png
+hsr	c	1203	나찰	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1203.png
+hsr	c	1204	경원	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1204.png
+hsr	c	1205	블레이드	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1205.png
+hsr	c	1206	소상	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1206.png
+hsr	c	1207	어공	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1207.png
+hsr	c	1208	부현	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1208.png
+hsr	c	1209	연경	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1209.png
+hsr	c	1210	계네빈	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1210.png
+hsr	c	1211	백로	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1211.png
+hsr	c	1212	경류	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1212.png
+hsr	c	1213	단항•음월	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1213.png
+hsr	c	1214	설의	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1214.png
+hsr	c	1215	한아	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1215.png
+hsr	c	1217	곽향	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1217.png
+hsr	c	1218	초구	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1218.png
+hsr	c	1220	비소	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1220.png
+hsr	c	1221	운리	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1221.png
+hsr	c	1222	영사	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1222.png
+hsr	c	1223	맥택	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1223.png
+hsr	c	1224	Mar. 7th	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1224.png
+hsr	c	1225	망귀인	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1225.png
+hsr	c	1301	갤러거	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1301.png
+hsr	c	1302	아젠티	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1302.png
+hsr	c	1303	완•매	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1303.png
+hsr	c	1304	어벤츄린	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1304.png
+hsr	c	1305	Dr. 레이시오	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1305.png
+hsr	c	1306	스파클	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1306.png
+hsr	c	1307	블랙 스완	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1307.png
+hsr	c	1308	아케론	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1308.png
+hsr	c	1309	로빈	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1309.png
+hsr	c	1310	반디	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1310.png
+hsr	c	1312	미샤	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1312.png
+hsr	c	1313	선데이	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1313.png
+hsr	c	1314	제이드	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1314.png
+hsr	c	1315	부트힐	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1315.png
+hsr	c	1317	라파	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1317.png
+hsr	c	1321	달리아	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1321.png
+hsr	c	1401	더 헤르타	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1401.png
+hsr	c	1402	아글라이아	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1402.png
+hsr	c	1403	트리비	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1403.png
+hsr	c	1404	마이데이	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1404.png
+hsr	c	1405	아낙사	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1405.png
+hsr	c	1406	사이퍼	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1406.png
+hsr	c	1407	카스토리스	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1407.png
+hsr	c	1408	파이논	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1408.png
+hsr	c	1409	히아킨	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1409.png
+hsr	c	1410	히실렌스	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1410.png
+hsr	c	1412	케리드라	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1412.png
+hsr	c	1413	에버나이트	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1413.png
+hsr	c	1414	단항•등황	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1414.png
+hsr	c	1415	키레네	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1415.png
+hsr	c	1501	스파키	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1501.png
+hsr	c	1502	효광	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1502.png
+hsr	c	1503	펄	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1503.png
+hsr	c	1504	애쉬베일	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1504.png
+hsr	c	1505	에바네시아	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1505.png
+hsr	c	1506	은랑 LV.999	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1506.png
+hsr	c	1507	천야•블레이드	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1507.png
+hsr	c	1508	토오사카 린	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1508.png
+hsr	c	1509	길가메시	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1509.png
+hsr	c	1510	히메코•노바	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1510.png
+hsr	c	1512	로빈•서머레토	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1512.png
+hsr	c	1513	어벤츄린•웨이브	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1513.png
+hsr	c	8001	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8001.png
+hsr	c	8002	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8002.png
+hsr	c	8003	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8003.png
+hsr	c	8004	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8004.png
+hsr	c	8005	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8005.png
+hsr	c	8006	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8006.png
+hsr	c	8007	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8007.png
+hsr	c	8008	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8008.png
+hsr	c	8009	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8009.png
+hsr	c	8010	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8010.png
+hsr	w	20000	화살촉	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20000.png
+hsr	w	20001	풍작	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20001.png
+hsr	w	20002	천경	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20002.png
+hsr	w	20003	앰버	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20003.png
+hsr	w	20004	그윽	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20004.png
+hsr	w	20005	합창	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20005.png
+hsr	w	20006	아카이브	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20006.png
+hsr	w	20007	시위를 떠난 화살	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20007.png
+hsr	w	20008	알찬 열매	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20008.png
+hsr	w	20009	무너진 행복	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20009.png
+hsr	w	20010	수비	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20010.png
+hsr	w	20011	심연의 고리	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20011.png
+hsr	w	20012	맞물린 톱니	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20012.png
+hsr	w	20013	영험한 열쇠	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20013.png
+hsr	w	20014	대립	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20014.png
+hsr	w	20015	증식	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20015.png
+hsr	w	20016	전멸	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20016.png
+hsr	w	20017	강토 개척	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20017.png
+hsr	w	20018	숨은 그림자	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20018.png
+hsr	w	20019	어울림	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20019.png
+hsr	w	20020	식견	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20020.png
+hsr	w	20021	불타는 그림자	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20021.png
+hsr	w	20022	추억 회상	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20022.png
+hsr	w	20023	비웃음	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20023.png
+hsr	w	20024	눈물의 흔적	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20024.png
+hsr	w	21000	수술 후의 대화	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21000.png
+hsr	w	21001	밤 인사와 잠든 얼굴	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21001.png
+hsr	w	21002	여생의 첫날	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21002.png
+hsr	w	21003	침묵만이	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21003.png
+hsr	w	21004	기억 속 모습	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21004.png
+hsr	w	21005	두더지파가 환영해	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21005.png
+hsr	w	21006	「나」의 탄생	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21006.png
+hsr	w	21007	같은 심정	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21007.png
+hsr	w	21008	사냥감의 시선	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21008.png
+hsr	w	21009	랜도의 선택	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21009.png
+hsr	w	21010	논검	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21010.png
+hsr	w	21011	행성과의 만남	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21011.png
+hsr	w	21012	비밀 맹세	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21012.png
+hsr	w	21013	세상을 진정시키지 마	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21013.png
+hsr	w	21014	알맞은 타이밍	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21014.png
+hsr	w	21015	땀방울처럼 빛나는 결심	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21015.png
+hsr	w	21016	우주 시장 동향	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21016.png
+hsr	w	21017	팔로우를 부탁해!	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21017.png
+hsr	w	21018	댄스! 댄스! 댄스!	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21018.png
+hsr	w	21019	푸른 하늘 아래	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21019.png
+hsr	w	21020	천재들의 휴식	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21020.png
+hsr	w	21021	등가교환	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21021.png
+hsr	w	21022	페르마타	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21022.png
+hsr	w	21023	우리는 와일드 파이어	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21023.png
+hsr	w	21024	움트는 봄물	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21024.png
+hsr	w	21025	과거와 미래	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21025.png
+hsr	w	21026	멍! 산책 시간!	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21026.png
+hsr	w	21027	느낌 있는 아침 식사 루틴	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21027.png
+hsr	w	21028	따듯한 밤은 길지 않고	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21028.png
+hsr	w	21029	훗날 기약	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21029.png
+hsr	w	21030	이게 바로 나야!	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21030.png
+hsr	w	21031	또다시 저승으로	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21031.png
+hsr	w	21032	누월재운의 뜻	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21032.png
+hsr	w	21033	도망칠 곳은 없다	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21033.png
+hsr	w	21034	오늘도 평화로운 하루	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21034.png
+hsr	w	21035	무엇이 진실인가	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21035.png
+hsr	w	21036	좋은꿈 마을 대모험	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21036.png
+hsr	w	21037	최후의 승자	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21037.png
+hsr	w	21038	불의 먼 곳에서	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21038.png
+hsr	w	21039	운명의 실을 엮다	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21039.png
+hsr	w	21040	은하 함락의 날	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21040.png
+hsr	w	21041	쇼타임	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21041.png
+hsr	w	21042	마음에 새긴 약속	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21042.png
+hsr	w	21043	두 사람의 콘서트	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21043.png
+hsr	w	21044	끝없는 춤	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21044.png
+hsr	w	21045	조화가 침묵한 후	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21045.png
+hsr	w	21046	피어나길 기다리는 꽃	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21046.png
+hsr	w	21047	그림자처럼 뒤따르는 밤	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21047.png
+hsr	w	21048	꿈의 몽타주	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21048.png
+hsr	w	21050	찰나에 결정되는 승리	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21050.png
+hsr	w	21051	천재들의 안부 인사	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21051.png
+hsr	w	21052	땀은 많이, 눈물은 적게	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21052.png
+hsr	w	21053	언제나 여정이 평탄하기를	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21053.png
+hsr	w	21054	이야기의 다음 페이지	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21054.png
+hsr	w	21055	내일의 내일이 올 때까지	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21055.png
+hsr	w	21056	바람을 쫓을 때	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21056.png
+hsr	w	21057	꽃은 잊지 않는다	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21057.png
+hsr	w	21058	과거의 핏자국	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21058.png
+hsr	w	21060	밀 내음이 가득한 꿈	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21060.png
+hsr	w	21061	휴일의 목욕탕 대모험	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21061.png
+hsr	w	21062	그 종착지에서 다시 만나자	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21062.png
+hsr	w	21064	슈룸 모험기	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21064.png
+hsr	w	21065	오늘의 행운	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21065.png
+hsr	w	21066	짧은 휴가	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/21066.png
+hsr	w	22000	초보자 임무 시작 전	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22000.png
+hsr	w	22001	저기, 나 여기 있어	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22001.png
+hsr	w	22002	내일을 위한 여정	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22002.png
+hsr	w	22003	인사록•음률 사냥	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22003.png
+hsr	w	22004	우주 대사업	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22004.png
+hsr	w	22005	영원한 미궁의 식사	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22005.png
+hsr	w	22006	핑크빛 내일을 향해	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22006.png
+hsr	w	22007	미래엔 우리가 함께할 거야	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22007.png
+hsr	w	22008	지평선의 끝을 향해	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/22008.png
+hsr	w	23000	은하철도의 밤	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23000.png
+hsr	w	23001	야경 속에서	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23001.png
+hsr	w	23002	대체할 수 없는 것	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23002.png
+hsr	w	23003	아직 전투는 끝나지 않았다	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23003.png
+hsr	w	23004	세계의 이름으로	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23004.png
+hsr	w	23005	승리의 순간	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23005.png
+hsr	w	23006	필요한 건 기다림뿐	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23006.png
+hsr	w	23007	계속 내리는 비	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23007.png
+hsr	w	23008	관의 울림	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23008.png
+hsr	w	23009	닿을 수 없는 저편	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23009.png
+hsr	w	23010	동트기 전	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23010.png
+hsr	w	23011	그녀는 두 눈을 감았네	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23011.png
+hsr	w	23012	깊게 든 단잠	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23012.png
+hsr	w	23013	세월은 흐를 뿐	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23013.png
+hsr	w	23014	이 몸이 검이니	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23014.png
+hsr	w	23015	태양보다 밝게 빛나는 것	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23015.png
+hsr	w	23016	고민, 그리고 행복	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23016.png
+hsr	w	23017	섬뜩한 밤	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23017.png
+hsr	w	23018	눈에 담긴 순간	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23018.png
+hsr	w	23019	거울 속 지난날의 나	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23019.png
+hsr	w	23020	순수 사유의 세례	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23020.png
+hsr	w	23021	속세에서의 유희	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23021.png
+hsr	w	23022	시간의 기억에 대한 재구성	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23022.png
+hsr	w	23023	언제나 불공평한 운명	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23023.png
+hsr	w	23024	흘러가는 강가를 따라	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23024.png
+hsr	w	23025	꿈은 어디로 돌아가야 하는가	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23025.png
+hsr	w	23026	찬란하게 빛나는 밤	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23026.png
+hsr	w	23027	두 번째 생명을 향해	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23027.png
+hsr	w	23028	값을 매길 수 없는 건 희망뿐	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23028.png
+hsr	w	23029	그 무수한 봄날	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23029.png
+hsr	w	23030	해 질 무렵 시작되는 춤	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23030.png
+hsr	w	23031	정복하고 사냥하리	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23031.png
+hsr	w	23032	오직 향만이 변함없이	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23032.png
+hsr	w	23033	인법첩•요란 파마	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23033.png
+hsr	w	23034	대지로 돌아온 비행	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23034.png
+hsr	w	23035	먼 길 끝의 귀로	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23035.png
+hsr	w	23036	시간을 황금으로 엮어	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23036.png
+hsr	w	23037	추궁할 수 없는 곳을 향해	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23037.png
+hsr	w	23038	시간이 한 송이 꽃이라면	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23038.png
+hsr	w	23039	피의 불꽃이여, 앞길을 태워라	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23039.png
+hsr	w	23040	이별이 더 아름답도록	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23040.png
+hsr	w	23041	생명은 불태워야 하는 것	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23041.png
+hsr	w	23042	무지개가 영원히 하늘에 머물길	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23042.png
+hsr	w	23043	바람에 흩날리는 거짓말	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23043.png
+hsr	w	23044	이와 같이 타오르는 여명	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23044.png
+hsr	w	23045	보답 없는 왕관	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23045.png
+hsr	w	23046	이상이 불타는 지옥	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23046.png
+hsr	w	23047	바다는 왜 노래하는가	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23047.png
+hsr	w	23048	황금 피가 새긴 시대	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23048.png
+hsr	w	23049	긴 밤의 별빛에게	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23049.png
+hsr	w	23050	그녀의 불꽃을 잊지 말라	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23050.png
+hsr	w	23051	끝없는 산과 강을 거치더라도	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23051.png
+hsr	w	23052	이 순간처럼 영원한 사랑	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23052.png
+hsr	w	23053	눈부신 파키의 세상	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23053.png
+hsr	w	23054	그녀가 보기로 결심했을 때	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23054.png
+hsr	w	23055	내일에 바치는 색채	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23055.png
+hsr	w	23056	거짓말의 종막	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23056.png
+hsr	w	23057	갤럭시 시티에 오신 것을 환영합니다	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23057.png
+hsr	w	23058	다음 꽃피는 계절의 만남	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23058.png
+hsr	w	23059	연옥을 불사른 새로운 몸	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23059.png
+hsr	w	23060	별이 밤하늘을 밝힐 때	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23060.png
+hsr	w	23061	고요히 빛나는 불티	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23061.png
+hsr	w	23062	보이는 것이 곧 나	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23062.png
+hsr	w	23063	그대는 나아가 노래하리니	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23063.png
+hsr	w	23064	파도에 내던진 한여름	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/23064.png
+hsr	w	24000	어떤 에이언즈의 몰락	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24000.png
+hsr	w	24001	별바다 순항	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24001.png
+hsr	w	24002	기억의 소재	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24002.png
+hsr	w	24003	고독의 치유	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24003.png
+hsr	w	24004	멈추지 않는 연산	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24004.png
+hsr	w	24005	기억은 영원히 막을 내리지 않는다	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24005.png
+hsr	w	24006	넘치는 환락의 축복	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/24006.png
+wuwa	c	1403	Aalto	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Aalto.png
+wuwa	c	1210	Aemeath	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Aemeath.png
+wuwa	c	1306	Augusta	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Augusta.png
+wuwa	c	1103	Baizhi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Baizhi.png
+wuwa	c	1206	Brant	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Brant.png
+wuwa	c	1307	Buling	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Buling.png
+wuwa	c	1301	Calcharo	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Calcharo.png
+wuwa	c	1603	Camellya	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Camellya.png
+wuwa	c	1607	Cantarella	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Cantarella.png
+wuwa	c	1107	Carlotta	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Carlotta.png
+wuwa	c	1409	Cartethyia	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Cartethyia.png
+wuwa	c	1205	Changli	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Changli.png
+wuwa	c	1508	Chisa	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Chisa.png
+wuwa	c	1202	Chixia	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Chixia.png
+wuwa	c	1407	Ciaccona	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Ciaccona.png
+wuwa	c	1602	Danjin	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Danjin.png
+wuwa	c	1211	Denia	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Denia.png
+wuwa	c	1203	Encore	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Encore.png
+wuwa	c	1208	Galbrena	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Galbrena.png
+wuwa	c	1108	Hiyuki	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Hiyuki.png
+wuwa	c	1311	Hsin	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Hsin.png
+wuwa	c	1410	Iuno	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Iuno.png
+wuwa	c	1405	Jianxin	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Jianxin.png
+wuwa	c	1212	Jingran	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Jingran.png
+wuwa	c	1304	Jinhsi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Jinhsi.png
+wuwa	c	1404	Jiyan	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Jiyan.png
+wuwa	c	1104	Lingyang	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lingyang.png
+wuwa	c	1109	Lucilla	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lucilla.png
+wuwa	c	1511	Lucy	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lucy.png
+wuwa	c	1504	Lumi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lumi.png
+wuwa	c	1207	Lupa	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lupa.png
+wuwa	c	1510	Luuk Herssen	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/LuukHerssen.png
+wuwa	c	1509	Lynae	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Lynae.png
+wuwa	c	1209	Mornye	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Mornye.png
+wuwa	c	1204	Mortefi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Mortefi.png
+wuwa	c	1506	Phoebe	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Phoebe.png
+wuwa	c	1608	Phrolova	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Phrolova.png
+wuwa	c	1413	Qingxiao	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Qingxiao.png
+wuwa	c	1411	Qiuyuan	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Qiuyuan.png
+wuwa	c	1308	Rebecca	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Rebecca.png
+wuwa	c	1606	Roccia	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Roccia.png
+wuwa	c	1604	Rover: Havoc	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Rover-Havoc.png
+wuwa	c	1502	Rover: Spectro	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Rover-Spectro.png
+wuwa	c	1102	Sanhua	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Sanhua.png
+wuwa	c	1505	Shorekeeper	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Shorekeeper.png
+wuwa	c	1412	Sigrika	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Sigrika.png
+wuwa	c	1110	Suisui	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Suisui.png
+wuwa	c	1312	Suoming	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Suoming.png
+wuwa	c	1601	Taoqi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Taoqi.png
+wuwa	c	1503	Verina	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Verina.png
+wuwa	c	1305	Xiangli Yao	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/XiangliYao.png
+wuwa	c	1402	Yangyang	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Yangyang.png
+wuwa	c	1610	Yangyang: Xuanling	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/YangyangXuanling.png
+wuwa	c	1302	Yinlin	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Yinlin.png
+wuwa	c	1106	Youhu	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Youhu.png
+wuwa	c	1303	Yuanwu	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Yuanwu.png
+wuwa	c	1507	Zani	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Zani.png
+wuwa	c	1105	Zhezhi	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Zhezhi.png
+wuwa	w	AbyssSurges	Abyss Surges	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AbyssSurges.png
+wuwa	w	AetherStrike	Aether Strike	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AetherStrike.png
+wuwa	w	AgesOfHarvest	Ages Of Harvest	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AgesOfHarvest.png
+wuwa	w	AmityAccord	Amity Accord	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AmityAccord.png
+wuwa	w	Augment	Augment	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Augment.png
+wuwa	w	AureateZenith	Aureate Zenith	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AureateZenith.png
+wuwa	w	Autumntrace	Autumntrace	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Autumntrace.png
+wuwa	w	AzureOath	Azure Oath	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/AzureOath.png
+wuwa	w	BeguilingMelody	Beguiling Melody	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BeguilingMelody.png
+wuwa	w	BlazingBrilliance	Blazing Brilliance	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BlazingBrilliance.png
+wuwa	w	BlazingJustice	Blazing Justice	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BlazingJustice.png
+wuwa	w	BloodpactsPledge	Bloodpacts Pledge	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BloodpactsPledge.png
+wuwa	w	BloomingJadehaven	Blooming Jadehaven	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BloomingJadehaven.png
+wuwa	w	BosonAstrolabe	Boson Astrolabe	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BosonAstrolabe.png
+wuwa	w	Broadblade41	Broadblade41	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Broadblade41.png
+wuwa	w	BroadbladeOfNight	Broadblade Of Night	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BroadbladeOfNight.png
+wuwa	w	BroadbladeOfVoyager	Broadblade Of Voyager	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/BroadbladeOfVoyager.png
+wuwa	w	Cadenza	Cadenza	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Cadenza.png
+wuwa	w	CalloftheAbyss	Callofthe Abyss	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/CalloftheAbyss.png
+wuwa	w	CelestialSpiral	Celestial Spiral	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/CelestialSpiral.png
+wuwa	w	CometFlare	Comet Flare	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/CometFlare.png
+wuwa	w	CommandoOfConviction	Commando Of Conviction	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/CommandoOfConviction.png
+wuwa	w	CosmicRipples	Cosmic Ripples	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/CosmicRipples.png
+wuwa	w	DauntlessEvernight	Dauntless Evernight	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/DauntlessEvernight.png
+wuwa	w	DaybreakersSpine	Daybreakers Spine	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/DaybreakersSpine.png
+wuwa	w	DefiersThorn	Defiers Thorn	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/DefiersThorn.png
+wuwa	w	Discord	Discord	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Discord.png
+wuwa	w	EmeraldOfGenesis	Emerald Of Genesis	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/EmeraldOfGenesis.png
+wuwa	w	EmeraldSentence	Emerald Sentence	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/EmeraldSentence.png
+wuwa	w	EndlessCollapse	Endless Collapse	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/EndlessCollapse.png
+wuwa	w	EverbrightPolestar	Everbright Polestar	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/EverbrightPolestar.png
+wuwa	w	FablesofWisdom	Fablesof Wisdom	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/FablesofWisdom.png
+wuwa	w	FeatherEdge	Feather Edge	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/FeatherEdge.png
+wuwa	w	FirstlightsHerald	Firstlights Herald	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/FirstlightsHerald.png
+wuwa	w	ForgedDwarfStar	Forged Dwarf Star	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/ForgedDwarfStar.png
+wuwa	w	FreezeFrame	Freeze Frame	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/FreezeFrame.png
+wuwa	w	Frostburn	Frostburn	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Frostburn.png
+wuwa	w	FusionAccretion	Fusion Accretion	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/FusionAccretion.png
+wuwa	w	Gauntlets21D	Gauntlets21 D	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Gauntlets21D.png
+wuwa	w	GauntletsOfNight	Gauntlets Of Night	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GauntletsOfNight.png
+wuwa	w	GauntletsOfVoyager	Gauntlets Of Voyager	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GauntletsOfVoyager.png
+wuwa	w	GlintOfClouds	Glint Of Clouds	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GlintOfClouds.png
+wuwa	w	GuardianBroadblade	Guardian Broadblade	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GuardianBroadblade.png
+wuwa	w	GuardianGauntlets	Guardian Gauntlets	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GuardianGauntlets.png
+wuwa	w	GuardianPistols	Guardian Pistols	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GuardianPistols.png
+wuwa	w	GuardianRectifier	Guardian Rectifier	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GuardianRectifier.png
+wuwa	w	GuardianSword	Guardian Sword	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/GuardianSword.png
+wuwa	w	HeliosCleaver	Helios Cleaver	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/HeliosCleaver.png
+wuwa	w	HollowMirage	Hollow Mirage	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/HollowMirage.png
+wuwa	w	JinzhouKeeper	Jinzhou Keeper	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/JinzhouKeeper.png
+wuwa	w	Kumokiri	Kumokiri	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Kumokiri.png
+wuwa	w	LaserShearer	Laser Shearer	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LaserShearer.png
+wuwa	w	LegendofDrunkenHero	Legendof Drunken Hero	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LegendofDrunkenHero.png
+wuwa	w	LetheanElegy	Lethean Elegy	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LetheanElegy.png
+wuwa	w	Lumingloss	Lumingloss	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Lumingloss.png
+wuwa	w	LuminousHymn	Luminous Hymn	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LuminousHymn.png
+wuwa	w	LunarCutter	Lunar Cutter	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LunarCutter.png
+wuwa	w	LustrousRazor	Lustrous Razor	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LustrousRazor.png
+wuwa	w	LuxUmbra	Lux Umbra	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/LuxUmbra.png
+wuwa	w	Marcato	Marcato	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Marcato.png
+wuwa	w	MeditationsonMercy	Meditationson Mercy	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/MeditationsonMercy.png
+wuwa	w	MoongazersSigil	Moongazers Sigil	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/MoongazersSigil.png
+wuwa	w	Novaburst	Novaburst	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Novaburst.png
+wuwa	w	OceansGift	Oceans Gift	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OceansGift.png
+wuwa	w	OriginiteTypeI	Originite Type I	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OriginiteTypeI.png
+wuwa	w	OriginiteTypeII	Originite Type II	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OriginiteTypeII.png
+wuwa	w	OriginiteTypeIII	Originite Type III	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OriginiteTypeIII.png
+wuwa	w	OriginiteTypeIV	Originite Type IV	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OriginiteTypeIV.png
+wuwa	w	OriginiteTypeV	Originite Type V	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/OriginiteTypeV.png
+wuwa	w	Overture	Overture	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Overture.png
+wuwa	w	PhasicHomogenizer	Phasic Homogenizer	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/PhasicHomogenizer.png
+wuwa	w	Pistols26	Pistols26	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Pistols26.png
+wuwa	w	PistolsOfNight	Pistols Of Night	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/PistolsOfNight.png
+wuwa	w	PistolsOfVoyager	Pistols Of Voyager	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/PistolsOfVoyager.png
+wuwa	w	PulsationBracer	Pulsation Bracer	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/PulsationBracer.png
+wuwa	w	RadianceCleaver	Radiance Cleaver	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RadianceCleaver.png
+wuwa	w	RadiantDawn	Radiant Dawn	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RadiantDawn.png
+wuwa	w	Rectifier25	Rectifier25	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Rectifier25.png
+wuwa	w	RectifierOfNight	Rectifier Of Night	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RectifierOfNight.png
+wuwa	w	RectifierOfVoyager	Rectifier Of Voyager	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RectifierOfVoyager.png
+wuwa	w	RedSpring	Red Spring	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RedSpring.png
+wuwa	w	RelativisticJet	Relativistic Jet	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RelativisticJet.png
+wuwa	w	RimeDrapedSprouts	Rime Draped Sprouts	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RimeDrapedSprouts.png
+wuwa	w	RomanceinFarewell	Romancein Farewell	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/RomanceinFarewell.png
+wuwa	w	SkullThrasher	Skull Thrasher	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SkullThrasher.png
+wuwa	w	SolarFlame	Solar Flame	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SolarFlame.png
+wuwa	w	SolswornCiphers	Solsworn Ciphers	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SolswornCiphers.png
+wuwa	w	SomnoireAnchor	Somnoire Anchor	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SomnoireAnchor.png
+wuwa	w	SpectralTrigger	Spectral Trigger	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SpectralTrigger.png
+wuwa	w	SpectrumBlaster	Spectrum Blaster	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SpectrumBlaster.png
+wuwa	w	StarfieldCalibrator	Starfield Calibrator	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/StarfieldCalibrator.png
+wuwa	w	StaticMist	Static Mist	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/StaticMist.png
+wuwa	w	StellarSymphony	Stellar Symphony	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/StellarSymphony.png
+wuwa	w	Stonard	Stonard	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Stonard.png
+wuwa	w	Stringmaster	Stringmaster	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Stringmaster.png
+wuwa	w	Sword18	Sword18	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Sword18.png
+wuwa	w	SwordOfNight	Sword Of Night	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SwordOfNight.png
+wuwa	w	SwordOfVoyager	Sword Of Voyager	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/SwordOfVoyager.png
+wuwa	w	TheLastDance	The Last Dance	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TheLastDance.png
+wuwa	w	ThousandfoldDeliverance	Thousandfold Deliverance	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/ThousandfoldDeliverance.png
+wuwa	w	Thunderbolt	Thunderbolt	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Thunderbolt.png
+wuwa	w	ThunderflareDominion	Thunderflare Dominion	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/ThunderflareDominion.png
+wuwa	w	Tragicomedy	Tragicomedy	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Tragicomedy.png
+wuwa	w	TrainingBroadblade	Training Broadblade	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TrainingBroadblade.png
+wuwa	w	TrainingGauntlets	Training Gauntlets	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TrainingGauntlets.png
+wuwa	w	TrainingPistols	Training Pistols	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TrainingPistols.png
+wuwa	w	TrainingRectifier	Training Rectifier	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TrainingRectifier.png
+wuwa	w	TrainingSword	Training Sword	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TrainingSword.png
+wuwa	w	TyroBroadblade	Tyro Broadblade	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TyroBroadblade.png
+wuwa	w	TyroGauntlets	Tyro Gauntlets	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TyroGauntlets.png
+wuwa	w	TyroPistols	Tyro Pistols	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TyroPistols.png
+wuwa	w	TyroRectifier	Tyro Rectifier	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TyroRectifier.png
+wuwa	w	TyroSword	Tyro Sword	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/TyroSword.png
+wuwa	w	UndyingFlame	Undying Flame	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/UndyingFlame.png
+wuwa	w	UnflickeringValor	Unflickering Valor	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/UnflickeringValor.png
+wuwa	w	UnspokenRue	Unspoken Rue	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/UnspokenRue.png
+wuwa	w	Variation	Variation	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/Variation.png
+wuwa	w	VerdantSummit	Verdant Summit	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/VerdantSummit.png
+wuwa	w	VeritysHandle	Veritys Handle	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/VeritysHandle.png
+wuwa	w	WaltzinMasquerade	Waltzin Masquerade	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/WaltzinMasquerade.png
+wuwa	w	WaningRedshift	Waning Redshift	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/WaningRedshift.png
+wuwa	w	WhispersofSirens	Whispersof Sirens	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/WhispersofSirens.png
+wuwa	w	WildfireMark	Wildfire Mark	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/WildfireMark.png
+wuwa	w	WoodlandAria	Woodland Aria	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/weapons/WoodlandAria.png
+sora	c	103	코하쿠	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_103_002.png
+sora	c	107	틸리아	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_107_002.png
+sora	c	108	카시미라	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_108_002.png
+sora	c	110	피렌	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_110_002.png
+sora	c	111	아야메	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_111_002.png
+sora	c	112	세이나	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_112_002.png
+sora	c	113	시먀오	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_113_002.png
+sora	c	114	샤통	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_114_002.png
+sora	c	115	호타루	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_115_002.png
+sora	c	116	레이센	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_116_002.png
+sora	c	117	징린	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_117_002.png
+sora	c	118	크루니스	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_118_002.png
+sora	c	119	나노하	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_119_002.png
+sora	c	120	카나체	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_120_002.png
+sora	c	123	안즈	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_123_002.png
+sora	c	125	프리지아	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_125_002.png
+sora	c	126	플로라	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_126_002.png
+sora	c	127	테레사	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_127_002.png
+sora	c	130	토나	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_130_002.png
+sora	c	132	미네르바	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_132_002.png
+sora	c	133	나츠카	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_133_002.png
+sora	c	134	후유카	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_134_002.png
+sora	c	135	미스티	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_135_002.png
+sora	c	137	엘레노어	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_137_002.png
+sora	c	139	엘리	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_139_002.png
+sora	c	140	스파클	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_140_002.png
+sora	c	141	치시아	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_141_002.png
+sora	c	142	코제트	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_142_002.png
+sora	c	143	레이스	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_143_002.png
+sora	c	144	치토세	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_144_002.png
+sora	c	145	오토하	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_145_002.png
+sora	c	147	캐러멜	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_147_002.png
+sora	c	149	그레이	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_149_002.png
+sora	c	150	라루	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_150_002.png
+sora	c	155	시아	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_155_002.png
+sora	c	156	나즈나	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_156_002.png
+sora	c	157	카린	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_157_002.png
+sora	c	158	라루(이브)	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_158_002.png
+sora	c	159	크루니스(새해)	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_159_002.png
+sora	c	160	윌로(여름)	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_160_002.png
+sora	c	162	세이나(기원)	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/char/avg1_162_002.png
+sora	w	211001	아침 안개	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1001_B.png
+sora	w	211002	평온	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1002_B.png
+sora	w	211003	황혼	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1003_B.png
+sora	w	211004	분홍빛 꿈	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1004_B.png
+sora	w	211005	고독한 연기	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1005_B.png
+sora	w	211006	감로	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1006_B.png
+sora	w	211007	희망	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1007_B.png
+sora	w	211008	귀로	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/1008_B.png
+sora	w	212001	성찬	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2001_B.png
+sora	w	212002	소란	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2002_B.png
+sora	w	212003	극락	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2003_B.png
+sora	w	212005	열정	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2005_B.png
+sora	w	212006	상서로운 빛	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2006_B.png
+sora	w	212007	바람을 타고	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2007_B.png
+sora	w	212008	물거품	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2008_B.png
+sora	w	212009	검은 소멸	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2009_B.png
+sora	w	212010	강인함	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/2010_B.png
+sora	w	213001	레몬과 유자의 호기심	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3001_B.png
+sora	w	213002	일렁이는 계절	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3002_B.png
+sora	w	213003	열대야의 끝	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3003_B.png
+sora	w	213004	괴도 콤비	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3004_B.png
+sora	w	213005	★~펑펑 소녀~★	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3005_B.png
+sora	w	213006	굿나잇	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3006_B.png
+sora	w	213007	에메랄드 틈새 경계	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3007_B.png
+sora	w	213008	휴식의 순간	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3008_B.png
+sora	w	213009	‘빗속의’ 선율	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3009_B.png
+sora	w	213010	수증기 증후군	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3010_B.png
+sora	w	213011	고양이 리듬	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3011_B.png
+sora	w	213012	별하늘에 안부를	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3012_B.png
+sora	w	213013	가을날 속삭임	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3013_B.png
+sora	w	213014	기사의 대장장이	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3014_B.png
+sora	w	213015	알려지지 않은 이름	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3015_B.png
+sora	w	213016	새장의 장미	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3016_B.png
+sora	w	213017	★~돌고 도는 인생~★	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3017_B.png
+sora	w	213018	음료수 사는 날	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3018_B.png
+sora	w	213019	망언	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3019_B.png
+sora	w	213020	플래시 고스트	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3020_B.png
+sora	w	213021	영험한 찬가	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3021_B.png
+sora	w	213022	저주받은 사랑의 강	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3022_B.png
+sora	w	213023	순백	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3023_B.png
+sora	w	213024	홀리데이 버블	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3024_B.png
+sora	w	213025	달콤한 초대	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3025_B.png
+sora	w	213026	청소 타임DA♥YO	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/3026_B.png
+sora	w	214001	고양이 신 레퀴엠	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4001_B.png
+sora	w	214002	하늘, 꽃 그리고 시	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4002_B.png
+sora	w	214003	날 닮은 너	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4003_B.png
+sora	w	214004	요정들의 꿈	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4004_B.png
+sora	w	214005	맑은 하늘의 꽃	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4005_B.png
+sora	w	214006	마녀의 그네	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4006_B.png
+sora	w	214007	자정의 타락 천사	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4007_B.png
+sora	w	214008	푸른 하늘 너머로	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4008_B.png
+sora	w	214009	‘공백’의 프롤로그	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4009_B.png
+sora	w	214010	깨끗한 기도	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4010_B.png
+sora	w	214011	여름날 오후의 비	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4011_B.png
+sora	w	214012	야심에 찬 시선	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4012_B.png
+sora	w	214013	항해의 청사진	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4013_B.png
+sora	w	214014	달콤한 말의 열매	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4014_B.png
+sora	w	214015	사슴의 울음	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4015_B.png
+sora	w	214016	봄날의 기록	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4016_B.png
+sora	w	214017	불꽃	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4017_B.png
+sora	w	214018	레모네이드와 홍차	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4018_B.png
+sora	w	214019	원샷원킬	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4019_B.png
+sora	w	214020	반짝이는 순간	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4020_B.png
+sora	w	214021	인연의 만남	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4021_B.png
+sora	w	214022	한밤의 고양이 방울	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4022_B.png
+sora	w	214023	그래피티 무지개	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4023_B.png
+sora	w	214024	하나, 둘, 셋, 점프!	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4024_B.png
+sora	w	214026	반짝이는 옛 연못	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4026_B.png
+sora	w	214027	용과 봉황	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4027_B.png
+sora	w	214028	대낮의 화원	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4028_B.png
+sora	w	214029	고양이의 보물	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4029_B.png
+sora	w	214030	오후의 틈새	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4030_B.png
+sora	w	214031	검과 도끼의 울음	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4031_B.png
+sora	w	214032	진실☆꿈 공장	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4032_B.png
+sora	w	214033	해골과의 춤사위	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4033_B.png
+sora	w	214036	길 잃은 순례자	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4036_B.png
+sora	w	214037	전설을 잡아라	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4037_B.png
+sora	w	214038	파도빛 유랑	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4038_B.png
+sora	w	214039	여름 서식지	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4039_B.png
+sora	w	214040	용기의 주먹	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4040_B.png
+sora	w	214041	여정의 선물	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4041_B.png
+sora	w	214042	술 익는 밤의 등불	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4042_B.png
+sora	w	214043	혁신의 씨앗	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4043_B.png
+sora	w	214044	봄빛 드리운 새 아침	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4044_B.png
+sora	w	214045	꽃밭의 환영	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4045_B.png
+sora	w	214046	겨울밤 끝의 여명	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4046_B.png
+sora	w	214047	편지는 바람을 타고	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4047_B.png
+sora	w	214048	메리 서프라이즈	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4048_B.png
+sora	w	214049	Memory of Stella	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4049_B.png
+sora	w	214050	연회장의 그림자	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4050_B.png
+sora	w	214051	별이 향하는 곳	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4051_B.png
+sora	w	214052	기적의 손길	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4052_B.png
+sora	w	214053	환희의 순간	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4053_B.png
+sora	w	214054	마이크로 원더랜드	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4054_B.png
+sora	w	214055	수면 위의 빛과 그림자	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4055_B.png
+sora	w	214056	일렁이는 여름의 잔영	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4056_B.png
+sora	w	214057	함께하는 항해	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4057_B.png
+sora	w	214058	여름 행진곡	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4058_B.png
+sora	w	214059	날아라, 새장 속 새여	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4059_B.png
+sora	w	214060	영광의 순간	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4060_B.png
+sora	w	214061	잠자리 동화	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4061_B.png
+sora	w	214062	행복은 어제에	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4062_B.png
+sora	w	214066	앞길을 밝히는 샛별	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4066_B.png
+sora	w	214067	영원히 반짝이는 빛	5	https://raw.githubusercontent.com/JforPlay/sstoy/main/public/assets/disc_icons/4067_B.png
+nte	c	1003	사키리	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_003.png
+nte	c	1004	라크리모사	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_004.png
+nte	c	1008	스키아	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_008.png
+nte	c	1010	나나리	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_010.png
+nte	c	1019	민트	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_019.png
+nte	c	1020	하니엘	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_020.png
+nte	c	1021	에드가	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_021.png
+nte	c	1023	백장	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_028.png
+nte	c	1025	하토르	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_012.png
+nte	c	1033	아들러	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_015.png
+nte	c	1036	잔홍	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_canhong.png
+nte	c	1039	파디아	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_027.png
+nte	c	1042	레이븐	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_heiyu.png
+nte	c	1046	「제로」	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_046.png
+nte	c	1051	「제로」	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_009.png
+nte	c	1052	호토리	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_013.png
+nte	c	1054	다포딜	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_005.png
+nte	c	1055	구원	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_104.png
+nte	c	1056	라크리모사	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_004.png
+nte	c	1057	아카네 린	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_mingyin.png
+nte	c	1070	우미츠키	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_haiyue.png
+nte	c	1071	카오스	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_kaesi1.png
+nte	c	1072	링코	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_lingke.png
+nte	c	1073	치즈	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_073.png
+nte	c	1075	일로이	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_yiluoyi.png
+nte	c	1076	신쿠	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_zhenhong.png
+nte	c	1091	라크리모사	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_lingke.png
+nte	c	1999	1999	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_1999.png
+nte	w	arc-1	광란의 「전자음악」	5	-
+nte	w	arc-2	영원한 왈츠	5	-
+nte	w	arc-3	폭발 현장	5	-
+nte	w	arc-4	입에 쓴 약이 몸에 좋다	5	-
+nte	w	arc-5	암흑 청춘의 망상	5	-
+nte	w	arc-6	용맹의 솜뭉치	5	-
+nte	w	arc-7	화려한 조명 속 광란의 파티	5	-
+nte	w	arc-8	불굴의 솜뭉치	5	-
+nte	w	arc-9	현실 도피처	5	-
+nte	w	arc-10	뒤틀린 도시의 부름	5	-
+nte	w	arc-11	시간 도둑	5	-
+nte	w	arc-12	심장을 좀먹는 칼	5	-
+nte	w	arc-13	금기의 문	5	-
+nte	w	arc-14	위험한 게임	5	-
+nte	w	arc-15	원행자의 목소리	5	-
+nte	w	arc-16	만인의 갈망	5	-
+nte	w	arc-17	빛나는 나날	5	-
+nte	w	arc-18	동백꽃 모임	5	-
+nte	w	arc-19	머리 조심	5	-
+nte	w	arc-20	광폭의 솜뭉치	5	-
+nte	w	arc-21	때는 온다	5	-
+nte	w	arc-22	영감 배틀로얄	5	-
+nte	w	arc-23	홍염의 신기루	5	-
+nte	w	arc-24	생각하는 고양이	5	-
+nte	w	arc-25	착한 강아지의 여행	5	-
+nte	w	arc-26	「은하의 찰나」	5	-
+nte	w	arc-27	광속의 솜뭉치	5	-
+nte	w	arc-28	백만불짜리 미소	5	-
+nte	w	arc-29	가면 뒤의 눈물	5	-
+nte	w	arc-30	성공을 향한 첫 걸음	5	-
+nte	w	arc-31	오라오라!	5	-
+nte	w	arc-32	정화 개시	5	-
+nte	w	arc-33	헤테로의 안녕	5	-
+nte	w	arc-34	달의 대척점	5	-
+nte	w	arc-35	「우리.」	5	-
+nte	w	arc-36	휴일	5	-
+nte	w	arc-37	「마지막 장미」	5	-
+nte	w	arc-38	봄을 심는 바보	5	-
+nte	w	arc-39	말하기 어려운 마음	5	-
+nte	w	arc-40	기민의 솜뭉치	5	-
+nte	w	arc-41	준비, 준비	5	-
+nte	w	arc-42	시간 밖으로의 행진	5	-
+nte	w	arc-43	망할 인연	5	-
+nte	w	arc-44	죄와 벌	5	-
+nte	w	arc-45	미소 천사	5	-
+nte	w	arc-46	고래의 노래	5	-
+nte	w	arc-47	「세상을 뒤흔든 비」	5	-
+nte	w	arc-48	잊힌 자	5	-
+nte	w	arc-49	염혼의 질주	5	-
+nte	w	arc-50	발도	5	-
+nte	w	arc-51	물망산	5	-
