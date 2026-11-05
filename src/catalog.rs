@@ -187,8 +187,7 @@ impl CatalogUi {
         };
         let kind = if entry.kind == Kind::Character { "c" } else { "w" };
         let key = format!("{game}/{kind}-{}.png", entry.id);
-        if entry.has_verified_image()
-            && !self.textures.contains_key(&key)
+        if !self.textures.contains_key(&key)
             && !self.queued.contains(&key)
         {
             self.queued.insert(key.clone());
