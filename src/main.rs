@@ -87,6 +87,72 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
     }
 }
 
+/// Crisp DPI-independent sci-fi star orbit and gacha pass artwork.
+/// All geometry is rendered as vectors. No blurry upscaled raster crops.
+fn paint_navigation_art(ui: &egui::Ui) {
+    let rect = ui.max_rect().expand(11.0);
+    let painter = ui.painter_at(rect);
+    let cyan = Color32::from_rgb(99, 232, 251);
+    let ice = Color32::from_rgb(195, 228, 255);
+    let navy = Color32::from_rgb(8, 40, 65);
+    let center = egui::pos2(rect.center().x, rect.top() + 79.0);
+    painter.rect_filled(
+        egui::Rect::from_min_max(rect.min,
+            egui::pos2(rect.right(), rect.top()+133.0)), 0.0, navy,
+    );
+    // Tilted orbit around the top four-point gacha sparkle.
+    let orbit: Vec<egui::Pos2> = (0..=84).map(|i| {
+        let t = std::f32::consts::TAU * (i as f32) / 84.0;
+        let (x, y) = (74.0*t.cos(), 24.0*t.sin());
+        egui::pos2(center.x + x*0.92-y*0.40, center.y + x*0.40+y*0.92)
+    }).collect();
+    painter.add(egui::Shape::line(orbit,
+        egui::Stroke::new(1.45, Color32::from_rgb(84, 157, 214))));
+    let star = |r: f32| -> Vec<egui::Pos2> {
+        (0..8).map(|i| {
+            let t = std::f32::consts::TAU*i as f32/8.0;
+            let radius = if i%2==0 { r } else { r*0.19 };
+            egui::pos2(center.x + t.sin()*radius, center.y-t.cos()*radius)
+        }).collect()
+    };
+    painter.add(egui::Shape::convex_polygon(star(28.0),
+        cyan, egui::Stroke::new(1.3,ice)));
+    painter.circle_filled(egui::pos2(center.x+41.0,center.y-39.0),2.0,ice);
+    painter.circle_filled(egui::pos2(center.x-65.0,center.y+41.0),1.7,cyan);
+
+    let ground = egui::Rect::from_min_max(
+        egui::pos2(rect.left(),rect.bottom()-286.0),rect.right_bottom());
+    painter.rect_filled(ground,0.0,Color32::from_rgb(6,34,57));
+    let p = |x: f32,y: f32| egui::pos2(rect.center().x+x,ground.bottom()+y);
+    let arc: Vec<egui::Pos2> = (0..=48).map(|i| {
+        let t = i as f32/48.0*std::f32::consts::PI*1.15;
+        p(-58.0 + 98.0*t.cos(), -81.0 - 96.0*t.sin())
+    }).collect();
+    painter.add(egui::Shape::line(arc,
+        egui::Stroke::new(1.2,Color32::from_rgb(54,131,192))));
+    // A floating glossy draw pass; corners and edges stay sharp at any DPI.
+    let card = [p(-76.0,-79.0),p(45.0,-101.0),p(68.0,-43.0),p(-54.0,-22.0)];
+    painter.add(egui::Shape::convex_polygon(card.to_vec(),
+        Color32::from_rgb(36,85,144),
+        egui::Stroke::new(2.2,Color32::from_rgb(132,198,252))));
+    let inner = [p(-62.0,-70.0),p(34.0,-87.0),p(50.0,-49.0),p(-44.0,-33.0)];
+    painter.add(egui::Shape::convex_polygon(inner.to_vec(),
+        Color32::from_rgb(25,56,110),
+        egui::Stroke::new(1.0,ice)));
+    painter.line_segment([p(-8.0,-78.0),p(4.0,-60.0)],
+        egui::Stroke::new(3.0,cyan));
+    painter.line_segment([p(4.0,-60.0),p(22.0,-64.0)],
+        egui::Stroke::new(2.0,ice));
+    for (x,y,r) in [(-94.0,-172.0,2.7),(86.0,-147.0,3.3),
+                     (-58.0,-237.0,2.0),(70.0,-260.0,2.0)] {
+        painter.circle_filled(p(x,y),r,ice);
+        painter.line_segment([p(x-6.0,y),p(x+6.0,y)],
+            egui::Stroke::new(0.7,cyan));
+        painter.line_segment([p(x,y-6.0),p(x,y+6.0)],
+            egui::Stroke::new(0.7,cyan));
+    }
+}
+
 fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
     view: ViewMode, text: &str) {
     let active = *selected == view;
@@ -236,8 +302,6 @@ struct Calculator {
     history: Vec<HistoryEntry>,
     show_history: bool,
     search_query: String,
-    sidebar_decor: Option<egui::TextureHandle>,
-    header_avatar: Option<egui::TextureHandle>,
     catalog_ui: catalog::CatalogUi,
     picker_kind: Option<catalog::Kind>,
     picker_filter: String,
@@ -251,28 +315,6 @@ impl Calculator {
         // preference could otherwise switch the UI back to Light on Windows.
         configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
-        // The user-supplied design artwork is bundled locally: no network access.
-        let sidebar_decor = image::load_from_memory(
-            include_bytes!("assets/sidebar_decor.jpg")
-        ).ok().map(|art| {
-            let rgba = art.to_rgba8();
-            let pixels = egui::ColorImage::from_rgba_unmultiplied(
-                [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
-            );
-            cc.egui_ctx.load_texture("sidebar_decor", pixels, egui::TextureOptions::LINEAR)
-        });
-        let header_avatar = image::load_from_memory(
-            include_bytes!("assets/header_avatar.jpg")
-        ).ok().map(|art| {
-            let rgba = art.to_rgba8();
-            cc.egui_ctx.load_texture(
-                "header_avatar",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
-                ),
-                egui::TextureOptions::LINEAR,
-            )
-        });
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
         // rejects out-of-generation responses to avoid showing outdated probabilities.
@@ -323,8 +365,6 @@ impl Calculator {
             history: Vec::new(),
             show_history: false,
             search_query: String::new(),
-            sidebar_decor,
-            header_avatar,
             catalog_ui: catalog::CatalogUi::new(&cc.egui_ctx),
             picker_kind: None,
             picker_filter: String::new(),
@@ -518,28 +558,6 @@ impl Calculator {
                     });
                     ui.with_layout(
                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let (avatar_rect, avatar_button) = ui.allocate_exact_size(
-                                egui::vec2(45.0, 45.0), egui::Sense::click(),
-                            );
-                            ui.painter().circle_filled(avatar_rect.center(), 22.5,
-                                Color32::from_rgb(51, 72, 107));
-                            if let Some(ref avatar) = self.header_avatar {
-                                ui.painter().image(avatar.id(), avatar_rect.shrink(3.0),
-                                    egui::Rect::from_min_max(
-                                        egui::pos2(0.0,0.0), egui::pos2(1.0,1.0)),
-                                    Color32::WHITE);
-                            } else {
-                                ui.painter().circle_filled(avatar_rect.center(), 17.0,
-                                    Color32::from_rgb(92, 110, 156));
-                                ui.painter().text(avatar_rect.center(),
-                                    egui::Align2::CENTER_CENTER, "✧",
-                                    egui::FontId::proportional(25.0), Color32::WHITE);
-                            }
-                            ui.painter().circle_filled(
-                                avatar_rect.right_bottom()-egui::vec2(4.0, 3.0),
-                                3.2, Color32::from_rgb(108, 232, 95),
-                            );
-                            if avatar_button.clicked() { self.show_help = true; }
                             if ui.add(egui::Button::new("?")
                                 .fill(CARD).corner_radius(10)
                                 .min_size(egui::vec2(39.0, 39.0))).clicked() {
@@ -590,20 +608,7 @@ impl Calculator {
             .exact_width(222.0)
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
-                if let Some(ref art) = self.sidebar_decor {
-                    let area = ui.max_rect().expand(11.0);
-                    let split = 58.0 / 178.0;
-                    ui.painter().image(art.id(),
-                        egui::Rect::from_min_max(area.min,
-                            egui::pos2(area.right(), area.top()+130.0)),
-                        egui::Rect::from_min_max(egui::pos2(0.0,0.0),
-                            egui::pos2(1.0,split)), Color32::WHITE);
-                    ui.painter().image(art.id(),
-                        egui::Rect::from_min_max(
-                            egui::pos2(area.left(),area.bottom()-274.0),area.right_bottom()),
-                        egui::Rect::from_min_max(egui::pos2(0.0,split),
-                            egui::pos2(1.0,1.0)), Color32::WHITE);
-                }
+                paint_navigation_art(ui);
                 ui.add_space(136.0);
                 for (view, label) in [
                     (ViewMode::Calculator, "Dashboard"),
