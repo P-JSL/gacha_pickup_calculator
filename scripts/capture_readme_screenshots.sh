@@ -23,20 +23,10 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     sleep 2
   }
   game() {
-    # Header search, followed by Enter: real app navigation (no debug states).
-    xdotool mousemove 1100 72 click 1
-    xdotool key ctrl+a
-    xdotool type --clearmodifiers --delay 55 "$1"
-    xdotool key Return
-    sleep 4
-    # After a game change no result is visible yet, so the Run button
-    # moves upwards. Detect the actual bright cyan button instead of
-    # hard-coding the Y coordinate of the initial dashboard.
-    scrot -q 75 /tmp/gacha-ui-before-run.png
-    button_y=$(python3 -c "from PIL import Image; im=Image.open(\"/tmp/gacha-ui-before-run.png\").convert(\"RGB\"); rows=[y for y in range(140,840) if sum(1 for x in range(930,1214,3) if ((c:=im.getpixel((x,y)))[0]<110 and c[1]>180 and c[2]>205))>55]; print(round(sum(rows)/len(rows)) if rows else 0)")
-    test "$button_y" -gt 140 || { echo "Run Simulation button not found in live GUI"; exit 1; }
-    xdotool mousemove 1100 "$button_y" click 1
-    sleep 9
+    # Click actual game tabs. Header search+Enter did not change the
+    # selected game in an earlier verified CI capture.
+    xdotool mousemove "$1" 540 click 1
+    sleep 10
     capture "$2"
   }
 
@@ -47,15 +37,19 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   navigate 343; capture characters
   navigate 400; capture weapons
   navigate 548; capture preferences
+  # The README photo retains default auto-refresh OFF. Enable it only for
+  # subsequent screenshots so switching game finishes the chart simulation.
+  xdotool mousemove 420 230 click 1
+  sleep 1
   navigate 168
-  game wuthering dashboard-wuwa-latest
-  game stella dashboard-stellasora-latest
-  game neverness dashboard-nte-latest
+  game 650 dashboard-wuwa-latest
+  game 766 dashboard-stellasora-latest
+  game 866 dashboard-nte-latest
 '
 
 python3 - <<'PY'
 from pathlib import Path
-from PIL import Image, ImageChops
+from PIL import Image
 
 paths = sorted(Path("ci-readme-shots").glob("*.png"))
 required = {
@@ -70,12 +64,19 @@ for p in paths:
         im.verify()
     with Image.open(p) as im:
         assert im.size == (1536, 864), f"Incorrect GUI capture dimensions: {p.name}"
-games = ["dashboard-hsr-aha.png", "dashboard-wuwa-latest.png",
-         "dashboard-stellasora-latest.png", "dashboard-nte-latest.png"]
-for prior, current in zip(games, games[1:]):
-    with Image.open("ci-readme-shots/" + prior) as first:
-        with Image.open("ci-readme-shots/" + current) as other:
-            assert ImageChops.difference(first, other).getbbox(), (
-                f"Game switch capture did not update screen: {current}")
+# Verify actual selected tabs, not merely differing cursor positions/history.
+# A previous CI run produced HSR images under all three game-specific names.
+selected_tabs = {
+    "dashboard-hsr-aha.png": (503, 535),
+    "dashboard-wuwa-latest.png": (600, 535),
+    "dashboard-stellasora-latest.png": (731, 535),
+    "dashboard-nte-latest.png": (827, 535),
+}
+for name, (x, y) in selected_tabs.items():
+    with Image.open("ci-readme-shots/" + name) as original:
+        rgb = original.convert("RGB").getpixel((x, y))
+        assert rgb[0] < 115 and rgb[1] > 185 and rgb[2] > 185, (
+            f"Wrong game selected in {name}: tab color {rgb}"
+        )
 print(f"Verified {len(paths)} actual graphical desktop screenshots")
 PY
