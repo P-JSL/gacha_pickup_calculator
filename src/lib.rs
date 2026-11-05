@@ -492,6 +492,43 @@ mod tests {
     }
 
     #[test]
+    fn all_game_profiles_have_normalized_first_passage_distributions() {
+        for game in games::Game::ALL {
+            let profile = games::GameSetup::new(game);
+            for banner in [&profile.character, &profile.weapon] {
+                let dist = banner.distribution(RateMode::CommunityEstimate).unwrap();
+                let total: f64 = dist.pmf.iter().sum();
+                assert!((total - 1.0).abs() < 1e-8, "{game:?}: {total}");
+                assert!(dist.cdf.windows(2).all(|w| w[0] <= w[1] + 1e-11));
+                assert!(dist.mean.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn star_rail_e6_s5_independent_reference_mean() {
+        let profile = games::GameSetup::new(games::Game::StarRail);
+        let ch = profile.character.distribution(RateMode::CommunityEstimate).unwrap();
+        let lc = profile.weapon.distribution(RateMode::CommunityEstimate).unwrap();
+        let both = ch.combine(&lc);
+        // Independent Python DP cross-check for 3 pity, first limited guaranteed.
+        assert!((ch.mean - 621.0719).abs() < 1e-3);
+        assert!((lc.mean - 333.8191).abs() < 1e-3);
+        assert!((both.mean - 954.891).abs() < 1e-3);
+        assert_eq!(both.quantile(0.9), 1126);
+    }
+
+    #[test]
+    fn nte_base_is_not_consolidated_rate() {
+        let profile = games::GameSetup::new(games::Game::Neverness);
+        if let BannerRule::Standard { ref rarity, .. } = profile.character.rule {
+            assert_eq!(rarity.chance(70, RateMode::PublishedOnly), 0.0099);
+            assert_eq!(rarity.chance(71, RateMode::PublishedOnly), 0.1959);
+            assert_eq!(rarity.chance(90, RateMode::PublishedOnly), 1.0);
+        } else { panic!("expected NTE character board rule"); }
+    }
+
+    #[test]
     fn wuthering_soft_starts_after_65() {
         let model = RateSchedule { base: 0.008, hard: 80, soft: SoftPity::WutheringEstimated };
         assert_eq!(model.chance(65, RateMode::CommunityEstimate), 0.008);
