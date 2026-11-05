@@ -1160,11 +1160,12 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
 }
 
 fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
-    ui.label(RichText::new(eyebrow).size(10.0).color(PRIMARY).strong());
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(eyebrow).size(9.5).color(PRIMARY).strong());
+        ui.heading(RichText::new(title).size(18.0).strong());
+        ui.label(RichText::new(subtitle).size(10.5).color(MUTED));
+    });
     ui.add_space(6.0);
-    ui.heading(RichText::new(title).size(23.0).strong());
-    ui.label(RichText::new(subtitle).size(12.0).color(MUTED));
-    ui.add_space(12.0);
 }
 
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
@@ -1172,18 +1173,24 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(12))
-        .inner_margin(11)
+        .corner_radius(egui::CornerRadius::same(11))
+        .inner_margin(10)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(number).color(PRIMARY).strong().size(11.0));
-                ui.add_space(5.0);
-                ui.label(RichText::new(heading).strong().size(15.0));
+            ui.horizontal_wrapped(|ui| {
+                egui::Frame::default()
+                    .fill(SELECTED_NAV)
+                    .corner_radius(egui::CornerRadius::same(5))
+                    .inner_margin(egui::Margin::symmetric(6, 2))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(number).color(PRIMARY).strong().size(10.0));
+                    });
+                ui.label(RichText::new(heading).strong().size(13.0));
+                if !description.is_empty() {
+                    ui.label(RichText::new(description).color(MUTED).size(10.0));
+                }
             });
-            ui.add_space(3.0);
-            ui.label(RichText::new(description).color(MUTED).size(12.0));
-            ui.add_space(7.0);
+            ui.add_space(4.0);
             content(ui);
         });
 }
@@ -1191,14 +1198,12 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
     egui::Frame::group(ui.style()).fill(CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(12)).inner_margin(11)
+        .corner_radius(egui::CornerRadius::same(11)).inner_margin(9)
         .show(ui, |ui| {
-            ui.set_min_width(ui.available_width().min(180.0));
-            ui.label(RichText::new(label).color(MUTED).size(12.0));
-            ui.add_space(5.0);
-            ui.label(RichText::new(value).color(accent).size(23.0).strong());
-            ui.add_space(3.0);
-            ui.label(RichText::new(note).color(MUTED).size(11.0));
+            ui.set_min_width(ui.available_width().min(145.0));
+            ui.label(RichText::new(label).color(MUTED).size(10.5));
+            ui.label(RichText::new(value).color(accent).size(21.0).strong());
+            ui.label(RichText::new(note).color(MUTED).size(10.0));
         });
 }
 
