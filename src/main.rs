@@ -908,7 +908,7 @@ impl Calculator {
     }
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
-        let Some(stats) = self.visible_stats() else {
+        let Some(stats) = self.visible_stats().cloned() else {
             if self.calculating {
                 ui.horizontal(|ui| {
                     ui.spinner();
