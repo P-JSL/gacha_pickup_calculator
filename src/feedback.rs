@@ -515,6 +515,67 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn four_star_refunds_compound_across_refunded_draws() {
+        let cfg = FeedbackConfig::for_game(Game::StellaSora);
+        let mut wallet = Wallet::new(&cfg);
+        let mut dedicated = 0;
+        for _ in 0..6 {
+            wallet.pay(&mut dedicated);
+            // A duplicate 4★ is obtained even on pulls funded by refunds.
+            wallet.refund(cfg.four_star_reward);
+        }
+        let sample = RefundScenario::from_wallet(&wallet, 0);
+        assert_eq!(sample.raw_pulls, 6);
+        assert_eq!(sample.points_funded_pulls, 2);
+        assert_eq!(sample.initial_flexible_required, 4);
+        assert_eq!(sample.earned_points, 240);
+        assert_eq!(sample.raw_pulls,
+            sample.initial_flexible_required + sample.points_funded_pulls);
+    }
+
+    #[test]
+    fn all_games_have_distinct_mutable_refund_presets() {
+        let hsr = FeedbackConfig::for_game(Game::StarRail);
+        let wuwa = FeedbackConfig::for_game(Game::WutheringWaves);
+        let nte = FeedbackConfig::for_game(Game::Neverness);
+        let stella = FeedbackConfig::for_game(Game::StellaSora);
+        for cfg in [&hsr, &wuwa, &nte, &stella] {
+            assert!(cfg.enabled);
+            cfg.validate().unwrap();
+        }
+        assert_eq!(hsr.points_per_ticket, 20);
+        assert_eq!(wuwa.points_per_ticket, 8);
+        assert_eq!(nte.points_per_ticket, 24);
+        assert_eq!(stella.points_per_ticket, 100);
+    }
+
+    #[test]
+    fn quantile_uses_one_correlated_scenario() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner { rule: BannerRule::Standard {
+            rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+            featured_share: 1.0,
+        }, pity: 0, guaranteed: false, target_copies: 3,
+           spark: None, any_rare_pity: 0 };
+        setup.weapon.target_copies = 0;
+        setup.character_dedicated = 1;
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.samples = 10;
+        cfg.four_star_reward = 0;
+        let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let sample = result.scenario_at_quantile(0.9).unwrap();
+        assert_eq!(sample.initial_flexible_required, result.quantile(0.9));
+        assert_eq!(sample.raw_pulls,
+            sample.initial_flexible_required + sample.points_funded_pulls
+                + sample.dedicated_used);
+        let means = result.successful_means(result.quantile(0.9)).unwrap();
+        assert!(means.count > 0);
+        assert!((means.average_raw -
+                 (means.average_dedicated + means.average_points_funded + means.average_flexible))
+            .abs() < 1e-10);
+    }
     #[test]
     fn stella_sora_expert_permits_apply_to_trekker_and_record_duplicates() {
         let cfg = FeedbackConfig::for_game(Game::StellaSora);
