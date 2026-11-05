@@ -638,6 +638,7 @@ impl Calculator {
                 ui, &stats.character, &stats.weapon, &stats.combined,
                 stats.feedback.as_ref(),
                 self.setup.character_dedicated == 0 && self.setup.weapon_dedicated == 0,
+                self.setup.game.secondary_banner_name(),
             );
             if stats.feedback.is_some()
                 && (self.setup.character_dedicated > 0 || self.setup.weapon_dedicated > 0)
@@ -925,6 +926,7 @@ fn draw_probability_chart(
     combined: &Distribution,
     feedback: Option<&FeedbackEstimate>,
     show_feedback: bool,
+    secondary_label: &str,
 ) {
     let raw_end = combined.pmf.len().saturating_sub(1);
     let end = feedback.map_or(raw_end, |f| raw_end.max(f.quantile(1.0))).max(1);
@@ -1014,7 +1016,7 @@ fn draw_probability_chart(
     }
     ui.horizontal_wrapped(|ui| {
         ui.colored_label(PRIMARY, "● 캐릭터 목표");
-        ui.colored_label(MINT, format!("● {} 목표", self.setup.game.secondary_banner_name()));
+        ui.colored_label(MINT, format!("● {secondary_label} 목표"));
         ui.colored_label(GOLD, "● 합산 · 환급 전");
         if show_feedback && feedback.is_some() {
             ui.colored_label(refund_color, "● 환급 반영");
