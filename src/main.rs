@@ -247,7 +247,7 @@ impl Calculator {
                         .strong();
                     let button = egui::Button::new(label)
                         .fill(if active { SELECTED_NAV } else { SIDEBAR })
-                        .stroke(egui::Stroke::new(if active { 1.0 } else { 0.0 }, BORDER))
+                        .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
                         .corner_radius(9);
                     if ui.add_sized([ui.available_width(), 34.0], button).clicked() {
                         self.view_mode = view;
