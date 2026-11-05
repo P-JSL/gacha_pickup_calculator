@@ -1827,6 +1827,17 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
             series.iter().map(|line| format!("{} {:.1}%", line.label,
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
+        // Keep the exact point probability visible inside the graph as well
+        // as in the native mouse tooltip, even on platforms where hover UI
+        // can be delayed or positioned outside a small desktop viewport.
+        let badge = egui::Rect::from_min_size(
+            egui::pos2(graph.left() + 5.0, graph.top() + 5.0),
+            egui::vec2((graph.width() - 10.0).max(12.0), 22.0));
+        painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
+        let overlay = painter.with_clip_rect(badge.shrink(3.0));
+        overlay.text(badge.left_center() + egui::vec2(5.0, 0.0),
+            egui::Align2::LEFT_CENTER, &tooltip,
+            egui::FontId::proportional(10.5), Color32::WHITE);
         response.clone().on_hover_text(tooltip);
         }
     }
