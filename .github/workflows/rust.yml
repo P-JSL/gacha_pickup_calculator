@@ -30,6 +30,13 @@ jobs:
         run: cargo test --all-targets
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: RustSec dependency vulnerability audit (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit
       - name: Build release
         run: cargo build --release
       - name: Linux GUI startup smoke (virtual display)
