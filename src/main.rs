@@ -7,7 +7,6 @@ use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
-use gacha_pickup_calculator::{RateSchedule, SoftPity};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
@@ -759,14 +758,14 @@ impl Calculator {
                 .include_x(0.0).include_x(model.hard as f64)
                 .allow_zoom(true).allow_drag(true)
                 .show(ui, |plot| {
-                    plot.line(Line::new(PlotPoints::from(observed_pts))
+                    plot.line(Line::new(PlotPoints::from_iter(observed_pts.into_iter()))
                         .name("실측 누적 확률 · KM").color(MINT).width(3.0));
-                    plot.line(Line::new(PlotPoints::from(predicted_pts))
+                    plot.line(Line::new(PlotPoints::from_iter(predicted_pts.into_iter()))
                         .name("선택한 모델").color(PRIMARY).width(2.5));
                     if data.quality.is_censor_aware() {
-                        plot.line(Line::new(PlotPoints::from(lower_pts))
+                        plot.line(Line::new(PlotPoints::from_iter(lower_pts.into_iter()))
                             .name("실측 95% 하한").color(GOLD).width(1.0));
-                        plot.line(Line::new(PlotPoints::from(upper_pts))
+                        plot.line(Line::new(PlotPoints::from_iter(upper_pts.into_iter()))
                             .name("실측 95% 상한").color(GOLD).width(1.0));
                     }
                 });
@@ -775,9 +774,9 @@ impl Calculator {
                     Plot::new("survival_observed_hazard").legend(Legend::default())
                         .height(220.0).include_y(0.0).include_y(100.0)
                         .show(ui, |plot| {
-                            plot.line(Line::new(PlotPoints::from(observed_hazard))
+                            plot.line(Line::new(PlotPoints::from_iter(observed_hazard.into_iter()))
                                 .name("실측 위험률").color(MINT).width(2.0));
-                            plot.line(Line::new(PlotPoints::from(predicted_hazard))
+                            plot.line(Line::new(PlotPoints::from_iter(predicted_hazard.into_iter()))
                                 .name("모델 위험률").color(PRIMARY).width(2.0));
                         });
                 });
