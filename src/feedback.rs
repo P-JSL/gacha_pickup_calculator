@@ -417,8 +417,8 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         (&setup.character, model.character_other_five_star_rate),
         (&setup.weapon, model.weapon_other_five_star_rate),
     ] {
-        if let BannerRule::FeaturedCounter { featured_rate, .. } = banner.rule {
-            if featured_rate + extra > 1.0 + f64::EPSILON {
+        if let BannerRule::FeaturedCounter { featured_rate, .. } = &banner.rule {
+            if *featured_rate + extra > 1.0 + f64::EPSILON {
                 return Err("픽업·비픽업 최고 등급 기본 확률의 합은 100%를 넘을 수 없습니다.".into());
             }
         }
