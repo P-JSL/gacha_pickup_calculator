@@ -30,16 +30,16 @@ fn overview_metric(ui: &mut egui::Ui, symbol: &str, label: &str, value: String, 
         .fill(DEEP_CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(14))
-        .inner_margin(14)
+        .inner_margin(11)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(symbol).size(18.0).color(color));
                 ui.label(RichText::new(label).size(12.0).strong());
             });
-            ui.add_space(6.0);
-            ui.label(RichText::new(value).size(26.0).color(Color32::WHITE).strong());
-            ui.add_space(5.0);
+            ui.add_space(3.0);
+            ui.label(RichText::new(value).size(24.0).color(Color32::WHITE).strong());
+            ui.add_space(2.0);
             ui.label(RichText::new(note).color(MUTED).size(10.5));
         });
 }
@@ -68,7 +68,7 @@ impl Calculator {
                 ui.label(RichText::new(self.setup.game.label()).color(CYAN).size(12.0));
             });
         });
-        ui.add_space(16.0);
+        ui.add_space(11.0);
 
         if let Some(stats) = &self.stats {
             let free_pulls = self.setup.available_flexible();
@@ -101,7 +101,7 @@ impl Calculator {
                     format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
                         self.setup.game.currency_name()), CYAN);
             });
-            ui.add_space(14.0);
+            ui.add_space(9.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
             let char_rate = stats.character.at(character_budget) * 100.0;
@@ -148,7 +148,7 @@ impl Calculator {
             });
         }
 
-        ui.add_space(16.0);
+        ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
         dirty
     }
