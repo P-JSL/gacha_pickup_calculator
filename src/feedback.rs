@@ -57,7 +57,7 @@ impl FeedbackConfig {
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
                 featured_first: 15, featured_duplicate: 15,
-                off_banner_rare: 15, weapon_first: 15, weapon_rare: 15,
+                off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
                 four_star_reward: 3, weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -778,8 +778,8 @@ mod tests {
         assert_eq!(wavebands.scenarios[0].initial_flexible_required, 2);
     }
     #[test]
-    fn off_banner_wuthering_rare_uses_conservative_default() {
-        assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 15);
+    fn off_banner_wuthering_rare_includes_30_extra_corals() {
+        assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 45);
     }
 
 }
