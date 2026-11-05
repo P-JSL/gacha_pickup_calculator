@@ -111,6 +111,33 @@ fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
     }
 }
 
+/// All quick/detailed ticket editors update the exact same GameSetup fields.
+#[derive(Clone, Copy)]
+enum TicketRole { Shared, Character, Weapon }
+
+fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketRole) -> bool {
+    match role {
+        TicketRole::Shared =>
+            ui.add(egui::DragValue::new(&mut setup.flexible)
+                .range(0..=100_000).speed(1).suffix("장")).changed(),
+        TicketRole::Character =>
+            ui.add(egui::DragValue::new(&mut setup.character_dedicated)
+                .range(0..=100_000).speed(1).suffix("장")).changed(),
+        TicketRole::Weapon => {
+            if setup.game == Game::StellaSora {
+                let mut discs = setup.weapon_ticket_inventory();
+                let changed = ui.add(egui::DragValue::new(&mut discs)
+                    .range(0..=30_000_000).speed(1).suffix("개")).changed();
+                if changed { setup.set_weapon_ticket_inventory(discs); }
+                changed
+            } else {
+                ui.add(egui::DragValue::new(&mut setup.weapon_dedicated)
+                    .range(0..=100_000).speed(1).suffix("개")).changed()
+            }
+        }
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
@@ -691,43 +718,64 @@ impl Calculator {
     }
 
     fn resources(&mut self, ui: &mut egui::Ui) -> bool {
-        let mut dirty = false;
-        section(ui, "03", "보유 티켓 및 사용 예산", "전용권은 다른 배너로 이전되지 않습니다.", |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.label("캐릭터 전용권");
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_dedicated)
-                    .range(0..=100_000).suffix("뽑")).changed();
+        let mut changed = false;
+        section(ui, "03", "보유 뽑기권 및 재화",
+            "한정 픽업 배너의 전용 재화만 집계합니다. 일반 배너용 티켓은 합산하지 않습니다.", |ui| {
+                let game = self.setup.game;
+                if game.shares_featured_ticket() {
+                    ui.label(RichText::new(format!(
+                        "캐릭터·광추 공용 · {}", game.character_ticket_name()
+                    )).color(PRIMARY).strong());
+                    changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
+                    ui.label(RichText::new(
+                        "스타레일 한정 캐릭터와 광추는 별의 궤도 전용 티켓을 함께 사용합니다."
+                    ).color(MUTED).size(11.0));
+                } else {
+                    ui.columns(2, |columns| {
+                        columns[0].label(RichText::new(format!(
+                            "캐릭터 · {}", game.character_ticket_name()
+                        )).color(PRIMARY));
+                        changed |= edit_ticket_inventory(
+                            &mut columns[0], &mut self.setup, TicketRole::Character
+                        );
+                        columns[1].label(RichText::new(format!(
+                            "{} · {}", game.secondary_banner_name(), game.weapon_ticket_name()
+                        )).color(PRIMARY));
+                        changed |= edit_ticket_inventory(
+                            &mut columns[1], &mut self.setup, TicketRole::Weapon
+                        );
+                    });
+                    if game == Game::StellaSora {
+                        ui.label(RichText::new(format!(
+                            "골든 디스크 300개 = 레코드 1뽑 · 현재 {}개 → {}뽑 (잔여 {}개)",
+                            self.setup.weapon_ticket_inventory(), self.setup.weapon_dedicated,
+                            self.setup.weapon_ticket_remainder
+                        )).color(MUTED).size(11.0));
+                    } else if game == Game::Neverness {
+                        ui.label(RichText::new(
+                            "Arc는 Tri-Key 10개로 10연만 가능합니다. 전용권은 캐릭터 모집에 사용되지 않습니다."
+                        ).color(MUTED).size(11.0));
+                    }
+                }
+                ui.add_space(7.0);
                 ui.separator();
-                ui.label(format!("{} 전용권", self.setup.game.secondary_banner_name()));
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_dedicated)
-                    .range(0..=100_000).suffix("뽑")).changed();
-                ui.separator();
-                ui.label("자유 배분권");
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
-                    .range(0..=100_000).suffix("뽑")).changed();
+                ui.horizontal_wrapped(|ui| {
+                    let currency = game.currency_name();
+                    let price = game.cost_per_pull();
+                    ui.label(format!("공용 전환 재화 · {currency}"));
+                    changed |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                        .range(0..=100_000_000).speed(1).suffix("개")).changed();
+                    ui.label(RichText::new(format!(
+                        "{}개 = 1뽑 · 전환 가능 {}뽑 (잔여 {}개)",
+                        price, self.setup.premium_currency / price,
+                        self.setup.premium_currency % price
+                    )).color(MINT));
+                });
+                ui.label(RichText::new(
+                    "전용권은 각 배너에만 사용하고, 공용 전환 재화는 계산 엔진이 두 배너에 배분합니다."
+                ).color(MUTED).size(11.0));
             });
-            ui.horizontal_wrapped(|ui| {
-                let currency = self.setup.game.currency_name();
-                let price = self.setup.game.cost_per_pull();
-                ui.label(format!("보유 {currency}"));
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
-                    .range(0..=100_000_000).speed(1).suffix(currency)).changed();
-                ui.separator();
-                ui.label(format!("1뽑 = {price}{currency}"));
-                ui.separator();
-                ui.label(RichText::new(format!(
-                    "자유 배분권 합계: {}뽑 (직접 {}뽑 + {currency} 전환 {}뽑, 잔여 {}{currency})",
-                    self.setup.available_flexible(), self.setup.flexible,
-                    self.setup.premium_currency / price,
-                    self.setup.premium_currency % price,
-                )).color(MINT));
-            });
-            if self.setup.game == Game::Neverness {
-                ui.label(RichText::new("이환 Arc 배너는 10연 단위이며, 배너 전용권의 10장 미만 잔여도 별도 보유권으로 처리됩니다.")
-                    .color(GOLD));
-            }
-        });
-        dirty
+        changed
     }
 
     fn feedback_controls(&mut self, ui: &mut egui::Ui) -> bool {
