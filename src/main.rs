@@ -276,7 +276,7 @@ impl Calculator {
                         RichText::new(title).size(14.0)
                             .color(if active { Color32::WHITE } else { MUTED }).strong()
                     ).fill(if active { SELECTED_NAV } else { SIDEBAR })
-                        .stroke(egui::Stroke::new(if active { 1.0 } else { 0.0 }, BORDER))
+                        .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
                         .corner_radius(11);
                     if ui.add_sized([ui.available_width(), 39.0], button).clicked() {
                         self.view_mode = view;
