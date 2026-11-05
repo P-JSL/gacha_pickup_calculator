@@ -232,7 +232,7 @@ jobs:
           bash scripts/capture_readme_screenshots.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: gacha-readme-screenshots-v014
+          name: gacha-readme-screenshots-v015
           path: ci-readme-shots/
           if-no-files-found: error
           retention-days: 14
@@ -251,9 +251,9 @@ jobs:
             exit 1
           fi
           git switch -C "$PR_BRANCH" FETCH_HEAD
-          mkdir -p docs/screenshots/v0.1.14
-          cp ci-readme-shots/*.png docs/screenshots/v0.1.14/
-          git add docs/screenshots/v0.1.14/
+          mkdir -p docs/screenshots/v0.1.15
+          cp ci-readme-shots/*.png docs/screenshots/v0.1.15/
+          git add docs/screenshots/v0.1.15/
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' \
                 -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
