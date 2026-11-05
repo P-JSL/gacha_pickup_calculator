@@ -3,7 +3,7 @@
 use eframe::egui;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -21,8 +21,43 @@ pub struct Entry {
     pub icon_url: String,
 }
 impl Entry {
-    pub fn has_verified_image(&self) -> bool { self.icon_url.starts_with("https://") }
+    pub fn has_verified_image(&self) -> bool { approved_icon_url(&self.icon_url) }
 }
+
+// Image URLs are compiled into the catalog, but a compromised upstream asset or
+// accidental future catalog change must not turn the app into a general URL client.
+// A fixed repository allowlist blocks arbitrary hosts, credentials, ports, queries,
+// fragments, protocol downgrades and redirects to internal network targets.
+const ICON_REPOSITORIES: &[&str] = &[
+    "https://raw.githubusercontent.com/Mar-7th/StarRailRes/",
+    "https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/",
+    "https://raw.githubusercontent.com/JforPlay/sstoy/",
+    "https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/",
+];
+const MAX_ICON_BYTES: u64 = 3_000_000;
+const MAX_ICON_SIDE: u32 = 4096;
+
+fn approved_icon_url(url: &str) -> bool {
+    if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
+        return false;
+    }
+    let Some(relative) = ICON_REPOSITORIES.iter()
+        .find_map(|prefix| url.strip_prefix(prefix)) else { return false };
+    let extension_ok = [".png", ".jpg", ".jpeg"]
+        .iter().any(|extension| relative.to_ascii_lowercase().ends_with(extension));
+    extension_ok && relative.split('/').all(|part|
+        !part.is_empty() && part != "." && part != ".."
+        && part.bytes().all(|byte|
+            byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b'%' | b'(' | b')')
+        )
+    )
+}
+
+fn approved_icon_bytes(bytes: &[u8]) -> bool {
+    bytes.len() >= 8 && (bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+        || (bytes.len() >= 3 && bytes.starts_with(b"\xff\xd8\xff")))
+}
+
 fn game_code(game: Game) -> &'static str {
     match game {
         Game::StarRail => "hsr",
@@ -115,14 +150,50 @@ impl CatalogUi {
     }
 
     fn fetch_icon(url: &str) -> Option<egui::ColorImage> {
-        if !url.starts_with("https://") { return None }
-        let response = ureq::get(url)
-            .timeout(Duration::from_secs(6))
+        if !approved_icon_url(url) { return None; }
+        // No redirects: upstream cannot bounce this request to localhost,
+        // cloud metadata services or an attacker-controlled HTTP endpoint.
+        let agent = ureq::AgentBuilder::new()
+            .redirects(0)
+            .timeout_connect(Duration::from_secs(3))
+            .timeout_read(Duration::from_secs(5))
+            .timeout_write(Duration::from_secs(3))
+            .build();
+        let response = agent.get(url)
+            .set("Accept", "image/png, image/jpeg")
             .set("User-Agent", "gacha-pickup-calculator/desktop")
             .call().ok()?;
+        let media_type = response.header("Content-Type")?
+            .split(';').next()?.trim().to_ascii_lowercase();
+        if !matches!(media_type.as_str(),
+            "image/png" | "image/jpeg" | "application/octet-stream") {
+            return None;
+        }
+        if response.header("Content-Length")
+            .and_then(|len| len.parse::<u64>().ok())
+            .is_some_and(|len| len > MAX_ICON_BYTES) {
+            return None;
+        }
         let mut bytes = Vec::new();
-        response.into_reader().take(3_000_000).read_to_end(&mut bytes).ok()?;
-        let image = image::load_from_memory(&bytes).ok()?.thumbnail(112, 112).to_rgba8();
+        response.into_reader().take(MAX_ICON_BYTES + 1)
+            .read_to_end(&mut bytes).ok()?;
+        if bytes.len() as u64 > MAX_ICON_BYTES || !approved_icon_bytes(&bytes) {
+            return None;
+        }
+        // Decode only PNG/JPEG from memory, with strict pixel dimensions and
+        // bounded (best-effort) decoder allocations. Never save or execute
+        // downloaded content, and never parse untrusted SVG/HTML.
+        let mut reader = image::ImageReader::new(Cursor::new(bytes))
+            .with_guessed_format().ok()?;
+        if !matches!(reader.format(), Some(image::ImageFormat::Png | image::ImageFormat::Jpeg)) {
+            return None;
+        }
+        let mut limits = image::Limits::default();
+        limits.max_image_width = Some(MAX_ICON_SIDE);
+        limits.max_image_height = Some(MAX_ICON_SIDE);
+        limits.max_alloc = Some(48 * 1024 * 1024);
+        reader.limits(limits);
+        let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
         Some(egui::ColorImage::from_rgba_unmultiplied(
             [image.width() as usize, image.height() as usize], image.as_raw(),
         ))
@@ -232,6 +303,21 @@ pub fn picker(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn image_download_policy_rejects_untrusted_servers_and_payloads() {
+        assert!(approved_icon_url("https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.png"));
+        for url in [
+            "http://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.png",
+            "https://raw.githubusercontent.com.evil.invalid/a.png",
+            "https://raw.githubusercontent.com/Mar-7th/StarRailRes/../private.png",
+            "https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.png?token=1",
+            "https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.svg",
+            "https://127.0.0.1/image.png",
+        ] { assert!(!approved_icon_url(url), "{url}"); }
+        assert!(!approved_icon_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
+        assert!(!approved_icon_bytes(b"MZ executable"));
+        assert!(approved_icon_bytes(b"\x89PNG\r\n\x1a\nnot-a-valid-image"));
+    }
     #[test]
     fn all_games_have_both_named_catalogs() {
         let mut unique = HashSet::new();
