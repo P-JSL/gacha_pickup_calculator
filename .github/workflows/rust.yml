@@ -48,6 +48,44 @@ jobs:
             exit 1
           fi
           echo "GUI stayed alive under virtual X11 display without crashing."
+      - name: Capture dark-mode chart screenshot (Linux GUI)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y scrot xdotool python3-pil
+          mkdir -p ci-artifacts
+          xvfb-run -a -s '-screen 0 1440x960x24' bash -c '
+            set -eu
+            LIBGL_ALWAYS_SOFTWARE=1 ./target/release/gacha_pickup_calculator >/tmp/gacha-chart.log 2>&1 &
+            app=$!
+            trap "kill $app 2>/dev/null || true" EXIT
+            sleep 9
+            kill -0 "$app" || { cat /tmp/gacha-chart.log; exit 1; }
+            xdotool mousemove 850 700
+            xdotool click --repeat 7 --delay 125 5
+            sleep 2
+            scrot -q 90 ci-artifacts/chart.png
+          '
+          python3 - <<'PY'
+          from PIL import Image
+          image = Image.open("ci-artifacts/chart.png").convert("RGB")
+          assert image.width >= 1200 and image.height >= 900, "Invalid screenshot"
+          core = image.crop((150, 60, 1150, 850)).resize((100, 79))
+          pixels = list(core.getdata())
+          dark = sum(max(p) < 155 for p in pixels) / len(pixels)
+          distinct = len(set(pixels))
+          print(f"GUI screenshot dark-pixel ratio: {dark:.1%}; distinct colors: {distinct}")
+          assert dark >= 0.55 and distinct >= 50, "GUI is not dark or screenshot is blank"
+          PY
+      - name: Upload Linux chart screenshot
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gacha-chart-visual-smoke-linux
+          path: ci-artifacts/chart.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
