@@ -256,7 +256,7 @@ struct UiPreferences {
 impl Default for UiPreferences {
     fn default() -> Self {
         Self {
-            auto_recalculate: true,
+            auto_recalculate: false,
             debounce_ms: 350,
             show_result_panel: true,
             show_chart_fill: true,
@@ -736,6 +736,74 @@ impl Calculator {
         ui.label(RichText::new(
             "화면 설정은 프로그램 실행 중에만 유지됩니다. 종료 시 기본값으로 돌아갑니다."
         ).color(MUTED).size(11.0));
+    }
+
+    /// Keep both tabs independent while sharing the underlying per-game session.
+    fn banner_page(&mut self, ui: &mut egui::Ui, character: bool) -> bool {
+        let mut dirty = false;
+        let kind = if character { catalog::Kind::Character } else { catalog::Kind::Weapon };
+        section(ui, "01", if character { "캐릭터 목표" } else { "무기 목표" },
+            "해당 배너의 목표와 보유 수량만 편집합니다.", |ui| {
+                self.catalog_selector(ui, kind);
+                if character {
+                    egui::ComboBox::from_id_salt("character_tab_goal")
+                        .selected_text(format!("E{} / {}장", self.target_eid, self.target_eid + 1))
+                        .show_ui(ui, |ui| {
+                            for level in 0..=6 {
+                                dirty |= ui.selectable_value(&mut self.target_eid,
+                                    level, format!("E{level} / {}장", level + 1)).changed();
+                            }
+                        });
+                    ui.horizontal(|ui| {
+                        ui.label("기보유 캐릭터");
+                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
+                            .range(0..=7).speed(1).suffix("장")).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("캐릭터 전용권");
+                        dirty |= edit_ticket_inventory(ui, &mut self.setup,
+                            if self.setup.game.shares_featured_ticket() {
+                                TicketRole::Shared
+                            } else { TicketRole::Character });
+                    });
+                } else {
+                    egui::ComboBox::from_id_salt("weapon_tab_goal")
+                        .selected_text(format!("S{} / {}장", self.target_refine, self.target_refine))
+                        .show_ui(ui, |ui| {
+                            for level in 0..=5 {
+                                dirty |= ui.selectable_value(&mut self.target_refine,
+                                    level, format!("S{level} / {level}장")).changed();
+                            }
+                        });
+                    ui.horizontal(|ui| {
+                        ui.label("기보유 무기");
+                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
+                            .range(0..=5).speed(1).suffix("장")).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(self.setup.game.weapon_ticket_name());
+                        let role = if self.setup.game.shares_featured_ticket() {
+                            TicketRole::Shared
+                        } else { TicketRole::Weapon };
+                        dirty |= edit_ticket_inventory(ui, &mut self.setup, role);
+                    });
+                }
+            });
+        ui.add_space(10.0);
+        section(ui, "02", "배너 천장", "이 배너의 천장 및 확정 상태만 변경합니다.", |ui| {
+            if character {
+                dirty |= Self::banner_controls(
+                    ui, "캐릭터", &mut self.setup.character.rule,
+                    &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                    &mut self.setup.character.any_rare_pity);
+            } else {
+                dirty |= Self::banner_controls(
+                    ui, self.setup.game.secondary_banner_name(), &mut self.setup.weapon.rule,
+                    &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                    &mut self.setup.weapon.any_rare_pity);
+            }
+        });
+        dirty
     }
 
     fn targets(&mut self, ui: &mut egui::Ui) -> bool {
@@ -1685,6 +1753,18 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
             series.iter().map(|line| format!("{} {:.1}%", line.label,
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
+        let bubble_width = (series.len() as f32 * 110.0 + 105.0)
+            .min(bounds.width() - 12.0).max(110.0);
+        let bubble = egui::Rect::from_min_size(
+            egui::pos2(
+                (pointer.x + 8.0).min(bounds.right() - bubble_width - 5.0)
+                    .max(bounds.left() + 5.0),
+                (pointer.y - 31.0).max(bounds.top() + 3.0)),
+            egui::vec2(bubble_width, 26.0));
+        painter.rect_filled(bubble, 5.0, Color32::from_rgb(4, 29, 44));
+        painter.text(bubble.left_center() + egui::vec2(6.0, 0.0),
+            egui::Align2::LEFT_CENTER, &tooltip,
+            egui::FontId::proportional(10.0), Color32::WHITE);
         response.clone().on_hover_text(tooltip);
         }
     }
@@ -1755,7 +1835,10 @@ impl eframe::App for Calculator {
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
         if self.header(ctx) {
-            self.schedule_recalculation();
+            self.input_needs_calculation = true;
+            if self.ui_preferences.auto_recalculate {
+                self.schedule_recalculation();
+            }
         }
         if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel {
             self.workspace_results_panel(ctx);
@@ -1788,17 +1871,15 @@ impl eframe::App for Calculator {
                                 ui.add_space(10.0);
                                 settings_changed |= self.feedback_controls(ui);
                             }
-                            ViewMode::Characters | ViewMode::Weapons => {
-                                page_intro(ui, "TARGET & PITY",
-                                    if self.view_mode == ViewMode::Characters {
-                                        "캐릭터 목표 관리"
-                                    } else {
-                                        "무기 · 광추 · 레코드 · Arc 목표 관리"
-                                    },
-                                    "캐릭터와 보조 배너의 목표 및 천장 상태는 서로 독립적입니다.");
-                                settings_changed |= self.targets(ui);
-                                ui.add_space(10.0);
-                                settings_changed |= self.pity(ui);
+                            ViewMode::Characters => {
+                                page_intro(ui, "CHARACTER BANNER", "캐릭터 목표 관리",
+                                    "캐릭터 선택·돌파·천장 및 보유권을 관리합니다.");
+                                settings_changed |= self.banner_page(ui, true);
+                            }
+                            ViewMode::Weapons => {
+                                page_intro(ui, "WEAPON BANNER", "무기 · 광추 · 레코드 · Arc 목표 관리",
+                                    "무기 선택·재련·천장 및 보유권을 관리합니다.");
+                                settings_changed |= self.banner_page(ui, false);
                             }
                             ViewMode::Preferences => {
                                 self.desktop_settings(ui);
@@ -1870,7 +1951,8 @@ impl eframe::App for Calculator {
         }
         if self.manual_calculation_requested {
             self.manual_calculation_requested = false;
-            self.schedule_recalculation();
+            self.pending_since = None;
+            self.recalculate();
         } else if settings_changed && self.ui_preferences.auto_recalculate {
             self.schedule_recalculation();
         }
