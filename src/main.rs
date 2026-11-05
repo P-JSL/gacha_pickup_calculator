@@ -86,6 +86,31 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
     }
 }
 
+fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
+    view: ViewMode, text: &str) {
+    let active = *selected == view;
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), 44.0), egui::Sense::click(),
+    );
+    if active {
+        ui.painter().rect_filled(rect, 10.0, SELECTED_NAV);
+    } else if response.hovered() {
+        ui.painter().rect_filled(rect, 10.0, CARD);
+    }
+    let color = if active { Color32::WHITE }
+        else { Color32::from_rgb(220, 235, 246) };
+    draw_nav_icon(ui.painter(),
+        egui::pos2(rect.left()+21.0,rect.center().y), view, color);
+    ui.painter().text(
+        egui::pos2(rect.left()+43.0,rect.center().y),
+        egui::Align2::LEFT_CENTER, text,
+        egui::FontId::proportional(14.0), color,
+    );
+    if response.clicked() {
+        *selected = view;
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
@@ -155,6 +180,7 @@ struct Calculator {
     history: Vec<HistoryEntry>,
     show_history: bool,
     search_query: String,
+    sidebar_decor: Option<egui::TextureHandle>,
 }
 
 impl Calculator {
@@ -163,6 +189,16 @@ impl Calculator {
         // preference could otherwise switch the UI back to Light on Windows.
         configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
+        // The user-supplied design artwork is bundled locally: no network access.
+        let sidebar_decor = image::load_from_memory(
+            include_bytes!("assets/sidebar_decor.jpg")
+        ).ok().map(|art| {
+            let rgba = art.to_rgba8();
+            let pixels = egui::ColorImage::from_rgba_unmultiplied(
+                [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
+            );
+            cc.egui_ctx.load_texture("sidebar_decor", pixels, egui::TextureOptions::LINEAR)
+        });
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
         // rejects out-of-generation responses to avoid showing outdated probabilities.
@@ -209,6 +245,7 @@ impl Calculator {
             history: Vec::new(),
             show_history: false,
             search_query: String::new(),
+            sidebar_decor,
         };
         app.recalculate();
         app
@@ -376,75 +413,36 @@ impl Calculator {
             .exact_width(222.0)
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
-                ui.add_space(12.0);
-                let (logo, painter) = ui.allocate_painter(
-                    egui::vec2(ui.available_width(), 82.0), egui::Sense::hover(),
-                );
-                let c = egui::pos2(logo.rect.center().x, logo.rect.top() + 35.0);
-                painter.circle_stroke(c, 24.0,
-                    egui::Stroke::new(1.2_f32, PRIMARY.gamma_multiply(0.65)));
-                painter.line_segment([
-                    egui::pos2(c.x - 17.0, c.y), egui::pos2(c.x + 17.0, c.y)
-                ], egui::Stroke::new(2.3_f32, PRIMARY));
-                painter.line_segment([
-                    egui::pos2(c.x, c.y - 17.0), egui::pos2(c.x, c.y + 17.0)
-                ], egui::Stroke::new(2.3_f32, PRIMARY));
-                painter.circle_filled(c, 5.0, Color32::WHITE);
-                painter.text(
-                    egui::pos2(logo.rect.center().x, logo.rect.bottom() - 5.0),
-                    egui::Align2::CENTER_BOTTOM, "GACHA LAB",
-                    egui::FontId::proportional(11.0), MUTED,
-                );
-                ui.add_space(17.0);
-                for (view, title) in [
+                if let Some(ref art) = self.sidebar_decor {
+                    let area = ui.max_rect().expand(11.0);
+                    let split = 58.0 / 178.0;
+                    ui.painter().image(art.id(),
+                        egui::Rect::from_min_max(area.min,
+                            egui::pos2(area.right(), area.top()+130.0)),
+                        egui::Rect::from_min_max(egui::pos2(0.0,0.0),
+                            egui::pos2(1.0,split)), Color32::WHITE);
+                    ui.painter().image(art.id(),
+                        egui::Rect::from_min_max(
+                            egui::pos2(area.left(),area.bottom()-274.0),area.right_bottom()),
+                        egui::Rect::from_min_max(egui::pos2(0.0,split),
+                            egui::pos2(1.0,1.0)), Color32::WHITE);
+                }
+                ui.add_space(136.0);
+                for (view, label) in [
                     (ViewMode::Calculator, "Dashboard"),
                     (ViewMode::Settings, "Simulator"),
                     (ViewMode::Currency, "Currency"),
                     (ViewMode::Characters, "Characters"),
                     (ViewMode::Weapons, "Weapons"),
                     (ViewMode::Analytics, "Analytics"),
-                    (ViewMode::TrackerSources, "Sources"),
-                    (ViewMode::ObservedDistribution, "CSV Analysis"),
                 ] {
-                    let active = self.view_mode == view;
-                    let (rect, response) = ui.allocate_exact_size(
-                        egui::vec2(ui.available_width(), 45.0), egui::Sense::click(),
-                    );
-                    let background = if active { SELECTED_NAV }
-                        else if response.hovered() { CARD }
-                        else { SIDEBAR };
-                    ui.painter().rect_filled(rect, 10.0, background);
-                    let color = if active { Color32::WHITE } else { MUTED };
-                    draw_nav_icon(ui.painter(),
-                        egui::pos2(rect.left() + 21.0, rect.center().y), view, color);
-                    ui.painter().text(
-                        egui::pos2(rect.left() + 43.0, rect.center().y),
-                        egui::Align2::LEFT_CENTER, title,
-                        egui::FontId::proportional(14.0), color,
-                    );
-                    if response.clicked() {
-                        self.view_mode = view;
-                    }
-                    ui.add_space(4.0);
+                    sidebar_nav(ui, &mut self.view_mode, view, label);
+                    ui.add_space(9.0);
                 }
-                ui.add_space(11.0);
+                ui.add_space(6.0);
                 ui.separator();
                 ui.add_space(13.0);
-                ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0).strong());
-                ui.add_space(5.0);
-                ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
-                ui.label(RichText::new(format!(
-                    "캐릭터 E{} · {} S{}",
-                    self.target_eid, self.setup.game.secondary_banner_name(), self.target_refine
-                )).color(MUTED).size(11.0));
-                ui.add_space(16.0);
-                ui.label(RichText::new("정확 DP + 순차 환급 시뮬레이션")
-                    .color(MUTED).size(10.0));
-                ui.add_space(9.0);
-                ui.hyperlink_to("GitHub / Source",
-                    "https://github.com/P-JSL/gacha_pickup_calculator");
-                ui.add_space(5.0);
-                ui.label(RichText::new(format!("v{} · DESKTOP", env!("CARGO_PKG_VERSION"))).color(MUTED).size(10.0));
+                sidebar_nav(ui, &mut self.view_mode, ViewMode::Settings, "Settings");
             });
     }
 
