@@ -407,122 +407,179 @@ impl Calculator {
         dirty
     }
 
-    /// Session-only run history; it is intentionally not presented as saved/persistent history.
+    /// User-facing summary and session history, attached to the right edge on wide screens.
     pub(super) fn workspace_results_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::right("workspace_results")
             .resizable(false)
-            .exact_width(280.0)
+            .exact_width(295.0)
             .frame(egui::Frame::default().fill(BG).inner_margin(10))
             .show(ctx, |ui| {
-                ui.add_space(7.0);
-                dashboard_card(ui, "▥  Result Summary", |ui| {
-                    let available = self.setup.available_flexible();
-                    if let Some(stats) = &self.stats {
-                        let raw = optimal_allocation(&stats.character, &stats.weapon,
-                            self.setup.character_dedicated,
-                            self.setup.weapon_dedicated, available);
-                        let rate = stats.feedback.as_ref()
-                            .map(|f| f.probability(available).0)
-                            .unwrap_or(raw.success_probability);
-                        ui.label(RichText::new("현재 보유권 기준 동시 달성").size(11.0).color(MUTED));
-                        ui.label(RichText::new(format!("{:.2}%", rate * 100.0))
-                            .size(26.0).color(SUCCESS).strong());
+                ui.add_space(1.0);
+                egui::Frame::group(ui.style())
+                    .fill(Color32::from_rgb(15, 42, 62))
+                    .stroke(egui::Stroke::new(1.0_f32, BORDER))
+                    .corner_radius(egui::CornerRadius::same(13))
+                    .inner_margin(12)
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.set_min_height(290.0);
+                        ui.label(RichText::new("▥  Result Summary").size(15.0).strong());
+                        ui.add_space(10.0);
                         ui.separator();
-                        let char_only = stats.character.at(
-                            self.setup.character_dedicated.saturating_add(available));
-                        let weapon_only = stats.weapon.at(
-                            self.setup.weapon_dedicated.saturating_add(available));
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("캐릭터 단독 배분 시").color(MUTED).size(11.0));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(RichText::new(format!("{:.2}%", char_only * 100.0))
-                                    .color(CYAN).strong());
-                            });
+                        ui.add_space(11.0);
+                        let available = self.setup.available_flexible();
+                        let results = self.stats.as_ref().map(|stats| {
+                            let raw = optimal_allocation(&stats.character, &stats.weapon,
+                                self.setup.character_dedicated,
+                                self.setup.weapon_dedicated, available);
+                            let joint = stats.feedback.as_ref()
+                                .map(|f| f.probability(available).0)
+                                .unwrap_or(raw.success_probability);
+                            (joint, stats.character.at(
+                                self.setup.character_dedicated.saturating_add(available)),
+                                stats.weapon.at(
+                                    self.setup.weapon_dedicated.saturating_add(available)))
                         });
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!("{} 단독 배분 시", self.setup.game.secondary_banner_name()))
-                                .color(MUTED).size(11.0));
+                            ui.label(RichText::new("◌  Refund Loop").size(12.0));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(RichText::new(format!("{:.2}%", weapon_only * 100.0))
-                                    .color(YELLOW).strong());
+                                let msg = if self.feedback_cfg.enabled {
+                                    "반복 재투입 적용"
+                                } else {
+                                    "Off"
+                                };
+                                ui.label(RichText::new(msg).color(SUCCESS).size(11.0).strong());
                             });
                         });
-                        ui.add_space(7.0);
+                        ui.add_space(10.0);
                         ui.separator();
-                        ui.label(RichText::new("Refund Loop · 환급 재투입").color(MUTED).size(11.0));
-                        if let Some(ref feedback) = stats.feedback {
-                            if let Some(means) = feedback.successful_means(available) {
-                                ui.label(RichText::new(format!("성공 경로 평균 +{:.1}뽑",
-                                    means.average_points_funded)).color(SUCCESS).strong());
-                            } else {
-                                ui.label(RichText::new("현재 예산 내 성공 표본 없음")
-                                    .color(MUTED).size(11.0));
-                            }
-                            ui.label(RichText::new(format!("전체 표본 평균 획득 재화 {:.1}{}",
-                                feedback.total_returned_points_average,
-                                self.setup.game.exchange_points_name()))
-                                .color(MUTED).size(10.0));
-                        } else {
-                            ui.label(RichText::new("환급 시뮬레이션 미적용")
-                                .color(MUTED).size(11.0));
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("◇  Extra Pulls from Refund").size(11.5));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                let bonus = self.stats.as_ref()
+                                    .and_then(|stats| stats.feedback.as_ref())
+                                    .and_then(|f| f.successful_means(available));
+                                let value = bonus.map_or("—".to_owned(),
+                                    |means| format!("+{:.1}뽑", means.average_points_funded));
+                                ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
+                            });
+                        });
+                        ui.add_space(13.0);
+                        egui::Frame::default()
+                            .fill(Color32::from_rgb(29, 65, 91))
+                            .corner_radius(9)
+                            .inner_margin(egui::Margin::symmetric(9, 6))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.label(RichText::new("★   Estimated Outcome")
+                                    .size(13.0).strong());
+                            });
+                        ui.add_space(9.0);
+                        for (title, value) in [
+                            ("Target Character", results.map(|(_,ch,_)|
+                                format!("E{} · {:.2}%", self.target_eid,ch*100.0))),
+                            ("Target Weapon", results.map(|(_,_,wp)|
+                                format!("S{} · {:.2}%", self.target_refine,wp*100.0))),
+                        ] {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("☑").color(SUCCESS).size(13.0));
+                                ui.label(RichText::new(title).size(11.0));
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(RichText::new(value.as_deref().unwrap_or("계산 중"))
+                                            .size(11.0).color(SUCCESS).strong());
+                                    });
+                            });
+                            ui.add_space(5.0);
                         }
-                    } else {
-                        ui.horizontal(|ui| {
-                            if self.calculating { ui.spinner(); }
-                            ui.label("계산 결과 대기 중");
-                        });
-                    }
-                });
-                ui.add_space(12.0);
-                dashboard_card(ui, "★  Estimated Outcome", |ui| {
-                    ui.label(RichText::new(format!(
-                        "캐릭터 E{} + {} S{}",
-                        self.target_eid, self.setup.game.secondary_banner_name(),
-                        self.target_refine
-                    )).strong().size(12.0));
-                    ui.add_space(5.0);
-                    let active = if self.feedback_cfg.enabled {
-                        "환급 재투입 모델 활성화"
-                    } else {
-                        "환급 미반영 확률"
-                    };
-                    ui.label(RichText::new(active).color(SUCCESS).size(11.0));
-                    ui.label(RichText::new(format!(
-                        "자유 재화 {}뽑 · 캐릭터 전용 {} · {} 전용 {}",
-                        self.setup.available_flexible(),
-                        self.setup.character_dedicated,
-                        self.setup.game.secondary_banner_name(),
-                        self.setup.weapon_dedicated
-                    )).color(MUTED).size(10.0));
-                    ui.add_space(8.0);
-                    if ui.button("상세 결과 및 분위수  →").clicked() {
-                        self.view_mode = ViewMode::Analytics;
-                    }
-                });
-                ui.add_space(12.0);
-                dashboard_card(ui, "◷  Simulation History", |ui| {
-                    if self.history.is_empty() {
-                        ui.label(RichText::new("이번 실행의 계산 기록이 없습니다.").color(MUTED).size(11.0));
-                    }
-                    for item in self.history.iter().take(5) {
-                        ui.horizontal(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label(RichText::new(item.game.label()).size(11.0).strong());
-                                ui.label(RichText::new(format!(
-                                    "E{} · {} S{}", item.eid,
-                                    item.game.secondary_banner_name(), item.refine
-                                )).color(MUTED).size(10.0));
+                        ui.add_space(6.0);
+                        egui::Frame::default()
+                            .fill(Color32::from_rgb(34, 101, 71))
+                            .corner_radius(9)
+                            .inner_margin(9)
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.horizontal(|ui| {
+                                    ui.label(RichText::new(format!(
+                                        "★ Overall (E{}S{})", self.target_eid,self.target_refine
+                                    )).size(11.0).strong());
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            let value = results.map(|(joint,_,_)|
+                                                format!("{:.2}%", joint*100.0))
+                                                .unwrap_or_else(|| "—".to_owned());
+                                            ui.label(RichText::new(value)
+                                                .size(17.0).color(YELLOW).strong());
+                                        });
+                                });
                             });
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(RichText::new(format!("{:.2}%", item.chance * 100.0))
-                                    .color(SUCCESS).strong());
-                            });
+                    });
+                ui.add_space(12.0);
+                egui::Frame::group(ui.style())
+                    .fill(Color32::from_rgb(14, 40, 60))
+                    .stroke(egui::Stroke::new(1.0_f32, BORDER))
+                    .corner_radius(egui::CornerRadius::same(13))
+                    .inner_margin(12)
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.set_min_height(344.0);
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("◷  Simulation History")
+                                .size(15.0).strong());
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    ui.label(RichText::new("⋮").color(MUTED).size(18.0));
+                                });
                         });
+                        ui.add_space(9.0);
                         ui.separator();
-                    }
-                    ui.label(RichText::new("현재 실행 중 계산 기록 · 프로그램 종료 시 초기화")
-                        .color(MUTED).size(10.0));
-                });
+                        ui.add_space(7.0);
+                        for i in 0..5 {
+                            ui.horizontal(|ui| {
+                                let (rect, _) = ui.allocate_exact_size(
+                                    egui::vec2(36.0, 36.0), egui::Sense::hover());
+                                let tint = if self.history.get(i).is_some() {
+                                    Color32::from_rgb(48, 80, 118)
+                                } else {
+                                    Color32::from_rgb(24, 52, 73)
+                                };
+                                ui.painter().rect_filled(rect, 9.0, tint);
+                                ui.painter().circle_stroke(rect.center(), 9.0,
+                                    egui::Stroke::new(1.2_f32, CYAN));
+                                ui.painter().circle_filled(rect.center(), 3.0, Color32::WHITE);
+                                if let Some(entry) = self.history.get(i) {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new(entry.game.label())
+                                            .size(10.8).strong());
+                                        ui.label(RichText::new(format!(
+                                            "E{} · {} S{}", entry.eid,
+                                            entry.game.secondary_banner_name(),entry.refine
+                                        )).color(MUTED).size(9.5));
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            ui.label(RichText::new(format!(
+                                                "{:.2}%",entry.chance*100.0
+                                            )).color(SUCCESS).size(11.0).strong());
+                                        });
+                                } else {
+                                    ui.label(RichText::new("No simulation yet")
+                                        .color(MUTED).size(10.0));
+                                }
+                            });
+                            if i != 4 { ui.separator(); }
+                        }
+                        ui.add_space(7.0);
+                        if ui.add(
+                            egui::Button::new("▤  View All History   →")
+                                .fill(Color32::from_rgb(31, 65, 89))
+                                .corner_radius(9)
+                                .min_size(egui::vec2(ui.available_width(), 34.0))
+                        ).clicked() {
+                            self.show_history = true;
+                        }
+                    });
             });
     }
 }
