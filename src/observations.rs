@@ -128,7 +128,8 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
             })
         };
         if quality == ObservationQuality::IndividualRightCensored {
-            let duration = number("duration")? as usize;
+            let duration = usize::try_from(number("duration")?)
+                .map_err(|_| format!("{line_no}행: duration이 플랫폼 정수 범위를 초과했습니다."))?;
             let event = fields[find("event").expect("validated header")].to_ascii_lowercase();
             let event = match event.as_str() {
                 "1" | "true" => true,
@@ -149,7 +150,8 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
             observations = observations.checked_add(1).ok_or("관측 횟수가 초과했습니다.")?;
             last_pity = last_pity.max(duration);
         } else {
-            let pity = number("pity")? as usize;
+            let pity = usize::try_from(number("pity")?)
+                .map_err(|_| format!("{line_no}행: pity가 플랫폼 정수 범위를 초과했습니다."))?;
             if !(1..=hard).contains(&pity) || pity <= previous_pity {
                 return Err(format!("{line_no}행: pity는 1~{hard}의 오름차순이어야 합니다."));
             }
@@ -164,7 +166,7 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
             if quality == ObservationQuality::AggregatedRightCensored {
                 let risk = number("at_risk")?;
                 let c = number("censored")?;
-                if risk == 0 || d.saturating_add(c) > risk {
+                if risk == 0 || d.checked_add(c).is_none_or(|sum| sum > risk) {
                     return Err(format!("{line_no}행: 위험집합보다 획득·중단 수가 많거나 위험집합이 0입니다."));
                 }
                 direct_risk[pity] = Some(risk);
@@ -190,8 +192,10 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
             censored[last_pity] += remaining;
         }
     }
-    let total_events = events.iter().sum::<u64>();
-    let total_censored = censored.iter().sum::<u64>();
+    let total_events = events.iter().try_fold(0_u64, |n, &v| n.checked_add(v))
+        .ok_or("누적 이벤트 수가 정수 범위를 초과했습니다.")?;
+    let total_censored = censored.iter().try_fold(0_u64, |n, &v| n.checked_add(v))
+        .ok_or("누적 검열 수가 정수 범위를 초과했습니다.")?;
     if observations == 0 || total_events == 0 {
         return Err("최소 한 번의 최고 등급 획득과 관측 대상이 필요합니다.".into());
     }
@@ -215,7 +219,7 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         }
         let d = events[pity];
         let c = censored[pity];
-        if d + c > remaining {
+        if d.checked_add(c).is_none_or(|total| total > remaining) {
             return Err(format!("pity {pity}: 획득·중단 수가 위험집합을 초과합니다."));
         }
         let n = remaining;
@@ -376,6 +380,12 @@ mod tests {
         assert!(c.mean_abs_hazard_delta < 1e-12);
         assert!(data.rows[1].cdf_low_95 <= 0.75);
         assert!(data.rows[1].cdf_high_95 >= 0.75);
+    }
+
+    #[test]
+    fn extreme_counts_are_rejected_without_integer_overflow() {
+        let csv = "pity,at_risk,events,censored\n1,18446744073709551615,18446744073709551615,18446744073709551615\n";
+        assert!(parse_observation_csv(csv, 90).is_err());
     }
 
     #[test]
