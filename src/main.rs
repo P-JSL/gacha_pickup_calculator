@@ -447,6 +447,26 @@ impl Calculator {
                         dirty = true;
                     }
                 });
+                if self.setup.game == Game::StellaSora {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label("캐릭터 비픽업 5성 기본률(%)");
+                        let mut p = self.feedback_cfg.character_other_five_star_rate * 100.0;
+                        if ui.add(egui::DragValue::new(&mut p)
+                            .range(0.0..=100.0).speed(0.1)).changed() {
+                            self.feedback_cfg.character_other_five_star_rate = p / 100.0;
+                            dirty = true;
+                        }
+                        ui.separator();
+                        ui.label("레코드 비픽업 5성 기본률(%)");
+                        let mut p = self.feedback_cfg.weapon_other_five_star_rate * 100.0;
+                        if ui.add(egui::DragValue::new(&mut p)
+                            .range(0.0..=100.0).speed(0.1)).changed() {
+                            self.feedback_cfg.weapon_other_five_star_rate = p / 100.0;
+                            dirty = true;
+                        }
+                    });
+                    ui.small("비픽업 5성은 픽업 천장을 초기화하지 않고, 중복 획득 보상 가정으로 환급됩니다.");
+                }
                 ui.horizontal_wrapped(|ui| {
                     ui.label("4성 최대 천장");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_hard)
