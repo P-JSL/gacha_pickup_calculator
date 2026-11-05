@@ -8,6 +8,7 @@ use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, Rate
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
 use std::collections::HashMap;
+use std::io::Read;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
@@ -1538,12 +1539,29 @@ impl Calculator {
                     if let Some(ref schedule) = candidate {
                         let load = (|| -> Result<ObservationDataset, String> {
                             let path = std::path::Path::new(&self.observation_path);
-                            let size = std::fs::metadata(path)
-                                .map_err(|e| format!("파일 확인 실패: {e}"))?.len();
-                            if size > 8 * 1024 * 1024 {
+                            let metadata = std::fs::symlink_metadata(path)
+                                .map_err(|e| format!("파일 확인 실패: {e}"))?;
+                            if !metadata.file_type().is_file() {
+                                return Err("심볼릭 링크·장치가 아닌 일반 CSV 파일만 허용합니다.".into());
+                            }
+                            const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
+                            if metadata.len() > MAX_CSV_BYTES {
                                 return Err("CSV 크기는 8 MiB 이하로 제한됩니다.".into());
                             }
-                            let contents = std::fs::read_to_string(path)
+                            let file = std::fs::File::open(path)
+                                .map_err(|e| format!("CSV 열기 실패: {e}"))?;
+                            if !file.metadata().is_ok_and(|m| m.is_file()) {
+                                return Err("CSV로 일반 파일만 허용합니다.".into());
+                            }
+                            // Bound the actual read; metadata can race with a
+                            // file replacement or change after the initial check.
+                            let mut bytes = Vec::new();
+                            file.take(MAX_CSV_BYTES + 1).read_to_end(&mut bytes)
+                                .map_err(|e| format!("CSV 읽기 실패: {e}"))?;
+                            if bytes.len() as u64 > MAX_CSV_BYTES {
+                                return Err("읽는 중 크기가 8 MiB를 초과했습니다.".into());
+                            }
+                            let contents = String::from_utf8(bytes)
                                 .map_err(|e| format!("UTF-8 CSV 읽기 실패: {e}"))?;
                             parse_observation_csv(&contents, schedule.hard)
                         })();
