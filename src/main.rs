@@ -825,7 +825,7 @@ fn draw_probability_chart(
         [graph.left_top(), graph.left_bottom()],
         [graph.right_top(), graph.right_bottom()],
     ] {
-        painter.line_segment(edge, egui::Stroke::new(1.0, BORDER));
+        painter.line_segment(edge, egui::Stroke::new(1.0_f32, BORDER));
     }
 
     let project = |x: usize, probability: f64| {
@@ -839,7 +839,7 @@ fn draw_probability_chart(
         let y = project(0, p).y;
         painter.line_segment(
             [egui::pos2(graph.left(), y), egui::pos2(graph.right(), y)],
-            egui::Stroke::new(1.0, BORDER),
+            egui::Stroke::new(1.0_f32, BORDER),
         );
         painter.text(
             egui::pos2(graph.left() - 7.0, y),
@@ -861,7 +861,7 @@ fn draw_probability_chart(
     ] {
         let points = sampled_cdf(distribution, end).into_iter()
             .map(|(x, p)| project(x, p)).collect();
-        painter.add(egui::Shape::line(points, egui::Stroke::new(2.5, color)));
+        painter.add(egui::Shape::line(points, egui::Stroke::new(2.5_f32, color)));
     }
     let refund_color = Color32::from_rgb(203, 158, 255);
     if show_feedback {
@@ -871,7 +871,7 @@ fn draw_probability_chart(
                 let x = i * end / n;
                 project(x, simulated.probability(x).0)
             }).collect();
-            painter.add(egui::Shape::line(points, egui::Stroke::new(3.0, refund_color)));
+            painter.add(egui::Shape::line(points, egui::Stroke::new(3.0_f32, refund_color)));
         }
     }
     if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
@@ -881,7 +881,7 @@ fn draw_probability_chart(
         painter.line_segment([
             egui::pos2(px, graph.top()),
             egui::pos2(px, graph.bottom()),
-        ], egui::Stroke::new(1.0, MUTED));
+        ], egui::Stroke::new(1.0_f32, MUTED));
         for (distribution, color) in [
             (character, PRIMARY), (weapon, MINT), (combined, GOLD),
         ] {
