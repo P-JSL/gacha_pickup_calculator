@@ -190,17 +190,17 @@ impl Calculator {
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(15))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
             .show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(20.0));
-                    ui.label(RichText::new("LAB").strong().size(20.0));
+                    ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(17.0));
+                    ui.label(RichText::new("LAB").strong().size(17.0));
                     ui.label(RichText::new(" /  ANALYTICS WORKSPACE")
                         .color(MUTED).size(11.0));
-                    ui.add_space(26.0);
+                    ui.add_space(12.0);
                     ui.label(RichText::new("게임").color(MUTED).size(12.0));
                     egui::ComboBox::from_id_salt("top_game")
-                        .width(165.0).selected_text(self.setup.game.label())
+                        .width(150.0).selected_text(self.setup.game.label())
                         .show_ui(ui, |ui| {
                             for game in Game::ALL {
                                 if ui.selectable_label(self.setup.game == game, game.label()).clicked()
@@ -229,8 +229,8 @@ impl Calculator {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(202.0)
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(13))
+            .exact_width(174.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
             .show(ctx, |ui| {
                 ui.add_space(20.0);
                 ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
@@ -249,7 +249,7 @@ impl Calculator {
                         .fill(if active { SELECTED_NAV } else { SIDEBAR })
                         .stroke(egui::Stroke::new(if active { 1.0 } else { 0.0 }, BORDER))
                         .corner_radius(9);
-                    if ui.add_sized([ui.available_width(), 40.0], button).clicked() {
+                    if ui.add_sized([ui.available_width(), 34.0], button).clicked() {
                         self.view_mode = view;
                     }
                     ui.add_space(4.0);
@@ -655,7 +655,7 @@ impl Calculator {
         // On a wide display the two independent banners are displayed next
         // to each other. On narrow/HiDPI Windows viewports they stack, so no
         // graph extends beyond the available logical width.
-        if ui.available_width() >= 880.0 {
+        if ui.available_width() >= 790.0 {
             ui.columns(2, |cols| {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
@@ -763,7 +763,7 @@ impl Calculator {
         ui.add_space(10.0);
         section(ui, "06", "달성 확률별 필요 재화", "DP 분위수는 정확 모델값, 환급 분위수는 모의실험의 추정치입니다.", |ui| {
             egui::Grid::new("quantiles").num_columns(6).striped(true)
-                .spacing([32.0, 8.0]).show(ui, |ui| {
+                .spacing([20.0, 6.0]).show(ui, |ui| {
                     ui.strong("달성률"); ui.strong("캐릭터");
                     ui.strong("무기"); ui.strong("합산 원시");
                     ui.strong("환급 후 자유 재화"); ui.strong("포인트 충당 표본"); ui.end_row();
@@ -1070,7 +1070,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 262.0 } else { 320.0 };
+    let height = if width < 650.0 { 218.0 } else { 254.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1162,9 +1162,9 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
 fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
     ui.label(RichText::new(eyebrow).size(10.0).color(PRIMARY).strong());
     ui.add_space(6.0);
-    ui.heading(RichText::new(title).size(27.0).strong());
+    ui.heading(RichText::new(title).size(23.0).strong());
     ui.label(RichText::new(subtitle).size(12.0).color(MUTED));
-    ui.add_space(22.0);
+    ui.add_space(12.0);
 }
 
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
@@ -1172,18 +1172,18 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(14))
-        .inner_margin(17)
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(11)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(number).color(PRIMARY).strong().size(11.0));
                 ui.add_space(5.0);
-                ui.label(RichText::new(heading).strong().size(17.0));
+                ui.label(RichText::new(heading).strong().size(15.0));
             });
             ui.add_space(3.0);
             ui.label(RichText::new(description).color(MUTED).size(12.0));
-            ui.add_space(14.0);
+            ui.add_space(7.0);
             content(ui);
         });
 }
@@ -1191,13 +1191,13 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
     egui::Frame::group(ui.style()).fill(CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(14)).inner_margin(17)
+        .corner_radius(egui::CornerRadius::same(12)).inner_margin(11)
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width().min(180.0));
             ui.label(RichText::new(label).color(MUTED).size(12.0));
-            ui.add_space(11.0);
-            ui.label(RichText::new(value).color(accent).size(28.0).strong());
-            ui.add_space(6.0);
+            ui.add_space(5.0);
+            ui.label(RichText::new(value).color(accent).size(23.0).strong());
+            ui.add_space(3.0);
             ui.label(RichText::new(note).color(MUTED).size(11.0));
         });
 }
@@ -1213,7 +1213,7 @@ impl eframe::App for Calculator {
         self.sidebar(ctx);
         let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG).inner_margin(19))
+            .frame(egui::Frame::default().fill(BG).inner_margin(12))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
@@ -1315,9 +1315,9 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
     ctx.style_mut(|style| {
-        style.spacing.item_spacing = egui::vec2(10.0, 9.0);
-        style.spacing.button_padding = egui::vec2(12.0, 7.0);
-        style.spacing.interact_size.y = 30.0;
+        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+        style.spacing.button_padding = egui::vec2(10.0, 5.0);
+        style.spacing.interact_size.y = 27.0;
         style.text_styles.insert(egui::TextStyle::Body,
             egui::FontId::proportional(14.0));
         style.text_styles.insert(egui::TextStyle::Button,
@@ -1351,8 +1351,8 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1230.0, 940.0])
-            .with_min_inner_size([840.0, 650.0])
+            .with_inner_size([1240.0, 800.0])
+            .with_min_inner_size([820.0, 620.0])
             .with_title("Gacha Lab — Rust 확률 분석기"),
         ..Default::default()
     };
