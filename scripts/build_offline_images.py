@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 import warnings
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageDraw, UnidentifiedImageError
 
 CATALOG = Path("src/catalog_data.tsv")
 ROOT = Path("dist/Image")
@@ -60,11 +60,12 @@ def entries():
         if not ident or any(not (c.isascii() and (c.isalnum() or c in "_-"))
                             for c in ident):
             raise ValueError("Unsafe image identifier")
-        parsed = urllib.parse.urlsplit(url)
-        if parsed.scheme != "https" or parsed.hostname not in HOSTS:
-            raise ValueError("Unapproved image origin")
-        if parsed.username or parsed.password or parsed.port not in (None, 443):
-            raise ValueError("Credentials or nonstandard port in image URL")
+        if url:
+            parsed = urllib.parse.urlsplit(url)
+            if parsed.scheme != "https" or parsed.hostname not in HOSTS:
+                raise ValueError("Unapproved image origin")
+            if parsed.username or parsed.password or parsed.port not in (None, 443):
+                raise ValueError("Credentials or nonstandard port in image URL")
         output = ROOT / GAME_DIR[game] / f"{role}-{ident}.png"
         if output in seen:
             raise ValueError(f"Duplicate image destination: {output}")
@@ -74,6 +75,19 @@ def entries():
 
 def fetch_and_normalize(item):
     url, destination = item
+    if not url:
+        # Latest officially announced items can lack redistribution-ready portraits.
+        # Make this visibly a placeholder, not a misleading image of another item.
+        im = Image.new("RGBA", (112, 112), (22, 49, 67, 255))
+        draw = ImageDraw.Draw(im)
+        draw.rectangle((2, 2, 109, 109), outline=(75, 173, 198, 255), width=2)
+        draw.text((40, 42), "NEW", fill=(239, 246, 250, 255))
+        out = io.BytesIO()
+        im.save(out, format="PNG")
+        normalized = out.getvalue()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(normalized)
+        return destination, hashlib.sha256(normalized).hexdigest()
     request = urllib.request.Request(
         url, headers={"User-Agent": "gacha-pickup-calculator-build/0.1"}
     )
