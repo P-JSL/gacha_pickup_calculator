@@ -117,8 +117,8 @@ impl Calculator {
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
-            target_eid: 6,
-            target_refine: 5,
+            target_eid: 0,
+            target_refine: 1,
             confidence: 90,
             query_mode: QueryMode::RequiredBudget,
             n_query: 1_000,
@@ -144,8 +144,8 @@ impl Calculator {
     fn change_game(&mut self, game: Game) {
         self.setup = GameSetup::new(game);
         self.feedback_cfg = FeedbackConfig::for_game(game);
-        self.target_eid = 6;
-        self.target_refine = 5;
+        self.target_eid = 0;
+        self.target_refine = 1;
         self.observation_data = None;
         self.observation_path.clear();
         self.observation_message.clear();
@@ -348,6 +348,22 @@ impl Calculator {
                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
                     .range(0..=100_000).suffix("뽑")).changed();
             });
+            ui.horizontal_wrapped(|ui| {
+                let currency = self.setup.game.currency_name();
+                let price = self.setup.game.cost_per_pull();
+                ui.label(format!("보유 {currency}"));
+                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                    .range(0..=100_000_000).speed(1).suffix(currency)).changed();
+                ui.separator();
+                ui.label(format!("1뽑 = {price}{currency}"));
+                ui.separator();
+                ui.label(RichText::new(format!(
+                    "자유 배분권 합계: {}뽑 (직접 {}뽑 + {currency} 전환 {}뽑, 잔여 {}{currency})",
+                    self.setup.available_flexible(), self.setup.flexible,
+                    self.setup.premium_currency / price,
+                    self.setup.premium_currency % price,
+                )).color(MINT));
+            });
             if self.setup.game == Game::Neverness {
                 ui.label(RichText::new("이환 Arc 배너는 10연 단위이며, 배너 전용권의 10장 미만 잔여도 별도 보유권으로 처리됩니다.")
                     .color(GOLD));
@@ -361,22 +377,38 @@ impl Calculator {
         section(ui, "04", "교환 재화 · 피드백 모델", "획득한 교환 재화를 다음 뽑기에 즉시 재사용합니다.", |ui| {
             dirty |= ui.checkbox(&mut self.feedback_cfg.enabled,
                 "피드백 뽑기 재화 반영 (재현 가능한 몬테카를로)").changed();
-            let manual = matches!(self.setup.game, Game::Neverness | Game::StellaSora);
-            if manual {
-                ui.colored_label(GOLD, "이 게임의 교환 비율·환급 규칙이 검증되지 않아 수동 입력 전용입니다.");
+            ui.label(RichText::new(format!(
+                "{} · 게임별 초기 설정 (필요 시 수동 수정 가능)",
+                self.setup.game.exchange_points_name()
+            )).color(PRIMARY));
+            if self.setup.game == Game::Neverness {
+                ui.colored_label(GOLD,
+                    "이환: Warp Pieces 교환 단가·보드 보상·Tri-Key 전환 조건은 추가 검증이 필요한 추정값입니다.");
+            }
+            if self.setup.game == Game::StellaSora {
+                ui.colored_label(GOLD,
+                    "스텔라 소라: 전문가 증명서 100개=1뽑, 중복 5성 200개·중복 4성 40개. 최초 신규 5성은 환급 0개로 설정합니다.");
+                ui.label(RichText::new(
+                    "최대 돌파 초과 추가 보상은 미반영. 4성 중복 획득률은 계정별로 달라질 수 있습니다."
+                ).color(MUTED).size(11.0));
             } else {
-                ui.label(RichText::new("게임 기본값은 참고용입니다. 4성의 보유·중복 상태는 계정별 평균 가정으로 입력하세요.")
+                ui.label(RichText::new("4성의 중복·보유 상태는 입력한 평균 보상 가정에 따라 계산합니다.")
                     .color(MUTED).size(11.0));
             }
             if self.feedback_cfg.enabled {
                 ui.horizontal_wrapped(|ui| {
+                    let name = self.setup.game.exchange_points_name();
                     ui.label("1회 교환 가격");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.points_per_ticket)
-                        .range(1..=100_000).suffix("포인트")).changed();
+                        .range(1..=100_000).suffix(name)).changed();
                     ui.separator();
-                    ui.label("현재 교환 포인트");
+                    ui.label(format!("현재 보유 {name}"));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                         .range(0..=1_000_000)).changed();
+                    ui.label(format!(
+                        "현재 재화로 {}뽑 즉시 교환 가능",
+                        self.feedback_cfg.initial_points / self.feedback_cfg.points_per_ticket.max(1)
+                    ));
                 });
                 ui.horizontal_wrapped(|ui| {
                     ui.label("픽업 캐릭터 첫 장");
@@ -388,13 +420,19 @@ impl Calculator {
                     ui.label("픽뚫 최고 등급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.off_banner_rare)
                         .range(0..=100_000)).changed();
-                    ui.label("픽업 무기 최고 등급");
+                    ui.label("무기·레코드 첫 장");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_first)
+                        .range(0..=100_000)).changed();
+                    ui.label("무기·레코드 중복 장당");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_rare)
                         .range(0..=100_000)).changed();
                 });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("4성 1개 평균 환급");
+                    ui.label("캐릭터 4성 평균 환급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_reward)
+                        .range(0..=100_000)).changed();
+                    ui.label("무기·레코드 4성 평균 환급");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_reward)
                         .range(0..=100_000)).changed();
                     ui.label("캐릭터 4성 기본률(%)");
                     let mut rate = self.feedback_cfg.character_four_star_rate * 100.0;
@@ -454,9 +492,10 @@ impl Calculator {
         };
         let q = self.confidence as f64 / 100.0;
         let raw_quantile = stats.combined.quantile(q);
+        let owned_flexible = self.setup.available_flexible();
         let current_raw = optimal_allocation(&stats.character, &stats.weapon,
-            self.setup.character_dedicated, self.setup.weapon_dedicated, self.setup.flexible);
-        let current_probability = stats.feedback.as_ref().map(|f| f.probability(self.setup.flexible).0)
+            self.setup.character_dedicated, self.setup.weapon_dedicated, owned_flexible);
+        let current_probability = stats.feedback.as_ref().map(|f| f.probability(owned_flexible).0)
             .unwrap_or(current_raw.success_probability);
         ui.add_space(12.0);
         ui.horizontal(|ui| {
@@ -492,7 +531,7 @@ impl Calculator {
                 metric(&mut cols[1],
                     if self.query_mode == QueryMode::RequiredBudget { "목표 확률에 필요한 자유 재화" }
                     else { "입력한 추가 자유 재화" },
-                    format!("{n}뽑"), "전용권 별도 · 환급 반영", GOLD);
+                    format!("{n}뽑"), "전용권 별도 · 순차 환급 재투입", GOLD);
                 let (p, low, high) = feedback.probability(n);
                 metric(&mut cols[2],
                     if self.query_mode == QueryMode::RequiredBudget { "계산된 성공 확률" }
@@ -515,6 +554,60 @@ impl Calculator {
                     "환급 없는 정확 DP", MINT);
             }
         });
+        if let Some(ref feedback) = stats.feedback {
+            let target_budget = if self.query_mode == QueryMode::RequiredBudget {
+                feedback.quantile(q)
+            } else { self.n_query };
+            ui.add_space(8.0);
+            section(ui, "04-A", "총 뽑기와 환급 재투입 내역",
+                    "같은 시뮬레이션 경로의 수치만 더하고 빼므로 서로 다른 분위수를 혼합하지 않습니다.", |ui| {
+                if let Some(scenario) = if self.query_mode == QueryMode::RequiredBudget {
+                    feedback.scenario_at_quantile(q)
+                } else {
+                    None
+                } {
+                    ui.label(RichText::new(format!(
+                        "목표 {}%의 경계 표본: 총 {}뽑 중 전용권 {}뽑, 보유·환급 포인트로 {}뽑을 충당하여 최초 자유 재화 {}뽑이 필요합니다.",
+                        self.confidence, scenario.raw_pulls, scenario.dedicated_used,
+                        scenario.points_funded_pulls, scenario.initial_flexible_required,
+                    )).strong().color(MINT));
+                    ui.label(format!(
+                        "관측한 한 경로의 정확한 내역: {} = {} + {} + {} (총뽑 = 전용권 + 포인트 충당 + 자유 재화)",
+                        scenario.raw_pulls, scenario.dedicated_used, scenario.points_funded_pulls,
+                        scenario.initial_flexible_required,
+                    ));
+                    ui.small(format!(
+                        "해당 표본에서 총 획득 환급 {}{} (최종 뽑기로 받은 미사용 환급 포함).                         이는 동일 목표 확률의 모든 실행 결과를 대표하는 고정 환급값은 아닙니다.",
+                        scenario.earned_points, self.setup.game.exchange_points_name()
+                    ));
+                }
+                if let Some(means) = feedback.successful_means(target_budget) {
+                    ui.separator();
+                    ui.label(format!(
+                        "자유 재화 {}뽑 이내 성공한 {}개 경로의 평균: 총 {:.1}뽑 = 전용권 {:.1} + 포인트 충당 {:.1} + 자유 재화 {:.1}뽑",
+                        target_budget, means.count, means.average_raw,
+                        means.average_dedicated, means.average_points_funded,
+                        means.average_flexible,
+                    ));
+                    ui.small(format!(
+                        "평균 누적 획득 환급 {:.1}{} · 환급으로 진행한 뽑기에서도 추가 환급 발생을 계속 계산합니다.",
+                        means.average_earned_points, self.setup.game.exchange_points_name()
+                    ));
+                }
+                if self.query_mode == QueryMode::RequiredBudget {
+                    let shortage = target_budget.saturating_sub(owned_flexible);
+                    let needed_native = self.setup.additional_currency_for(target_budget);
+                    ui.separator();
+                    ui.label(RichText::new(format!(
+                        "보유 자유 배분권 {}뽑 + 보유 {} {}개를 제외하면 추가 준비는 약 {}뽑 상당, 정확히 {}{}입니다.",
+                        self.setup.flexible, self.setup.game.currency_name(),
+                        self.setup.premium_currency, shortage, needed_native,
+                        self.setup.game.currency_name()
+                    )).strong().color(GOLD));
+                    ui.small("현재 보유 교환 포인트는 환급 시뮬레이션의 최초 잔액에 이미 포함되어 있으며, 중복 차감하지 않습니다.");
+                }
+            });
+        }
         ui.add_space(8.0);
         section(ui, "05", "확률 그래프",
                 "X축: 소모 뽑기 수 · Y축: 목표 달성 누적 확률(%). 내부 계산 결과를 직접 그립니다.", |ui| {
@@ -535,11 +628,11 @@ impl Calculator {
         });
         ui.add_space(10.0);
         section(ui, "06", "달성 확률별 필요 재화", "DP 분위수는 정확 모델값, 환급 분위수는 모의실험의 추정치입니다.", |ui| {
-            egui::Grid::new("quantiles").num_columns(5).striped(true)
+            egui::Grid::new("quantiles").num_columns(6).striped(true)
                 .spacing([32.0, 8.0]).show(ui, |ui| {
                     ui.strong("달성률"); ui.strong("캐릭터");
                     ui.strong("무기"); ui.strong("합산 원시");
-                    ui.strong("환급 후 자유 재화"); ui.end_row();
+                    ui.strong("환급 후 자유 재화"); ui.strong("포인트 충당 표본"); ui.end_row();
                     for t in [50, 75, 80, 90, 95, 99] {
                         let p = t as f64 / 100.0;
                         ui.label(format!("{t}%"));
@@ -548,14 +641,20 @@ impl Calculator {
                         ui.strong(format!("{}", stats.combined.quantile(p)));
                         if let Some(ref f) = stats.feedback {
                             ui.strong(format!("{}", f.quantile(p)));
-                        } else { ui.label("미적용"); }
+                            ui.label(f.scenario_at_quantile(p).map_or("–".to_owned(),
+                                |s| format!("{}뽑", s.points_funded_pulls)));
+                        } else { ui.label("미적용"); ui.label("–"); }
                         ui.end_row();
                     }
                 });
             if let Some(ref f) = stats.feedback {
                 ui.separator();
-                ui.label(format!("환급 모의실험 {}회 · 평균 원시 {:.1}뽑 · 평균 추가 자유 재화 {:.1}뽑 · 평균 반환 {:.1} 포인트",
-                    f.budgets.len(), f.average_raw, f.average_initial_flexible, f.total_returned_points_average));
+                ui.label(format!(
+                    "환급 모의실험 {}회 · 평균 원시 {:.1}뽑 · 평균 최초 자유 재화 {:.1}뽑 · 평균 획득 환급 {:.1}{}",
+                    f.budgets.len(), f.average_raw, f.average_initial_flexible,
+                    f.total_returned_points_average, self.setup.game.exchange_points_name()
+                ));
+                ui.small("환급 충당 표본은 해당 달성률 경계의 같은 실행 결과이며, 평균 환급이나 보장량이 아닙니다.");
                 ui.label(RichText::new("주의: 4성 보유량·중복 판정·일부 배너 내부 우선순위는 근사입니다. 100% 보장은 표본으로 주장하지 않습니다.")
                     .color(GOLD).size(11.0));
             }
