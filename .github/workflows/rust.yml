@@ -229,8 +229,8 @@ jobs:
               raise SystemExit("Windows executable is unexpectedly small.")
           package = Path(f"dist/gacha-pickup-calculator-windows-x64-v{version}.zip")
           icons = sorted(Path("dist/Image").rglob("*.png"))
-          if len(icons) != 676:
-              raise SystemExit(f"Missing sanitized catalog images: {len(icons)}/676")
+          if len(icons) != 681:
+              raise SystemExit(f"Missing sanitized catalog images: {len(icons)}/681")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
               for icon in icons:
