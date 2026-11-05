@@ -1283,8 +1283,6 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         );
         response.clone().on_hover_text(tooltip);
     }
-        });
-    }
     // The compact dashboard uses one line per card. Keep legends only where
     // multiple curves must be distinguished in the detailed analytics view.
     if series.len() > 1 {
