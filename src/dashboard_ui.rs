@@ -414,7 +414,7 @@ impl Calculator {
             .exact_width(313.0)
             .frame(egui::Frame::default().fill(BG).inner_margin(10))
             .show(ctx, |ui| {
-                ui.add_space(1.0);
+                ui.add_space(8.0);
                 egui::Frame::group(ui.style())
                     .fill(Color32::from_rgb(15, 42, 62))
                     .stroke(egui::Stroke::new(1.0_f32, BORDER))
