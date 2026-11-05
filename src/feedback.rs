@@ -237,17 +237,21 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
     let mut won = 0;
     let mut four_pity = 0;
     while won < rule.target_copies {
+        // Arc is purchased as an indivisible ten-pull. Refunds from the
+        // current pack must not finance any of its remaining nine pulls.
+        for _ in 0..10 { wallet.pay(dedicated); }
         let mut featured = 0;
         let mut off = 0;
+        let mut pending_four_star_points = 0;
         for _ in 0..10 {
-            wallet.pay(dedicated);
             let x = rng.uniform();
             if x < 0.0075 { featured += 1; four_pity = 0; }
             else if x < 0.03 { off += 1; four_pity = 0; }
             else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false) {
-                wallet.refund(model.four_star_reward);
+                pending_four_star_points += model.four_star_reward;
             }
         }
+        wallet.refund(pending_four_star_points);
         if featured_pity == 7 && featured == 0 { featured = 1; }
         else if any_pity == 5 && featured + off == 0 {
             if rng.hits(0.25) { featured += 1; } else { off += 1; }
@@ -342,6 +346,19 @@ mod tests {
         assert_eq!(v.quantile(1.0), 2);
         assert_eq!(v.probability(1).0, 0.0);
         assert_eq!(v.probability(2).0, 1.0);
+    }
+
+    #[test]
+    fn arc_batch_requires_all_ten_tickets_upfront() {
+        let mut setup = GameSetup::new(Game::Neverness);
+        setup.character.target_copies = 0;
+        setup.weapon.target_copies = 1;
+        let mut cfg = FeedbackConfig::for_game(Game::Neverness);
+        cfg.samples = 200;
+        cfg.weapon_rare = 100;
+        cfg.points_per_ticket = 1;
+        let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert!(result.budgets.iter().all(|&n| n >= 10));
     }
 
     #[test]
