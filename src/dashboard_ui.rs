@@ -9,7 +9,7 @@ const DEEP_CARD: Color32 = Color32::from_rgb(16, 43, 64);
 
 /// Subtle vertical gradient; the rounded base remains visible at the corners.
 fn wash(ui: &egui::Ui, rect: egui::Rect, upper: Color32, lower: Color32) {
-    ui.painter().rect_filled(rect, 13.0, lower);
+    ui.painter().rect_filled(rect, 14.0, upper);
     let r = rect.shrink(9.0);
     if r.width() <= 0.0 || r.height() <= 0.0 { return; }
     let mut mesh = egui::Mesh::default();
@@ -23,11 +23,7 @@ fn wash(ui: &egui::Ui, rect: egui::Rect, upper: Color32, lower: Color32) {
     }
     mesh.indices.extend_from_slice(&[0, 2, 1, 1, 2, 3]);
     ui.painter().add(egui::Shape::mesh(mesh));
-    ui.painter().line_segment(
-        [egui::pos2(rect.left() + 15.0, rect.top() + 1.0),
-         egui::pos2(rect.right() - 15.0, rect.top() + 1.0)],
-        egui::Stroke::new(0.8_f32, Color32::from_rgb(60, 111, 143)),
-    );
+
 }
 
 fn dashboard_card(ui: &mut egui::Ui, title: &str, content: impl FnOnce(&mut egui::Ui)) {
@@ -159,7 +155,11 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
                 ui.label(RichText::new(label).size(10.5).color(Color32::WHITE).strong());
             });
             ui.scope(|ui| {
+                ui.visuals_mut().extreme_bg_color = Color32::from_rgb(10, 35, 54);
                 ui.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(13, 35, 55);
+                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(13, 35, 55);
+                ui.visuals_mut().widgets.hovered.weak_bg_fill = Color32::from_rgb(20, 54, 78);
+                ui.visuals_mut().widgets.active.weak_bg_fill = Color32::from_rgb(25, 76, 100);
                 ui.visuals_mut().widgets.hovered.bg_fill = Color32::from_rgb(23, 63, 91);
                 ui.visuals_mut().widgets.active.bg_fill = Color32::from_rgb(23, 85, 115);
                 inner(ui);
@@ -411,7 +411,7 @@ impl Calculator {
     pub(super) fn workspace_results_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::right("workspace_results")
             .resizable(false)
-            .exact_width(295.0)
+            .exact_width(313.0)
             .frame(egui::Frame::default().fill(BG).inner_margin(10))
             .show(ctx, |ui| {
                 ui.add_space(1.0);
@@ -422,11 +422,12 @@ impl Calculator {
                     .inner_margin(12)
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        ui.set_min_height(290.0);
+                        ui.set_min_height(283.0);
+                        ui.spacing_mut().item_spacing.y = 2.0;
                         ui.label(RichText::new("▥  Result Summary").size(15.0).strong());
-                        ui.add_space(10.0);
+                        ui.add_space(6.0);
                         ui.separator();
-                        ui.add_space(11.0);
+                        ui.add_space(5.0);
                         let available = self.setup.available_flexible();
                         let results = self.stats.as_ref().map(|stats| {
                             let raw = optimal_allocation(&stats.character, &stats.weapon,
@@ -451,9 +452,9 @@ impl Calculator {
                                 ui.label(RichText::new(msg).color(SUCCESS).size(11.0).strong());
                             });
                         });
-                        ui.add_space(10.0);
+                        ui.add_space(6.0);
                         ui.separator();
-                        ui.add_space(10.0);
+                        ui.add_space(6.0);
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("◇  Extra Pulls from Refund").size(11.5));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -465,7 +466,7 @@ impl Calculator {
                                 ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
                             });
                         });
-                        ui.add_space(13.0);
+                        ui.add_space(7.0);
                         egui::Frame::default()
                             .fill(Color32::from_rgb(29, 65, 91))
                             .corner_radius(9)
@@ -475,7 +476,7 @@ impl Calculator {
                                 ui.label(RichText::new("★   Estimated Outcome")
                                     .size(13.0).strong());
                             });
-                        ui.add_space(9.0);
+                        ui.add_space(6.0);
                         for (title, value) in [
                             ("Target Character", results.map(|(_,ch,_)|
                                 format!("E{} · {:.2}%", self.target_eid,ch*100.0))),
@@ -491,9 +492,9 @@ impl Calculator {
                                             .size(11.0).color(SUCCESS).strong());
                                     });
                             });
-                            ui.add_space(5.0);
+                            ui.add_space(3.0);
                         }
-                        ui.add_space(6.0);
+                        ui.add_space(4.0);
                         egui::Frame::default()
                             .fill(Color32::from_rgb(34, 101, 71))
                             .corner_radius(9)
