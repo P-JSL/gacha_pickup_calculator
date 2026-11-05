@@ -58,7 +58,7 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, Analytics, Settings, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Analytics, Settings, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
 
 struct HistoryEntry {
     game: Game,
@@ -266,7 +266,10 @@ impl Calculator {
                 ui.add_space(25.0);
                 for (view, title) in [
                     (ViewMode::Calculator, "⌂   Dashboard"),
-                    (ViewMode::Settings, "⚙   Simulator"),
+                    (ViewMode::Settings, "◇   Simulator"),
+                    (ViewMode::Currency, "◈   Currency"),
+                    (ViewMode::Characters, "♧   Characters"),
+                    (ViewMode::Weapons, "⚔   Weapons"),
                     (ViewMode::Analytics, "▥   Analytics"),
                     (ViewMode::TrackerSources, "☷   Sources"),
                     (ViewMode::ObservedDistribution, "▧   CSV Analysis"),
@@ -1311,6 +1314,26 @@ impl eframe::App for Calculator {
                             ViewMode::Analytics => {
                                 self.dashboard(ui);
                             }
+                            ViewMode::Currency => {
+                                page_intro(ui, "CURRENCY & REFUNDS",
+                                    "재화 및 환급 설정",
+                                    "전용권·공통 재화·환급 재투입 조건을 변경합니다.");
+                                settings_changed |= self.resources(ui);
+                                ui.add_space(10.0);
+                                settings_changed |= self.feedback_controls(ui);
+                            }
+                            ViewMode::Characters | ViewMode::Weapons => {
+                                page_intro(ui, "TARGET & PITY",
+                                    if self.view_mode == ViewMode::Characters {
+                                        "캐릭터 목표 관리"
+                                    } else {
+                                        "무기 · 광추 · 레코드 · Arc 목표 관리"
+                                    },
+                                    "캐릭터와 보조 배너의 목표 및 천장 상태는 서로 독립적입니다.");
+                                settings_changed |= self.targets(ui);
+                                ui.add_space(10.0);
+                                settings_changed |= self.pity(ui);
+                            }
                             ViewMode::Settings => {
                                 ui.horizontal_wrapped(|ui| {
                                     ui.vertical(|ui| {
@@ -1453,8 +1476,8 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1600.0, 940.0])
-            .with_min_inner_size([1050.0, 700.0])
+            .with_inner_size([1440.0, 870.0])
+            .with_min_inner_size([1000.0, 680.0])
             .with_title("Gacha Pickup Calculator"),
         ..Default::default()
     };
