@@ -392,19 +392,28 @@ impl Calculator {
                     });
                     ui.with_layout(
                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let (avatar_rect, avatar_button) = ui.allocate_exact_size(
+                                egui::vec2(45.0, 45.0), egui::Sense::click(),
+                            );
+                            ui.painter().circle_filled(avatar_rect.center(), 22.5,
+                                Color32::from_rgb(51, 72, 107));
                             if let Some(ref avatar) = self.header_avatar {
-                                let (rect, response) = ui.allocate_exact_size(
-                                    egui::vec2(45.0, 45.0), egui::Sense::click(),
-                                );
-                                ui.painter().circle_filled(
-                                    rect.center(), 22.5, Color32::from_rgb(42, 68, 96),
-                                );
-                                ui.painter().image(avatar.id(),rect.shrink(3.0),
+                                ui.painter().image(avatar.id(), avatar_rect.shrink(3.0),
                                     egui::Rect::from_min_max(
-                                        egui::pos2(0.0,0.0),egui::pos2(1.0,1.0)),
+                                        egui::pos2(0.0,0.0), egui::pos2(1.0,1.0)),
                                     Color32::WHITE);
-                                if response.clicked() { self.show_help = true; }
+                            } else {
+                                ui.painter().circle_filled(avatar_rect.center(), 17.0,
+                                    Color32::from_rgb(92, 110, 156));
+                                ui.painter().text(avatar_rect.center(),
+                                    egui::Align2::CENTER_CENTER, "✧",
+                                    egui::FontId::proportional(25.0), Color32::WHITE);
                             }
+                            ui.painter().circle_filled(
+                                avatar_rect.right_bottom()-egui::vec2(4.0, 3.0),
+                                3.2, Color32::from_rgb(108, 232, 95),
+                            );
+                            if avatar_button.clicked() { self.show_help = true; }
                             if ui.add(egui::Button::new("?")
                                 .fill(CARD).corner_radius(10)
                                 .min_size(egui::vec2(39.0, 39.0))).clicked() {
