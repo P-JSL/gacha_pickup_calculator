@@ -108,7 +108,7 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
 }
 
 /// Compact 3-column chart panel: header, right-aligned result badge, area graph.
-fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32) {
+fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32, appearance: UiPreferences) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
@@ -135,7 +135,7 @@ fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[Cha
                         .show(ui, |ui| { ui.label(label); });
                 });
             });
-            draw_probability_chart(ui, source);
+            draw_probability_chart(ui, source, appearance);
         });
 }
 
@@ -171,11 +171,8 @@ impl Calculator {
     /// Reference-style overview. All visible values come from the active model, never from demo data.
     pub(super) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
-        if let Some(stats) = &self.stats {
+        if let Some(stats) = self.visible_stats() {
             let free_pulls = self.setup.available_flexible();
-            let ticket_count = self.setup.character_dedicated
-                .saturating_add(self.setup.weapon_dedicated)
-                .saturating_add(free_pulls);
             let raw = optimal_allocation(
                 &stats.character,
                 &stats.weapon,
@@ -188,11 +185,27 @@ impl Calculator {
             let expected = stats.feedback.as_ref().map(|f| f.average_raw)
                 .unwrap_or(stats.combined.mean);
             let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
+            if self.input_needs_calculation || self.calculating {
+                ui.label(RichText::new("입력 반영 중 · 이전 계산 결과를 유지합니다.")
+                    .color(YELLOW).size(10.0));
+            }
             ui.columns(4, |columns| {
-                overview_metric(&mut columns[0], 0, "Owned Pulls",
-                    format!("{ticket_count}"),
-                    format!("전용권 {} · 자유 {}",
-                        self.setup.character_dedicated + self.setup.weapon_dedicated, free_pulls), CYAN);
+                let (label, value, detail) = if self.setup.game.shares_featured_ticket() {
+                    ("별의 궤도 전용 티켓", format!("{}", self.setup.flexible),
+                        format!("캐릭터·광추 공용 / 성옥 전환 {}뽑",
+                            self.setup.premium_currency / self.setup.game.cost_per_pull()))
+                } else {
+                    ("Character / Weapon Tickets",
+                        format!("{} / {}", self.setup.character_dedicated,
+                            self.setup.weapon_dedicated),
+                        if self.setup.game == Game::StellaSora {
+                            format!("하늘 티켓 / 골든 디스크 {}개",
+                                self.setup.weapon_ticket_inventory())
+                        } else {
+                            format!("전용권 2종 · 공용 전환 {}뽑", free_pulls)
+                        })
+                };
+                overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
                 overview_metric(&mut columns[1], 1, "Target Success Rate",
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
                 overview_metric(&mut columns[2], 2, "Expected Pulls",
@@ -220,21 +233,21 @@ impl Calculator {
             if ui.available_width() >= 720.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
-                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN);
+                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
                     probability_card(&mut columns[1], "Weapon Probability",
-                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW);
+                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences);
                     probability_card(&mut columns[2], "Overall Result",
-                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK);
+                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
                 });
             } else {
                 probability_card(ui, "Character Probability",
-                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN);
+                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences);
                 ui.add_space(8.0);
                 probability_card(ui, "Weapon Probability",
-                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW);
+                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences);
                 ui.add_space(8.0);
                 probability_card(ui, "Overall Result",
-                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK);
+                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
             }
 
         } else if self.calculating {
@@ -293,22 +306,56 @@ impl Calculator {
                 ui.add_space(3.0);
                 ui.separator();
                 ui.add_space(3.0);
-                ui.columns(3, |cols| {
-                    setting_tile(&mut cols[0], "♧", "Owned Tickets", |ui| {
-                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
-                            .range(0..=100_000).suffix("뽑")).changed();
+                let game = self.setup.game;
+                if game.shares_featured_ticket() {
+                    ui.columns(3, |cols| {
+                        setting_tile(&mut cols[0], "◇", game.character_ticket_name(), |ui| {
+                            dirty |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
+                        });
+                        setting_tile(&mut cols[1], "◆",
+                            &format!("Premium Currency · {}", game.currency_name()), |ui| {
+                                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                                    .range(0..=100_000_000).speed(1)).changed();
+                            });
+                        setting_tile(&mut cols[2], "◌",
+                            &format!("Refund Currency · {}", game.exchange_points_name()), |ui| {
+                                dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
+                                    .range(0..=1_000_000)).changed();
+                            });
                     });
-                    setting_tile(&mut cols[1], "◇",
-                        &format!("Premium Currency · {}", self.setup.game.currency_name()), |ui| {
-                            dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
-                                .range(0..=100_000_000).speed(1)).changed();
-                        });
-                    setting_tile(&mut cols[2], "◌",
-                        &format!("Refund Currency · {}", self.setup.game.exchange_points_name()), |ui| {
-                            dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
-                                .range(0..=1_000_000)).changed();
-                        });
-                });
+                } else {
+                    ui.columns(4, |cols| {
+                        setting_tile(&mut cols[0], "♧",
+                            &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
+                                dirty |= edit_ticket_inventory(
+                                    ui, &mut self.setup, TicketRole::Character
+                                );
+                            });
+                        setting_tile(&mut cols[1], "⚔",
+                            &format!("{} · {}", game.secondary_banner_name(),
+                                game.weapon_ticket_name()), |ui| {
+                                dirty |= edit_ticket_inventory(
+                                    ui, &mut self.setup, TicketRole::Weapon
+                                );
+                            });
+                        setting_tile(&mut cols[2], "◆",
+                            &format!("공용 재화 · {}", game.currency_name()), |ui| {
+                                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                                    .range(0..=100_000_000).speed(1)).changed();
+                            });
+                        setting_tile(&mut cols[3], "◌",
+                            &format!("환급 · {}", game.exchange_points_name()), |ui| {
+                                dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
+                                    .range(0..=1_000_000)).changed();
+                            });
+                    });
+                    if game == Game::StellaSora {
+                        ui.label(RichText::new(format!(
+                            "골든 디스크 300개 = 레코드 1뽑 · {}뽑 + 잔여 {}개",
+                            self.setup.weapon_dedicated, self.setup.weapon_ticket_remainder
+                        )).color(MUTED).size(10.0));
+                    }
+                }
                 ui.add_space(8.0);
                 ui.columns(4, |cols| {
                     setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
@@ -390,13 +437,13 @@ impl Calculator {
                                 .fill(CYAN).corner_radius(11)
                                 .min_size(egui::vec2(206.0, 43.0))
                         ).clicked() {
-                            dirty = true;
+                            self.manual_calculation_requested = true;
                         }
                         if ui.add(egui::Button::new("↻  Reset")
                             .fill(DEEP_CARD).corner_radius(9)
                             .min_size(egui::vec2(92.0, 40.0))).clicked() {
                             self.change_game(self.setup.game);
-                            dirty = true;
+                            self.manual_calculation_requested = true;
                         }
                         if ui.button("상세 설정").clicked() {
                             self.view_mode = ViewMode::Settings;
@@ -429,7 +476,7 @@ impl Calculator {
                         ui.separator();
                         ui.add_space(5.0);
                         let available = self.setup.available_flexible();
-                        let results = self.stats.as_ref().map(|stats| {
+                        let results = self.visible_stats().map(|stats| {
                             let raw = optimal_allocation(&stats.character, &stats.weapon,
                                 self.setup.character_dedicated,
                                 self.setup.weapon_dedicated, available);
@@ -458,7 +505,7 @@ impl Calculator {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("◇  Extra Pulls from Refund").size(11.5));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let bonus = self.stats.as_ref()
+                                let bonus = self.visible_stats()
                                     .and_then(|stats| stats.feedback.as_ref())
                                     .and_then(|f| f.successful_means(available));
                                 let value = bonus.map_or("—".to_owned(),
