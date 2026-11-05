@@ -64,3 +64,5 @@ Stella Sora: https://stelladb.pages.dev/
 Note: Data on these sites are not guaranteed to have the same scope, completeness, or acquisition mechanism.
 
 추가 제한: 여러 이력이 같은 계정에서 나오는 경우 관측 구간이 서로 독립적이지 않을 수 있으며, 일반 Greenwood 95% 구간은 계정별 군집 상관을 보정하지 않습니다. 위 파일에서 계정 ID를 수집하지 않기 때문에 계정 단위 부트스트랩은 아직 지원하지 않습니다.
+
+Greenwood의 점별 신뢰구간은 생존확률이 정확히 1 또는 0인 경계에서 정규적인 분산 추정이 성립하지 않습니다. 결과 화면에서는 해당 구간의 밴드를 생략하여 불확실성이 없다는 잘못된 인상을 피합니다.
