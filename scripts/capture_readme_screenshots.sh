@@ -29,9 +29,14 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     xdotool type --clearmodifiers --delay 55 "$1"
     xdotool key Return
     sleep 4
-    # Start manual simulation: input auto-refresh is OFF by default.
-    xdotool mousemove 1120 816 click 1
-    sleep 7
+    # After a game change no result is visible yet, so the Run button
+    # moves upwards. Detect the actual bright cyan button instead of
+    # hard-coding the Y coordinate of the initial dashboard.
+    scrot -q 75 /tmp/gacha-ui-before-run.png
+    button_y=$(python3 -c "from PIL import Image; im=Image.open(\"/tmp/gacha-ui-before-run.png\").convert(\"RGB\"); rows=[y for y in range(140,840) if sum(1 for x in range(930,1214,3) if ((c:=im.getpixel((x,y)))[0]<110 and c[1]>180 and c[2]>205))>55]; print(round(sum(rows)/len(rows)) if rows else 0)")
+    test "$button_y" -gt 140 || { echo "Run Simulation button not found in live GUI"; exit 1; }
+    xdotool mousemove 1100 "$button_y" click 1
+    sleep 9
     capture "$2"
   }
 
@@ -65,8 +70,12 @@ for p in paths:
         im.verify()
     with Image.open(p) as im:
         assert im.size == (1536, 864), f"Incorrect GUI capture dimensions: {p.name}"
-with Image.open("ci-readme-shots/dashboard-hsr-aha.png") as first:
-    with Image.open("ci-readme-shots/dashboard-wuwa-latest.png") as other:
-        assert ImageChops.difference(first, other).getbbox(), "Game switch capture did not change UI"
+games = ["dashboard-hsr-aha.png", "dashboard-wuwa-latest.png",
+         "dashboard-stellasora-latest.png", "dashboard-nte-latest.png"]
+for prior, current in zip(games, games[1:]):
+    with Image.open("ci-readme-shots/" + prior) as first:
+        with Image.open("ci-readme-shots/" + current) as other:
+            assert ImageChops.difference(first, other).getbbox(), (
+                f"Game switch capture did not update screen: {current}")
 print(f"Verified {len(paths)} actual graphical desktop screenshots")
 PY
