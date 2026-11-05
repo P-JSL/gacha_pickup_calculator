@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y scrot xdotool python3-pil
+          sudo apt-get install -y scrot xdotool python3-pil fonts-noto-cjk
           mkdir -p ci-artifacts
           xvfb-run -a -s '-screen 0 1440x960x24' bash -c '
             set -eu
