@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Capture actual v0.1.14 desktop GUI screens, using the sanitized local PNG library.
+# Capture actual v0.1.15 desktop GUI screens, using the sanitized local PNG library.
 # Requires: xvfb-run, xdotool, scrot, Python3/Pillow; no generated mockups.
 set -euo pipefail
 test -x target/release/gacha_pickup_calculator
