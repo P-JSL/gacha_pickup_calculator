@@ -364,7 +364,7 @@ impl Calculator {
         egui::TopBottomPanel::top("header")
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(14))
             .show(ctx, |ui| {
-                ui.add_space(23.0);
+                ui.add_space(31.0);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new("Gacha Pickup Calculator").strong().size(22.0));
@@ -402,7 +402,6 @@ impl Calculator {
                             });
                     });
                 });
-                ui.add_space(20.0);
             });
         dirty
     }
@@ -1265,7 +1264,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
-    let height = if width < 650.0 { 174.0 } else { 216.0 };
+    let height = if width < 650.0 { 145.0 } else { 196.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1444,7 +1443,7 @@ impl eframe::App for Calculator {
         }
         let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG).inner_margin(10))
+            .frame(egui::Frame::default().fill(BG).inner_margin(18))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
