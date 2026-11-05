@@ -249,6 +249,31 @@ impl Calculator {
                 probability_card(ui, "Overall Result",
                     format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
             }
+            if self.setup.game == Game::WutheringWaves {
+                if let (Some(tickets), Some(wavebands)) =
+                    (stats.feedback.as_ref(), stats.feedback_wavebands.as_ref()) {
+                    ui.add_space(8.0);
+                    let q = self.confidence as f64 / 100.0;
+                    egui::Frame::group(ui.style())
+                        .fill(DEEP_CARD).inner_margin(10).corner_radius(10)
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(RichText::new(format!(
+                                "명조 · 산호 교환 비교 ({}% 달성 기준)", self.confidence
+                            )).strong().color(CYAN));
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(format!(
+                                    "뽑기권 교환: 최초 자유 재화 {}뽑 · 평균 실제 {:.1}뽑",
+                                    tickets.quantile(q), tickets.average_raw));
+                                ui.separator();
+                                ui.label(format!(
+                                    "돌파 최대 2개 구매: 최초 자유 재화 {}뽑 · 평균 실제 {:.1}뽑",
+                                    wavebands.quantile(q), wavebands.average_raw));
+                            });
+                            ui.small("돌파 1개당 산호 360개가 필요합니다. 부족한 산호는 먼저 적립하며 실제 매입 횟수는 표본마다 다를 수 있습니다.");
+                        });
+                }
+            }
 
         } else if self.calculating {
             dashboard_card(ui, "Probability Overview", |ui| {
