@@ -206,11 +206,48 @@ fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketR
     }
 }
 
+/// Match simulation assumptions across all three WuWa coral strategies.
+fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[FeedbackEstimate],
+    setup: &GameSetup, confidence: usize) {
+    let owned = setup.available_flexible();
+    let threshold = confidence as f64 / 100.0;
+    section(ui, "WU", "명조 · 산호 투자 전략 3종 비교",
+        "환급 재투입까지 계산한 몬테카를로 비교입니다. 돌파 재료는 산호를 확보한 이후 구매합니다.", |ui| {
+            egui::ScrollArea::horizontal().show(ui, |ui| {
+                egui::Grid::new("wuwa_comparison_table").striped(true)
+                    .min_col_width(95.0).spacing([14.0, 9.0]).show(ui, |ui| {
+                        for title in ["산호 사용", &format!("{}% 필요 자유뽑", confidence),
+                            "추가 별의 소리", "현재 재화 성공률", "평균 총 뽑", "평균 돌파 구매"] {
+                            ui.label(RichText::new(title).strong());
+                        }
+                        ui.end_row();
+                        for (count, result) in strategies.iter().enumerate() {
+                            let needed = result.quantile(threshold);
+                            let extra = setup.additional_currency_for(needed);
+                            let chance = result.probability(owned).0;
+                            ui.label(match count {
+                                0 => "뽑기권 전환", 1 => "돌파 최대 1개",
+                                _ => "돌파 최대 2개",
+                            });
+                            ui.label(format!("{needed}뽑"));
+                            ui.label(format!("{extra}개"));
+                            ui.label(format!("{:.2}%", chance * 100.0));
+                            ui.label(format!("{:.1}뽑", result.average_raw));
+                            ui.label(format!("{:.2}개", result.average_wavebands_purchased));
+                            ui.end_row();
+                        }
+                    });
+            });
+            ui.small("필요 자유뽑은 별도 전용권을 제외한 최초 뽑기 예산입니다. 확률은 표본 기반 추정치입니다.");
+        });
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
+    wuwa_strategies: Option<Vec<FeedbackEstimate>>,
 }
 
 struct CalculationRequest {
@@ -229,10 +266,23 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     let character = request.setup.character.distribution(request.mode)?;
     let weapon = request.setup.weapon.distribution(request.mode)?;
     let combined = character.combine(&weapon);
-    let feedback = if request.feedback_config.enabled {
-        Some(estimate(&request.setup, request.mode, &request.feedback_config)?)
-    } else { None };
-    Ok(Computed { character, weapon, combined, feedback })
+    let (feedback, wuwa_strategies) = if request.feedback_config.enabled
+        && request.setup.game == Game::WutheringWaves
+    {
+        let mut strategies = Vec::with_capacity(3);
+        for max_wavebands in 0..=2 {
+            let mut variant = request.feedback_config.clone();
+            variant.wuwa_waveband_max = max_wavebands;
+            strategies.push(estimate(&request.setup, request.mode, &variant)?);
+        }
+        let selected = strategies[request.feedback_config.wuwa_waveband_max.min(2)].clone();
+        (Some(selected), Some(strategies))
+    } else if request.feedback_config.enabled {
+        (Some(estimate(&request.setup, request.mode, &request.feedback_config)?), None)
+    } else {
+        (None, None)
+    };
+    Ok(Computed { character, weapon, combined, feedback, wuwa_strategies })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -990,6 +1040,27 @@ impl Calculator {
                 "{} · 게임별 환급 기본값",
                 self.setup.game.exchange_points_name()
             )).color(PRIMARY));
+            if self.setup.game == Game::WutheringWaves {
+                ui.colored_label(PRIMARY,
+                    "명조: 산호를 뽑기권으로 사용하거나 픽업 캐릭터 돌파 재료를 최대 2개 우선 구매합니다.");
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("산호 사용 전략");
+                    egui::ComboBox::from_id_salt("wuwa_wavebands")
+                        .selected_text(format!("돌파 최대 {}개", self.feedback_cfg.wuwa_waveband_max))
+                        .show_ui(ui, |ui| {
+                            for count in 0..=2 {
+                                dirty |= ui.selectable_value(
+                                    &mut self.feedback_cfg.wuwa_waveband_max, count,
+                                    if count == 0 { "뽑기권만 교환".to_owned() }
+                                    else { format!("돌파 {count}개 우선") }).changed();
+                            }
+                        });
+                    ui.label("돌파 1개 가격");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.wuwa_waveband_cost)
+                        .range(1..=100_000).suffix("산호")).changed();
+                });
+                ui.small("산호 8개=뽑기권 1개, 돌파 재료 360개 기본값(사용자 수정 가능). 획득 중 발생한 산호까지 반영하며 남는 산호는 뽑기에 사용합니다.");
+            }
             if self.setup.game == Game::Neverness {
                 ui.colored_label(GOLD,
                     "이환: Warp Pieces 교환 단가·보드 보상·Tri-Key 전환 조건은 추가 검증이 필요한 추정값입니다.");
@@ -1283,6 +1354,10 @@ impl Calculator {
             }
         });
         ui.add_space(12.0);
+        if let Some(strategies) = &stats.wuwa_strategies {
+            wuwa_strategy_table(ui, strategies, &self.setup, self.confidence);
+            ui.add_space(10.0);
+        }
         if let Some(ref feedback) = stats.feedback {
             let target_budget = if self.query_mode == QueryMode::RequiredBudget {
                 feedback.quantile(q)
@@ -1863,8 +1938,8 @@ impl eframe::App for Calculator {
                                         "무기 · 광추 · 레코드 · Arc 목표 관리"
                                     },
                                     "선택한 배너만 편집하며, 입력값은 대시보드·시뮬레이터와 공유합니다.");
-                                settings_changed |= self.single_banner_page(ui,
-                                    self.view_mode == ViewMode::Weapons);
+                                let weapon = self.view_mode == ViewMode::Weapons;
+                                settings_changed |= self.single_banner_page(ui, weapon);
                             }
                             ViewMode::Preferences => {
                                 self.desktop_settings(ui);
