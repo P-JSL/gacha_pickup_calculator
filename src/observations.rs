@@ -247,7 +247,7 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
 fn survival_cdf_interval(survival: f64, sum: f64) -> Option<(f64, f64)> {
     // Greenwood is undefined when survival is exactly zero and has zero-width,
     // misleading confidence bands before the first observed event.
-    if !(0.0..1.0).contains(&survival) { return None; }
+    if survival <= 0.0 || survival >= 1.0 { return None; }
     let log_h = (-survival.ln()).ln();
     let err = 1.96 * sum.sqrt() / survival.ln().abs();
     let lower_s = -((log_h + err).exp());
