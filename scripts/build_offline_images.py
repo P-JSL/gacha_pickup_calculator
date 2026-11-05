@@ -23,7 +23,7 @@ CATALOG = Path("src/catalog_data.tsv")
 ROOT = Path("dist/Image")
 GAME_DIR = {"hsr": "HSR", "wuwa": "WutheringWaves",
             "sora": "StellaSora", "nte": "Neverness"}
-MAX_INPUT_BYTES = 2 * 1024 * 1024
+MAX_INPUT_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 8_000_000
 MAX_EDGE = 4096
 EXPECTED_FORMATS = {"PNG", "JPEG"}
