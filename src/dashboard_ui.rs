@@ -87,22 +87,28 @@ fn metric_icon(p: &egui::Painter, c: egui::Pos2, kind: usize, color: Color32) {
 
 /// Paint a card with fixed geometry so values cannot push other dashboard cards down.
 fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, note: String, color: Color32) {
-    let (r, _) = ui.allocate_exact_size(
+    let (r, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width().max(90.0), 120.0), egui::Sense::hover(),
     );
+    response.on_hover_text(format!("{label}\n{value}\n{note}"));
     let base = if kind == 1 { Color32::from_rgb(14, 59, 76) }
                else if kind == 2 { Color32::from_rgb(35, 57, 94) }
                else { Color32::from_rgb(28, 63, 96) };
     wash(ui, r, base, Color32::from_rgb(17, 43, 67));
-    metric_icon(ui.painter(), egui::pos2(r.left()+34.0,r.top()+47.0), kind, color);
-    let left = r.left()+66.0;
-    ui.painter().text(egui::pos2(left,r.top()+18.0),
-        egui::Align2::LEFT_TOP, label, egui::FontId::proportional(12.0),
+    let paint = ui.painter_at(r.shrink(6.0));
+    let compact = r.width() < 205.0;
+    if !compact {
+        metric_icon(&paint, egui::pos2(r.left()+31.0,r.top()+47.0),kind,color);
+    }
+    let left = if compact { r.left()+13.0 } else { r.left()+64.0 };
+    paint.text(egui::pos2(left,r.top()+17.0),
+        egui::Align2::LEFT_TOP, label, egui::FontId::proportional(11.0),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+43.0),
-        egui::Align2::LEFT_TOP, value, egui::FontId::proportional(27.0),
+    paint.text(egui::pos2(left,r.top()+45.0),
+        egui::Align2::LEFT_TOP, value,
+        egui::FontId::proportional(if compact { 21.0 } else { 25.0 }),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+94.0),
+    paint.text(egui::pos2(left,r.top()+94.0),
         egui::Align2::LEFT_TOP, note, egui::FontId::proportional(10.0),
         MUTED);
 }
@@ -152,7 +158,9 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
             ui.set_min_height(48.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(icon).size(16.0).color(Color32::WHITE));
-                ui.label(RichText::new(label).size(10.5).color(Color32::WHITE).strong());
+                ui.add(egui::Label::new(
+                    RichText::new(label).size(10.5).color(Color32::WHITE).strong()
+                ).truncate()).on_hover_text(label);
             });
             ui.scope(|ui| {
                 ui.visuals_mut().extreme_bg_color = Color32::from_rgb(10, 35, 54);
@@ -189,32 +197,43 @@ impl Calculator {
                 ui.label(RichText::new("입력 반영 중 · 이전 계산 결과를 유지합니다.")
                     .color(YELLOW).size(10.0));
             }
-            ui.columns(4, |columns| {
-                let (label, value, detail) = if self.setup.game.shares_featured_ticket() {
-                    ("별의 궤도 전용 티켓", format!("{}", self.setup.flexible),
-                        format!("캐릭터·광추 공용 / 성옥 전환 {}뽑",
+            let (ticket_label, ticket_value, ticket_note) =
+                if self.setup.game.shares_featured_ticket() {
+                    ("별의 궤도 전용 티켓".to_owned(), self.setup.flexible.to_string(),
+                        format!("캐릭터·광추 공용 · 성옥 {}뽑",
                             self.setup.premium_currency / self.setup.game.cost_per_pull()))
                 } else {
-                    ("Character / Weapon Tickets",
+                    (format!("캐릭터 / {} 전용권", self.setup.game.secondary_banner_name()),
                         format!("{} / {}", self.setup.character_dedicated,
                             self.setup.weapon_dedicated),
                         if self.setup.game == Game::StellaSora {
-                            format!("하늘 티켓 / 골든 디스크 {}개",
-                                self.setup.weapon_ticket_inventory())
+                            format!("골든 디스크 {}개", self.setup.weapon_ticket_inventory())
                         } else {
-                            format!("전용권 2종 · 공용 전환 {}뽑", free_pulls)
+                            format!("공용 전환 {}뽑", free_pulls)
                         })
                 };
-                overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
-                overview_metric(&mut columns[1], 1, "Target Success Rate",
-                    format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
-                overview_metric(&mut columns[2], 2, "Expected Pulls",
-                    format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK);
-                overview_metric(&mut columns[3], 3, "Remaining Currency",
+            let metrics = [
+                (ticket_label, ticket_value, ticket_note, CYAN),
+                ("목표 달성 확률".to_owned(),
+                    format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS),
+                ("예상 필요 뽑기 수".to_owned(),
+                    format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK),
+                ("보유 프리미엄 재화".to_owned(),
                     self.setup.premium_currency.to_string(),
                     format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                        self.setup.game.currency_name()), CYAN);
-            });
+                        self.setup.game.currency_name()), CYAN),
+            ];
+            let metric_columns = if ui.available_width() >= 760.0 { 4 }
+                else if ui.available_width() >= 365.0 { 2 } else { 1 };
+            for (row, chunk) in metrics.chunks(metric_columns).enumerate() {
+                ui.columns(chunk.len(), |columns| {
+                    for (col, (label, value, note, accent)) in chunk.iter().enumerate() {
+                        overview_metric(&mut columns[col], row * metric_columns + col,
+                            label, value.clone(), note.clone(), *accent);
+                    }
+                });
+                if row + 1 < 4_usize.div_ceil(metric_columns) { ui.add_space(8.0); }
+            }
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
@@ -230,7 +249,7 @@ impl Calculator {
             let chart_total = [ChartSeries {
                 label: "전체 · 환급 전", source: ChartSource::Exact(&stats.combined), color: PINK,
             }];
-            if ui.available_width() >= 720.0 {
+            if ui.available_width() >= 850.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
                         format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
@@ -239,15 +258,31 @@ impl Calculator {
                     probability_card(&mut columns[2], "Overall Result",
                         format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
                 });
+            } else if ui.available_width() >= 580.0 {
+                ui.columns(2, |cols| {
+                    probability_card(&mut cols[0], "캐릭터 획득 확률",
+                        format!("E{} 성공 {:.2}%", self.target_eid, char_rate),
+                        &chart_char, CYAN, self.ui_preferences);
+                    probability_card(&mut cols[1], &format!("{banner_name} 획득 확률"),
+                        format!("S{} 성공 {:.2}%", self.target_refine, weapon_rate),
+                        &chart_weapon, YELLOW, self.ui_preferences);
+                });
+                ui.add_space(8.0);
+                probability_card(ui, "전체 목표 달성 확률",
+                    format!("전체 성공 {:.2}%", chance*100.0),
+                    &chart_total, PINK, self.ui_preferences);
             } else {
-                probability_card(ui, "Character Probability",
-                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences);
+                probability_card(ui, "캐릭터 획득 확률",
+                    format!("E{} 성공 {:.2}%", self.target_eid, char_rate),
+                    &chart_char, CYAN, self.ui_preferences);
                 ui.add_space(8.0);
-                probability_card(ui, &format!("{banner_name} Probability"),
-                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences);
+                probability_card(ui, &format!("{banner_name} 획득 확률"),
+                    format!("S{} 성공 {:.2}%", self.target_refine, weapon_rate),
+                    &chart_weapon, YELLOW, self.ui_preferences);
                 ui.add_space(8.0);
-                probability_card(ui, "Overall Result",
-                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
+                probability_card(ui, "전체 목표 달성 확률",
+                    format!("전체 성공 {:.2}%", chance * 100.0),
+                    &chart_total, PINK, self.ui_preferences);
             }
 
         } else if self.calculating {
