@@ -239,7 +239,7 @@ jobs:
     needs: [verify, images]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -264,6 +264,30 @@ jobs:
           path: ci-readme-shots/
           if-no-files-found: error
           retention-days: 14
+      - name: Commit actual GUI screenshots to same-repository PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$PR_BRANCH"
+          actual_sha=$(git rev-parse FETCH_HEAD)
+          if [ "$actual_sha" != "$PR_HEAD_SHA" ]; then
+            echo "::error::PR head changed during screenshot capture; declining to publish stale images"
+            exit 1
+          fi
+          git switch -C "$PR_BRANCH" FETCH_HEAD
+          mkdir -p docs/screenshots/v0.1.14
+          cp ci-readme-shots/*.png docs/screenshots/v0.1.14/
+          git add docs/screenshots/v0.1.14/
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m 'docs: add verified latest-character GUI screenshots [skip ci]'
+            git push origin HEAD:"$PR_BRANCH"
+          fi
 
   release:
     name: Publish versioned release
