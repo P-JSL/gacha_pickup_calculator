@@ -194,6 +194,22 @@ jobs:
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
+      - name: Install verified image decoder
+        if: steps.version.outputs.publish == 'true'
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir "Pillow==13.0.0"
+      - name: Fetch and sanitize offline icons
+        if: steps.version.outputs.publish == 'true'
+        run: python3 scripts/build_offline_images.py
+      - name: Malware scan sanitized images (fail closed)
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam
+          clamscan --recursive --infected dist/Image
       - name: Prepare and verify release assets
         if: steps.version.outputs.publish == 'true'
         env:
@@ -212,12 +228,26 @@ jobs:
           if executable.stat().st_size < 100_000:
               raise SystemExit("Windows executable is unexpectedly small.")
           package = Path(f"dist/gacha-pickup-calculator-windows-x64-v{version}.zip")
+          icons = sorted(Path("dist/Image").rglob("*.png"))
+          if len(icons) != 676:
+              raise SystemExit(f"Missing sanitized catalog images: {len(icons)}/676")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
-              zipped.writestr("README.txt", "Gacha Pickup Calculator\nRun gacha_pickup_calculator.exe on Windows x64.\nThe ZIP contains the same executable as the standalone release asset.\n")
+              for icon in icons:
+                  zipped.write(icon, icon.relative_to("dist").as_posix())
+              zipped.write("dist/Image/SHA256SUMS.txt", "Image/SHA256SUMS.txt")
+              zipped.writestr("README.txt",
+                  "Gacha Pickup Calculator / Windows x64\\n"
+                  "Extract this entire ZIP while retaining the Image subfolders.\\n"
+                  "Run gacha_pickup_calculator.exe in the same directory as Image/.\\n"
+                  "Images were downloaded and sanitized during the release build.\\n"
+                  "The program does not fetch any images at runtime.\\n")
           with ZipFile(package) as zipped:
               assert zipped.testzip() is None
               assert executable.name in zipped.namelist()
+              assert len([n for n in zipped.namelist()
+                  if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
+              assert "Image/SHA256SUMS.txt" in zipped.namelist()
           PY
           cd dist
           sha256sum gacha_pickup_calculator.exe \
@@ -240,7 +270,7 @@ jobs:
             dist/SHA256SUMS.txt \
             --target "$GITHUB_SHA" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
-            --notes "Windows x64 executable and portable ZIP; Rust source archive and SHA-256 checksums. Windows GUI interactive startup has not been tested in CI."
+            --notes "Windows x64 portable ZIP includes offline Image/<game>/*.png files. Untrusted image downloads are normalized to PNG, bounded, SHA-256 hashed and malware-scanned at release build time. Extract the entire ZIP. Runtime image fetching is disabled. CI runs GUI startup smoke tests, but manual interactive QA is still recommended."
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           for asset in gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
