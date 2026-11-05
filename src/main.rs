@@ -746,8 +746,10 @@ impl Calculator {
                 model_survival *= 1.0 - chance;
                 observed_pts.push([x, (1.0 - row.survival) * 100.0]);
                 predicted_pts.push([x, (1.0 - model_survival) * 100.0]);
-                lower_pts.push([x, row.cdf_low_95 * 100.0]);
-                upper_pts.push([x, row.cdf_high_95 * 100.0]);
+                if let Some((low, high)) = row.cdf_ci_95 {
+                    lower_pts.push([x, low * 100.0]);
+                    upper_pts.push([x, high * 100.0]);
+                }
                 if row.at_risk >= 20 {
                     observed_hazard.push([x, row.hazard * 100.0]);
                     predicted_hazard.push([x, chance * 100.0]);
@@ -784,7 +786,7 @@ impl Calculator {
                                 .name("모델 위험률").color(PRIMARY).width(2.0_f32));
                         });
                 });
-            ui.colored_label(GOLD, "주의: Kaplan–Meier는 독립적인 기록 중단만 보정합니다. 임의 계정 업로드, 오래된 이력 누락, 다른 배너 혼합, 최초 스택 불명은 보정하지 않습니다.");
+            ui.colored_label(GOLD, "주의: Greenwood 95% 구간은 최초 획득 이전(F=0)과 전원 획득 이후(F=1)의 경계에서 표시하지 않습니다. 독립적 기록 중단만 보정하며 임의 계정 업로드, 누락·혼합된 이력은 보정하지 않습니다.");
         });
     }
 }
