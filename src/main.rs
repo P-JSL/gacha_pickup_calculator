@@ -1177,7 +1177,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
-    let height = if width < 650.0 { 194.0 } else { 242.0 };
+    let height = if width < 650.0 { 166.0 } else { 218.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1276,19 +1276,24 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
                 project(x, line.source.probability(x)), 3.5, line.color,
             );
         }
+        let tooltip = format!(
+            "{x}뽑 이내 · {}",
+            series.iter().map(|line| format!("{} {:.1}%", line.label,
+                line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
+        );
+        response.clone().on_hover_text(tooltip);
+    }
+        });
+    }
+    // The compact dashboard uses one line per card. Keep legends only where
+    // multiple curves must be distinguished in the detailed analytics view.
+    if series.len() > 1 {
         ui.horizontal_wrapped(|ui| {
-            ui.strong(format!("{x}뽑 이내"));
             for line in series {
-                ui.colored_label(line.color,
-                    format!("{} {:.1}%", line.label, line.source.probability(x) * 100.0));
+                ui.colored_label(line.color, format!("● {}", line.label));
             }
         });
     }
-    ui.horizontal_wrapped(|ui| {
-        for line in series {
-            ui.colored_label(line.color, format!("● {}", line.label));
-        }
-    });
 }
 
 fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
