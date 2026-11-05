@@ -36,8 +36,8 @@ const ICON_REPOSITORIES: &[&str] = &[
     "https://raw.githubusercontent.com/JforPlay/sstoy/",
     "https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/",
 ];
-const MAX_ICON_BYTES: u64 = 3_000_000;
-const MAX_ICON_SIDE: u32 = 4096;
+const MAX_ICON_BYTES: u64 = 512 * 1024;
+const MAX_ICON_SIDE: u32 = 256;
 
 fn approved_icon_url(url: &str) -> bool {
     if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
@@ -190,13 +190,13 @@ impl CatalogUi {
         let root = executable.parent()?.join("Image");
         let candidate = root.join(game).join(file);
         let metadata = fs::symlink_metadata(&candidate).ok()?;
-        if !metadata.file_type().is_file() || metadata.len() > 512 * 1024 {
+        if !metadata.file_type().is_file() || metadata.len() > MAX_ICON_BYTES {
             return None;
         }
         let canonical = candidate.canonicalize().ok()?;
         if !canonical.starts_with(root.canonicalize().ok()?) { return None; }
         let bytes = fs::read(canonical).ok()?;
-        if bytes.len() > 512 * 1024
+        if bytes.len() as u64 > MAX_ICON_BYTES
             || !approved_icon_bytes(&bytes)
             || !bytes.starts_with(b"\x89PNG\r\n\x1a\n")
         { return None; }
@@ -204,8 +204,8 @@ impl CatalogUi {
             .with_guessed_format().ok()?;
         if reader.format() != Some(image::ImageFormat::Png) { return None; }
         let mut limits = image::Limits::default();
-        limits.max_image_width = Some(256);
-        limits.max_image_height = Some(256);
+        limits.max_image_width = Some(MAX_ICON_SIDE);
+        limits.max_image_height = Some(MAX_ICON_SIDE);
         limits.max_alloc = Some(8 * 1024 * 1024);
         reader.limits(limits);
         let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
