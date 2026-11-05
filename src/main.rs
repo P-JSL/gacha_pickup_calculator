@@ -1926,7 +1926,16 @@ impl eframe::App for Calculator {
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
         if self.header(ctx) {
-            self.schedule_recalculation();
+            self.input_needs_calculation = true;
+            if self.ui_preferences.auto_recalculate {
+                self.schedule_recalculation();
+            } else {
+                // Game switching and navigation never start a new expensive
+                // simulation while automatic updates are disabled.
+                self.pending_since = None;
+                self.calculating = false;
+                self.generation = self.generation.wrapping_add(1);
+            }
         }
         // Reserve a usable central editing width. The optional right sidebar
         // collapses on smaller windows rather than overlapping input controls.
@@ -2174,6 +2183,13 @@ fn main() -> eframe::Result {
 #[cfg(test)]
 mod chart_tests {
     use super::*;
+    #[test]
+    fn automatic_recalculation_is_disabled_by_default() {
+        let prefs = UiPreferences::default();
+        assert!(!prefs.auto_recalculate);
+        assert!(prefs.show_hover_guides);
+    }
+
     #[test]
     fn sample_curve_has_endpoints_and_monotonic_probabilities() {
         let dist = Distribution::new(vec![0.0, 0.2, 0.3, 0.5]);
