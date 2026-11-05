@@ -4,7 +4,7 @@
 
 use crate::{Banner, BannerRule, RateSchedule, SoftPity, Spark};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Game {
     StarRail,
     WutheringWaves,
