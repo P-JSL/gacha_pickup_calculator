@@ -90,6 +90,7 @@ struct Calculator {
     observation_banner: TrackedBanner,
     observation_message: String,
     history: Vec<HistoryEntry>,
+    search_query: String,
 }
 
 impl Calculator {
@@ -142,6 +143,7 @@ impl Calculator {
             observation_banner: TrackedBanner::Character,
             observation_message: String::new(),
             history: Vec::new(),
+            search_query: String::new(),
         };
         app.recalculate();
         app
@@ -212,6 +214,48 @@ impl Calculator {
         self.calculating = true;
     }
 
+    /// Enter-driven navigation search; only actual sections and supported games are matched.
+    fn activate_search(&mut self) -> bool {
+        let query = self.search_query.trim().to_lowercase();
+        if query.is_empty() {
+            return false;
+        }
+        let mut game_changed = false;
+        let game = if query.contains("스타레일") || query.contains("hsr") {
+            Some(Game::StarRail)
+        } else if query.contains("명조") || query.contains("wuthering") {
+            Some(Game::WutheringWaves)
+        } else if query.contains("스텔라") || query.contains("stella") {
+            Some(Game::StellaSora)
+        } else if query.contains("이환") || query.contains("yihuan") || query.contains("neverness") {
+            Some(Game::Neverness)
+        } else {
+            None
+        };
+        if let Some(game) = game {
+            if self.setup.game != game {
+                self.change_game(game);
+                game_changed = true;
+            }
+            self.view_mode = ViewMode::Calculator;
+        } else if query.contains("currency") || query.contains("재화") || query.contains("refund") || query.contains("환급") {
+            self.view_mode = ViewMode::Currency;
+        } else if query.contains("character") || query.contains("캐릭터") {
+            self.view_mode = ViewMode::Characters;
+        } else if query.contains("weapon") || query.contains("무기") || query.contains("광추")
+            || query.contains("arc") || query.contains("레코드") {
+            self.view_mode = ViewMode::Weapons;
+        } else if query.contains("analytics") || query.contains("분석") {
+            self.view_mode = ViewMode::Analytics;
+        } else if query.contains("simulator") || query.contains("설정") {
+            self.view_mode = ViewMode::Settings;
+        } else if query.contains("dashboard") || query.contains("대시보드") {
+            self.view_mode = ViewMode::Calculator;
+        }
+        self.search_query.clear();
+        game_changed
+    }
+
     /// Compact Windows desktop header matching the dashboard reference.
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
@@ -224,6 +268,13 @@ impl Calculator {
                         ui.label(RichText::new("Probability & Refund Simulator")
                             .color(MUTED).size(11.0));
                     });
+                    ui.add_space(24.0);
+                    let search = ui.add(egui::TextEdit::singleline(&mut self.search_query)
+                        .desired_width(305.0)
+                        .hint_text("⌕  Search games or sections..."));
+                    if search.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                        dirty |= self.activate_search();
+                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("ⓘ  Help").clicked() {
                             self.show_help = true;
