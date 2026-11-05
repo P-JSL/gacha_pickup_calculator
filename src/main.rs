@@ -7,6 +7,7 @@ use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
+use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
@@ -265,6 +266,29 @@ impl Default for UiPreferences {
     }
 }
 
+/// Each game's currency, targets and selected artwork are independent.
+#[derive(Clone)]
+struct GameSession {
+    setup: GameSetup,
+    feedback: FeedbackConfig,
+    eid: usize,
+    refine: usize,
+    character_id: String,
+    weapon_id: String,
+}
+
+impl GameSession {
+    fn defaults(game: Game) -> Self {
+        Self {
+            setup: GameSetup::new(game),
+            feedback: FeedbackConfig::for_game(game),
+            eid: 0, refine: 1,
+            character_id: catalog::first(game, catalog::Kind::Character),
+            weapon_id: catalog::first(game, catalog::Kind::Weapon),
+        }
+    }
+}
+
 struct HistoryEntry {
     game: Game,
     eid: usize,
@@ -306,6 +330,7 @@ struct Calculator {
     picker_filter: String,
     selected_character_id: String,
     selected_weapon_id: String,
+    game_sessions: HashMap<Game, GameSession>,
 }
 
 impl Calculator {
@@ -369,6 +394,7 @@ impl Calculator {
             picker_filter: String::new(),
             selected_character_id: catalog::first(Game::StarRail, catalog::Kind::Character),
             selected_weapon_id: catalog::first(Game::StarRail, catalog::Kind::Weapon),
+            game_sessions: HashMap::new(),
         };
         app.recalculate();
         app
@@ -422,14 +448,39 @@ impl Calculator {
     }
 
     fn change_game(&mut self, game: Game) {
-        self.setup = GameSetup::new(game);
-        self.selected_character_id = catalog::first(game, catalog::Kind::Character);
-        self.selected_weapon_id = catalog::first(game, catalog::Kind::Weapon);
+        if self.setup.game != game {
+            // Save all editable fields so switching between four games never loses
+            // inventory, target goals, pity state, selected item or refund assumptions.
+            self.game_sessions.insert(self.setup.game, GameSession {
+                setup: self.setup.clone(),
+                feedback: self.feedback_cfg.clone(),
+                eid: self.target_eid,
+                refine: self.target_refine,
+                character_id: self.selected_character_id.clone(),
+                weapon_id: self.selected_weapon_id.clone(),
+            });
+            let next = self.game_sessions.remove(&game)
+                .unwrap_or_else(|| GameSession::defaults(game));
+            self.setup = next.setup;
+            self.feedback_cfg = next.feedback;
+            self.target_eid = next.eid;
+            self.target_refine = next.refine;
+            self.selected_character_id = next.character_id;
+            self.selected_weapon_id = next.weapon_id;
+        } else {
+            // The reset action invokes change_game(current_game) to restore this
+            // game's default inputs without touching saved values for other games.
+            self.game_sessions.remove(&game);
+            let defaults = GameSession::defaults(game);
+            self.setup = defaults.setup;
+            self.feedback_cfg = defaults.feedback;
+            self.target_eid = defaults.eid;
+            self.target_refine = defaults.refine;
+            self.selected_character_id = defaults.character_id;
+            self.selected_weapon_id = defaults.weapon_id;
+        }
         self.picker_kind = None;
         self.picker_filter.clear();
-        self.feedback_cfg = FeedbackConfig::for_game(game);
-        self.target_eid = 0;
-        self.target_refine = 1;
         self.observation_data = None;
         self.observation_path.clear();
         self.observation_message.clear();
