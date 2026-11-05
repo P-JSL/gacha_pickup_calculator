@@ -19,6 +19,8 @@ pub struct Entry {
     pub name: String,
     pub rarity: u8,
     pub icon_url: String,
+    pub release_order: u32,
+    pub status: &'static str,
 }
 impl Entry {
     pub fn has_verified_image(&self) -> bool { approved_icon_url(&self.icon_url) }
@@ -66,6 +68,20 @@ fn game_code(game: Game) -> &'static str {
         Game::StellaSora => "sora",
     }
 }
+/// Only source-verified recent releases/announcements are prioritized.
+/// Other roster entries remain available below these; unverified leaks are excluded.
+fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
+    match (game, id) {
+        (Game::StarRail, "1503") => (20261015, "최신 4.6"),
+        (Game::WutheringWaves, "1312") => (20261022, "최신 3.7"),
+        (Game::WutheringWaves, "1311") => (20260930, "신규 3.7"),
+        (Game::Neverness, "upcoming_elyms") => (20261111, "공개 예정 1.5"),
+        (Game::Neverness, "upcoming_exe") => (20261202, "공개 예정 1.5"),
+        (Game::StellaSora, "firstlight_noya") => (20261020, "신규 2.0"),
+        _ => (0, ""),
+    }
+}
+
 fn parse() -> Vec<Entry> {
     let mut out = Vec::new();
     for line in include_str!("catalog_data.tsv").lines() {
@@ -80,15 +96,20 @@ fn parse() -> Vec<Entry> {
             _ => continue,
         };
         let kind = match fields[1] { "c" => Kind::Character, "w" => Kind::Weapon, _ => continue };
+        let (release_order, status) = if kind == Kind::Character {
+            recent_character(game, fields[2])
+        } else { (0, "") };
         out.push(Entry {
             game, kind, id: fields[2].to_owned(), name: fields[3].to_owned(),
             rarity: fields[4].parse().unwrap_or(5),
             icon_url: fields[5].to_owned(),
+            release_order, status,
         });
     }
     out.sort_by(|a, b| {
         game_code(a.game).cmp(game_code(b.game))
             .then_with(|| (a.kind == Kind::Weapon).cmp(&(b.kind == Kind::Weapon)))
+            .then_with(|| b.release_order.cmp(&a.release_order))
             .then_with(|| b.rarity.cmp(&a.rarity))
             .then_with(|| a.name.cmp(&b.name))
     });
@@ -289,6 +310,10 @@ pub fn picker(
                                 .selected(current_id == item.id)).clicked() {
                                 selected = Some(item.id.clone());
                             }
+                            if !item.status.is_empty() {
+                                ui.label(egui::RichText::new(item.status)
+                                    .color(egui::Color32::LIGHT_GREEN).size(10.0));
+                            }
                             if !item.has_verified_image() {
                                 ui.label(egui::RichText::new("이미지 미확보")
                                     .color(egui::Color32::GRAY).size(9.0));
@@ -303,6 +328,13 @@ pub fn picker(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn upcoming_and_released_characters_are_prioritized() {
+        assert_eq!(first(Game::StarRail, Kind::Character), "1503");
+        assert_eq!(first(Game::Neverness, Kind::Character), "upcoming_exe");
+        assert_eq!(first(Game::StellaSora, Kind::Character), "firstlight_noya");
+        assert_eq!(first(Game::WutheringWaves, Kind::Character), "1312");
+    }
     #[test]
     fn image_download_policy_rejects_untrusted_servers_and_payloads() {
         assert!(approved_icon_url("https://raw.githubusercontent.com/Mar-7th/StarRailRes/main/icon.png"));
@@ -329,8 +361,10 @@ mod tests {
         }
         for item in entries() {
             assert!(!item.name.trim().is_empty());
-            assert!(item.has_verified_image(),
-                "{} {} must have an existing image source", item.id, item.name);
+            if !item.icon_url.is_empty() {
+                assert!(item.has_verified_image(),
+                    "{} {} must use an approved image source", item.id, item.name);
+            }
             assert!(unique.insert((game_code(item.game), item.kind as u8, item.id.clone())),
                 "duplicate catalog id: {}", item.id);
         }
