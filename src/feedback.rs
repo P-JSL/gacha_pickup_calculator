@@ -43,7 +43,7 @@ impl FeedbackConfig {
             Game::StarRail => Self {
                 enabled: true, points_per_ticket: 20, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40,
-                off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
+                off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 8, weapon_four_star_reward: 8, character_four_star_rate: 0.051,
                 weapon_four_star_rate: 0.066,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -413,6 +413,16 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
 pub fn estimate(setup: &GameSetup, mode: RateMode,
                 model: &FeedbackConfig) -> Result<FeedbackEstimate, String> {
     model.validate()?;
+    for (banner, extra) in [
+        (&setup.character, model.character_other_five_star_rate),
+        (&setup.weapon, model.weapon_other_five_star_rate),
+    ] {
+        if let BannerRule::FeaturedCounter { featured_rate, .. } = banner.rule {
+            if featured_rate + extra > 1.0 + f64::EPSILON {
+                return Err("픽업·비픽업 최고 등급 기본 확률의 합은 100%를 넘을 수 없습니다.".into());
+            }
+        }
+    }
     let mut rng = SplitMix64(0xF17E_1234_ABCD_0905);
     let mut budgets = Vec::with_capacity(model.samples);
     let mut raw_pulls = Vec::with_capacity(model.samples);
