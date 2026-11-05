@@ -61,6 +61,7 @@ jobs:
             app=$!
             trap "kill $app 2>/dev/null || true" EXIT
             sleep 9
+            xdotool mousemove 1470 27
             kill -0 "$app" || { cat /tmp/gacha-chart.log; exit 1; }
             scrot -q 90 ci-artifacts/initial.png
             # Settings is the second entry in the persistent navigation rail.
@@ -70,7 +71,7 @@ jobs:
             scrot -q 90 ci-artifacts/settings.png
             xdotool mousemove 95 167 click 1
             sleep 2
-            xdotool mousemove 850 700
+            xdotool mousemove 1470 27
             xdotool click --repeat 7 --delay 125 5
             sleep 2
             scrot -q 90 ci-artifacts/overview.png
