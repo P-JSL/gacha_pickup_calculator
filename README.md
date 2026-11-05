@@ -85,17 +85,25 @@ gacha-pickup-calculator-windows-x64-v0.1.14/
 
 **이미지 681개**는 릴리즈 빌드에서 다운로드 후 크기·확장자 검증, PNG 재인코딩, SHA-256 생성 및 악성코드 스캔을 거쳐 ZIP에 포함됩니다. 공식 이미지가 없는 일부 발표 캐릭터는 생성한 `NEW` 플레이스홀더로 대체합니다. 단독 EXE는 이미지를 포함하지 않으므로 **휴대용 ZIP 이용을 권장**합니다.
 
-### 소스 실행과 테스트
+### 소스 빌드 및 오프라인 이미지 준비
 
 ```bash
-cargo run --release
 cargo fmt --all -- --check
 cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 cargo build --release
+
+# 이미지 681개를 배포 과정과 같은 방식으로 사전 수집·PNG 변환
+python3 -m pip install "Pillow==13.0.0"
+python3 scripts/build_offline_images.py
+cp -r dist/Image target/release/Image
+
+./target/release/gacha_pickup_calculator
 ```
 
-소스 빌드에는 Rust crate 다운로드가 필요할 수 있습니다. Linux GUI는 X11/Wayland와 OpenGL에 의존하며 한글 표시에는 Noto CJK 등의 설치된 글꼴이 필요합니다. 소스 실행 시에도 실행 파일 옆에 `Image` 폴더를 준비해야 실제 캐릭터 이미지가 나타납니다.
+Windows에서는 `target\release\gacha_pickup_calculator.exe` 옆에 `dist\Image` 폴더를 복사한 뒤 실행하십시오. `cargo run --release`도 가능하지만 이미지 디렉터리가 미리 배치되지 않았다면 기본 아이콘만 표시됩니다.
+
+소스 빌드에는 Rust crate 다운로드가 필요할 수 있고, **이미지 준비 스크립트는 릴리즈 제작 시에만** 지정된 원본 HTTPS 서버에 접근합니다. GUI 실행 자체는 이미지 네트워크 다운로드가 없습니다. Linux GUI는 X11/Wayland와 OpenGL에 의존하며 한글 표시에는 Noto CJK 등의 글꼴이 필요합니다.
 
 ## 게임별 규칙과 재화
 
@@ -103,7 +111,7 @@ cargo build --release
 |---|---|---|---|
 | 붕괴: 스타레일 | 캐릭터·광추 **한정 티켓 공용** | 성옥 **160개** | 캐릭터 90회 천장·50:50, 광추 80회 천장·75:25 |
 | 명조 | 캐릭터권/무기권 별도 | 별의 소리 **160개** | 캐릭터 80천장·50:50, 무기 80천장·픽업 확정 |
-| 스텔라 소라 | 여행가권/레코드 골든 디스크 별도 | Stellanite Dust **300개** | 여행가 160회 픽업 보장·일회성 120회 보상, 레코드 별도 |
+| 스텔라 소라 | 여행가권/레코드 골든 디스크 별도 | 별의 파편 **300개** | 여행가 160회 픽업 보장·일회성 120회 보상, 레코드 별도 |
 | 이환 | 캐릭터권/Arc 전용권 별도 | Annulith **160개** | 캐릭터 90회 픽업 보장, Arc 10연 단위 모델 |
 
 선택한 게임의 실제 이벤트·베타 배너가 기존 표준 배너와 다르면 모델 규칙부터 검증해야 합니다. 소프트 천장 커뮤니티 추정치를 공식 확률식처럼 취급하지 않습니다.
