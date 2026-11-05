@@ -759,7 +759,11 @@ impl Calculator {
                 .allow_zoom(true).allow_drag(true)
                 .show(ui, |plot| {
                     plot.line(Line::new(PlotPoints::from_iter(observed_pts))
-                        .name("실측 누적 확률 · KM").color(MINT).width(3.0_f32));
+                        .name(if data.quality.is_censor_aware() {
+                            "실측 누적 확률 · KM"
+                        } else {
+                            "완료 이력 분포 · 편향 가능"
+                        }).color(MINT).width(3.0_f32));
                     plot.line(Line::new(PlotPoints::from_iter(predicted_pts))
                         .name("선택한 모델").color(PRIMARY).width(2.5_f32));
                     if data.quality.is_censor_aware() {
