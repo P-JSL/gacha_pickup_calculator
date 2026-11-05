@@ -5,6 +5,7 @@ use egui_plot::{Legend, Line, Plot, PlotPoints};
 use gacha_pickup_calculator::feedback::{estimate, FeedbackConfig, FeedbackEstimate};
 use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
+use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 
 const BG: Color32 = Color32::from_rgb(13, 19, 33);
 const CARD: Color32 = Color32::from_rgb(24, 34, 51);
@@ -110,6 +111,15 @@ impl Calculator {
                         "공개 기본 확률 + 확정 천장").changed();
                     dirty |= ui.radio_value(&mut self.mode, RateMode::CommunityEstimate,
                         "소프트 천장 추정 모델").changed();
+                });
+                ui.menu_button("실측 트래커 ▾", |ui| {
+                    ui.label(RichText::new("날짜가 고정된 외부 관측 자료").strong());
+                    for reference in references(self.setup.game) {
+                        ui.hyperlink_to(reference.name, reference.url);
+                        ui.small(format!("자료 확인일: {}", reference.observed_on));
+                    }
+                    ui.separator();
+                    ui.small("외부 통계가 내부 소프트 천장 확률을 자동 변경하지 않습니다.");
                 });
                 ui.menu_button("사용법 / 출처 ▾", |ui| {
                     if ui.button("모델과 출처 확인").clicked() {
@@ -312,6 +322,15 @@ impl Calculator {
                             }
                         });
                 });
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("캐릭터 4성 현재 스택");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.character_four_star_pity)
+                        .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
+                    ui.separator();
+                    ui.label("무기 4성 현재 스택");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_pity)
+                        .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
+                });
                 ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
             }
         });
@@ -460,6 +479,38 @@ impl Calculator {
                 && matches!(self.setup.game, Game::StarRail | Game::WutheringWaves) {
                 ui.colored_label(GOLD, "소프트 천장 확률은 커뮤니티 추정 모델입니다. 공식 서버 확률식이 아닙니다.");
             }
+        });
+        ui.add_space(10.0);
+        section(ui, "07", "실측 트래커 교차 검증",
+                "관측 평균과 현재 확률 모델을 비교합니다. 표본은 공식 서버 확률이 아니며 자동 보정하지 않습니다.", |ui| {
+            let observed = references(self.setup.game);
+            for source in observed {
+                ui.horizontal_wrapped(|ui| {
+                    ui.hyperlink_to(source.name, source.url);
+                    ui.label(RichText::new(format!("관측 {} (고정 스냅샷)", source.observed_on))
+                        .color(MUTED).size(11.0));
+                });
+                if let Some(mean) = source.mean_rare_pulls {
+                    let banner = match source.banner {
+                        TrackedBanner::Character => Some(&self.setup.character),
+                        TrackedBanner::Weapon => Some(&self.setup.weapon),
+                        TrackedBanner::General => None,
+                    };
+                    if let Some(pred) = banner.and_then(|b| expected_for_banner(b, self.mode)) {
+                        let diff = (pred - mean) / mean * 100.0;
+                        ui.label(format!("5성 간격: 트래커 평균 {:.1}뽑 | 모델 기대 {:.1}뽑 | 편차 {:+.1}%",
+                            mean, pred, diff));
+                        ui.small("같은 배너·천장 0부터의 5성 획득 간격 비교입니다. 픽업 확정·중복 환급은 포함되지 않습니다.");
+                    }
+                }
+                if let Some(count) = source.total_pulls {
+                    ui.small(format!("사이트 표기 표본 뽑기 횟수: {count}"));
+                }
+                ui.label(RichText::new(source.notes).color(MUTED).size(11.0));
+                ui.separator();
+            }
+            ui.colored_label(GOLD,
+                "평균 스택 하나만으로 스택별 확률이나 소프트 천장 함수를 역산할 수 없습니다. 이탈·불완전 이력·표본 편향을 확인해야 합니다.");
         });
     }
 }
