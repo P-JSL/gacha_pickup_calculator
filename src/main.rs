@@ -981,6 +981,7 @@ impl eframe::App for Calculator {
                         dirty |= self.resources(ui);
                         ui.add_space(8.0);
                         dirty |= self.feedback_controls(ui);
+                        // Keep the currently visible result synchronized before drawing it.
                         if dirty { self.schedule_recalculation(); }
                         self.dashboard(ui);
                     }
@@ -1002,6 +1003,12 @@ impl eframe::App for Calculator {
                 ui.add_space(25.0);
             });
         });
+        // Header game/model changes can happen while viewing tracker pages.
+        // They must still invalidate the calculator, otherwise returning to the
+        // dashboard would show probabilities for the previous game.
+        if dirty && self.view_mode != ViewMode::Calculator {
+            self.schedule_recalculation();
+        }
         if let Some(edited_at) = self.pending_since {
             if edited_at.elapsed() >= Duration::from_millis(300) {
                 self.pending_since = None;
