@@ -3,10 +3,10 @@
 use eframe::egui;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
-use std::io::{Cursor, Read};
+use std::fs;
+use std::io::Cursor;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind { Character, Weapon }
@@ -36,8 +36,8 @@ const ICON_REPOSITORIES: &[&str] = &[
     "https://raw.githubusercontent.com/JforPlay/sstoy/",
     "https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/",
 ];
-const MAX_ICON_BYTES: u64 = 3_000_000;
-const MAX_ICON_SIDE: u32 = 4096;
+const MAX_ICON_BYTES: u64 = 512 * 1024;
+const MAX_ICON_SIDE: u32 = 256;
 
 fn approved_icon_url(url: &str) -> bool {
     if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
@@ -99,6 +99,8 @@ fn parse() -> Vec<Entry> {
         let kind = match fields[1] { "c" => Kind::Character, "w" => Kind::Weapon, _ => continue };
         let (release_order, status) = if kind == Kind::Character {
             recent_character(game, fields[2])
+        } else if game == Game::StellaSora && fields[2] == "guiding_star_disc" {
+            (20261020, "신규 레코드 2.0")
         } else { (0, "") };
         out.push(Entry {
             game, kind, id: fields[2].to_owned(), name: fields[3].to_owned(),
@@ -171,50 +173,40 @@ impl CatalogUi {
         }
     }
 
-    fn fetch_icon(url: &str) -> Option<egui::ColorImage> {
-        if !approved_icon_url(url) { return None; }
-        // No redirects: upstream cannot bounce this request to localhost,
-        // cloud metadata services or an attacker-controlled HTTP endpoint.
-        let agent = ureq::AgentBuilder::new()
-            .redirects(0)
-            .timeout(Duration::from_secs(12))
-            .timeout_connect(Duration::from_secs(3))
-            .timeout_read(Duration::from_secs(5))
-            .timeout_write(Duration::from_secs(3))
-            .build();
-        let response = agent.get(url)
-            .set("Accept", "image/png, image/jpeg")
-            .set("User-Agent", "gacha-pickup-calculator/desktop")
-            .call().ok()?;
-        let media_type = response.header("Content-Type")?
-            .split(';').next()?.trim().to_ascii_lowercase();
-        if !matches!(media_type.as_str(),
-            "image/png" | "image/jpeg" | "application/octet-stream") {
+    /// Only verified local, bounded PNGs are loaded. Never perform an
+    /// HTTP request or parse scripts from the image catalog at runtime.
+    fn fetch_icon(relative: &str) -> Option<egui::ColorImage> {
+        let mut parts = relative.split('/');
+        let game = parts.next()?;
+        let file = parts.next()?;
+        if parts.next().is_some()
+            || !["HSR", "WutheringWaves", "StellaSora", "Neverness"].contains(&game)
+            || !file.ends_with(".png")
+            || !file.trim_end_matches(".png").chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+        { return None; }
+
+        let executable = std::env::current_exe().ok()?;
+        let root = executable.parent()?.join("Image");
+        let candidate = root.join(game).join(file);
+        let metadata = fs::symlink_metadata(&candidate).ok()?;
+        if !metadata.file_type().is_file() || metadata.len() > MAX_ICON_BYTES {
             return None;
         }
-        if response.header("Content-Length")
-            .and_then(|len| len.parse::<u64>().ok())
-            .is_some_and(|len| len > MAX_ICON_BYTES) {
-            return None;
-        }
-        let mut bytes = Vec::new();
-        response.into_reader().take(MAX_ICON_BYTES + 1)
-            .read_to_end(&mut bytes).ok()?;
-        if bytes.len() as u64 > MAX_ICON_BYTES || !approved_icon_bytes(&bytes) {
-            return None;
-        }
-        // Decode only PNG/JPEG from memory, with strict pixel dimensions and
-        // bounded (best-effort) decoder allocations. Never save or execute
-        // downloaded content, and never parse untrusted SVG/HTML.
+        let canonical = candidate.canonicalize().ok()?;
+        if !canonical.starts_with(root.canonicalize().ok()?) { return None; }
+        let bytes = fs::read(canonical).ok()?;
+        if bytes.len() as u64 > MAX_ICON_BYTES
+            || !approved_icon_bytes(&bytes)
+            || !bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+        { return None; }
         let mut reader = image::ImageReader::new(Cursor::new(bytes))
             .with_guessed_format().ok()?;
-        if !matches!(reader.format(), Some(image::ImageFormat::Png | image::ImageFormat::Jpeg)) {
-            return None;
-        }
+        if reader.format() != Some(image::ImageFormat::Png) { return None; }
         let mut limits = image::Limits::default();
         limits.max_image_width = Some(MAX_ICON_SIDE);
         limits.max_image_height = Some(MAX_ICON_SIDE);
-        limits.max_alloc = Some(48 * 1024 * 1024);
+        limits.max_alloc = Some(8 * 1024 * 1024);
         reader.limits(limits);
         let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
         Some(egui::ColorImage::from_rgba_unmultiplied(
@@ -238,16 +230,21 @@ impl CatalogUi {
     }
 
     pub fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
-        if entry.has_verified_image()
-            && !self.textures.contains_key(&entry.icon_url)
-            && !self.queued.contains(&entry.icon_url)
-        {
-            self.queued.insert(entry.icon_url.clone());
-            if self.send_url.send(entry.icon_url.clone()).is_err() {
-                self.queued.remove(&entry.icon_url);
+        let game = match entry.game {
+            Game::StarRail => "HSR",
+            Game::WutheringWaves => "WutheringWaves",
+            Game::Neverness => "Neverness",
+            Game::StellaSora => "StellaSora",
+        };
+        let role = if entry.kind == Kind::Character { "c" } else { "w" };
+        let key = format!("{game}/{role}-{}.png", entry.id);
+        if !self.textures.contains_key(&key) && !self.queued.contains(&key) {
+            self.queued.insert(key.clone());
+            if self.send_url.send(key.clone()).is_err() {
+                self.queued.remove(&key);
             }
         }
-        if let Some(Some(tex)) = self.textures.get(&entry.icon_url) {
+        if let Some(Some(tex)) = self.textures.get(&key) {
             ui.image((tex.id(), egui::vec2(size, size)));
         } else {
             let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
@@ -352,6 +349,8 @@ mod tests {
         assert!(!approved_icon_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
         assert!(!approved_icon_bytes(b"MZ executable"));
         assert!(approved_icon_bytes(b"\x89PNG\r\n\x1a\nnot-a-valid-image"));
+        assert!(CatalogUi::fetch_icon("HSR/../../evil.png").is_none());
+        assert!(CatalogUi::fetch_icon("HSR/asset.svg").is_none());
     }
     #[test]
     fn all_games_have_both_named_catalogs() {

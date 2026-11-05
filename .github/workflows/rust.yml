@@ -1,5 +1,10 @@
 name: Rust CI and Release
 
+# A new commit supersedes earlier image downloads and UI builds on the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -158,6 +163,14 @@ jobs:
           path: ci-artifacts/windows-ui.png
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload Linux executable for real screenshot capture
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gacha-linux-release-executable
+          path: target/release/gacha_pickup_calculator
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -166,15 +179,99 @@ jobs:
           path: target/release/gacha_pickup_calculator.exe
           if-no-files-found: error
 
+  images:
+    name: Build and scan offline image library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned image decoder
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir "Pillow==13.0.0"
+      - name: Fetch, validate and re-encode all catalog images
+        run: python3 scripts/build_offline_images.py
+      - name: Scan all normalized images for malware
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam
+          clamscan --recursive --infected dist/Image
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gacha-offline-images
+          path: dist/Image/
+          if-no-files-found: error
+
+  ui_docs:
+    name: Capture latest-character GUI for README
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: gacha-linux-release-executable
+          path: target/release/
+      - uses: actions/download-artifact@v4
+        with:
+          name: gacha-offline-images
+          path: target/release/Image/
+      - name: Actual Linux UI with packaged images
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
+          chmod +x target/release/gacha_pickup_calculator
+          bash scripts/capture_readme_screenshots.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gacha-readme-screenshots-v014
+          path: ci-readme-shots/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Commit actual GUI screenshots to same-repository PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$PR_BRANCH"
+          actual_sha=$(git rev-parse FETCH_HEAD)
+          if [ "$actual_sha" != "$PR_HEAD_SHA" ]; then
+            echo "::error::PR head changed during screenshot capture; declining to publish stale images"
+            exit 1
+          fi
+          git switch -C "$PR_BRANCH" FETCH_HEAD
+          mkdir -p docs/screenshots/v0.1.14
+          cp ci-readme-shots/*.png docs/screenshots/v0.1.14/
+          git add docs/screenshots/v0.1.14/
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m 'docs: add verified latest-character GUI screenshots [skip ci]'
+            git push origin HEAD:"$PR_BRANCH"
+          fi
+
   release:
     name: Publish versioned release
-    needs: verify
+    needs: [verify, images, ui_docs]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Check version and existing release
         id: version
         env:
@@ -201,6 +298,11 @@ jobs:
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
+      - uses: actions/download-artifact@v4
+        if: steps.version.outputs.publish == 'true'
+        with:
+          name: gacha-offline-images
+          path: dist/Image
       - name: Check release notes
         if: steps.version.outputs.publish == 'true'
         env:
@@ -224,12 +326,28 @@ jobs:
           if executable.stat().st_size < 100_000:
               raise SystemExit("Windows executable is unexpectedly small.")
           package = Path(f"dist/gacha-pickup-calculator-windows-x64-v{version}.zip")
+          icons = sorted(Path("dist/Image").rglob("*.png"))
+          expected = sum(1 for line in Path("src/catalog_data.tsv").read_text(
+              encoding="utf-8").splitlines() if len(line.split("\t")) == 6)
+          if len(icons) != expected or expected < 680:
+              raise SystemExit(f"Incomplete sanitized assets: {len(icons)}/{expected}")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
-              zipped.writestr("README.txt", "Gacha Pickup Calculator\nRun gacha_pickup_calculator.exe on Windows x64.\nThe ZIP contains the same executable as the standalone release asset.\n")
+              for icon in icons:
+                  zipped.write(icon, icon.relative_to("dist").as_posix())
+              zipped.write("dist/Image/SHA256SUMS.txt", "Image/SHA256SUMS.txt")
+              zipped.writestr("README.txt",
+                  "Gacha Pickup Calculator / Windows x64\n"
+                  "Extract this entire ZIP, preserving the Image directory.\n"
+                  "Run gacha_pickup_calculator.exe alongside the Image folder.\n"
+                  "All image files were decoded, re-encoded and malware-scanned in CI.\n"
+                  "No image network requests are performed while using the app.\n")
           with ZipFile(package) as zipped:
               assert zipped.testzip() is None
               assert executable.name in zipped.namelist()
+              assert len([n for n in zipped.namelist()
+                  if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
+              assert "Image/SHA256SUMS.txt" in zipped.namelist()
           PY
           cd dist
           sha256sum gacha_pickup_calculator.exe \
@@ -250,7 +368,7 @@ jobs:
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
             dist/SHA256SUMS.txt \
-            --target "$GITHUB_SHA" \
+            --target "$(git rev-parse HEAD)" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
             --notes-file "RELEASE_NOTES_v$VERSION.md"
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
