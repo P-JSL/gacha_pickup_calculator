@@ -190,7 +190,7 @@ impl Calculator {
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
             .show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(17.0));
@@ -229,12 +229,12 @@ impl Calculator {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(174.0)
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .exact_width(150.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
             .show(ctx, |ui| {
-                ui.add_space(20.0);
+                ui.add_space(8.0);
                 ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
-                ui.add_space(13.0);
+                ui.add_space(8.0);
                 for (view, title) in [
                     (ViewMode::Calculator, "01   확률 대시보드"),
                     (ViewMode::Settings, "02   시뮬레이션 설정"),
@@ -249,14 +249,14 @@ impl Calculator {
                         .fill(if active { SELECTED_NAV } else { SIDEBAR })
                         .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
                         .corner_radius(9);
-                    if ui.add_sized([ui.available_width(), 34.0], button).clicked() {
+                    if ui.add_sized([ui.available_width(), 30.0], button).clicked() {
                         self.view_mode = view;
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(3.0);
                 }
-                ui.add_space(22.0);
-                ui.separator();
                 ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
                 ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0));
                 ui.add_space(5.0);
                 ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
@@ -265,13 +265,13 @@ impl Calculator {
                     self.target_eid, self.setup.game.secondary_banner_name(),
                     self.target_refine
                 )).color(MUTED).size(11.0));
-                ui.add_space(12.0);
+                ui.add_space(7.0);
                 ui.label(RichText::new("정확 DP · 조건부 환급 추정")
                     .color(MUTED).size(10.0));
                 ui.add_space(12.0);
                 ui.hyperlink_to("GitHub / Source", "https://github.com/P-JSL/gacha_pickup_calculator");
                 ui.add_space(5.0);
-                ui.label(RichText::new("v0.1.9  ·  DESKTOP").color(MUTED).size(10.0));
+                ui.label(RichText::new("v0.1.10  ·  DESKTOP").color(MUTED).size(10.0));
             });
     }
 
@@ -344,13 +344,33 @@ impl Calculator {
     fn pity(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
         section(ui, "02", "천장 및 확정 상태", "캐릭터와 무기 천장은 독립적으로 관리됩니다.", |ui| {
-            dirty |= Self::banner_controls(ui, "캐릭터", &mut self.setup.character.rule,
-                &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
-                &mut self.setup.character.any_rare_pity);
-            ui.separator();
-            dirty |= Self::banner_controls(ui, self.setup.game.secondary_banner_name(), &mut self.setup.weapon.rule,
-                &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
-                &mut self.setup.weapon.any_rare_pity);
+            let secondary = self.setup.game.secondary_banner_name();
+            if ui.available_width() >= 440.0 {
+                ui.columns(2, |cols| {
+                    dirty |= Self::banner_controls(
+                        &mut cols[0], "캐릭터", &mut self.setup.character.rule,
+                        &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                        &mut self.setup.character.any_rare_pity,
+                    );
+                    dirty |= Self::banner_controls(
+                        &mut cols[1], secondary, &mut self.setup.weapon.rule,
+                        &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                        &mut self.setup.weapon.any_rare_pity,
+                    );
+                });
+            } else {
+                dirty |= Self::banner_controls(
+                    ui, "캐릭터", &mut self.setup.character.rule,
+                    &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                    &mut self.setup.character.any_rare_pity,
+                );
+                ui.separator();
+                dirty |= Self::banner_controls(
+                    ui, secondary, &mut self.setup.weapon.rule,
+                    &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                    &mut self.setup.weapon.any_rare_pity,
+                );
+            }
             if let Some(spark) = self.setup.character.spark.as_mut() {
                 ui.separator();
                 ui.label(RichText::new("배너별 120회 별도 교환 보너스").color(PRIMARY));
@@ -414,7 +434,7 @@ impl Calculator {
             dirty |= ui.checkbox(&mut self.feedback_cfg.enabled,
                 "피드백 뽑기 재화 반영 (재현 가능한 몬테카를로)").changed();
             ui.label(RichText::new(format!(
-                "{} · 게임별 초기 설정 (필요 시 수동 수정 가능)",
+                "{} · 게임별 환급 기본값",
                 self.setup.game.exchange_points_name()
             )).color(PRIMARY));
             if self.setup.game == Game::Neverness {
@@ -442,12 +462,15 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                         .range(0..=1_000_000)).changed();
                     ui.label(format!(
-                        "현재 재화로 {}뽑 즉시 교환 가능",
+                        "현재 교환 가능 {}뽑",
                         self.feedback_cfg.initial_points / self.feedback_cfg.points_per_ticket.max(1)
                     ));
                 });
-                ui.horizontal_wrapped(|ui| {
-                    ui.label("픽업 캐릭터 첫 장");
+                egui::CollapsingHeader::new("고급 설정 · 중복 보상 / 4성 확률 / 시뮬레이션")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("픽업 캐릭터 첫 장");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.featured_first)
                         .range(0..=100_000)).changed();
                     ui.label("중복 장당");
@@ -527,7 +550,8 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_pity)
                         .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
                 });
-                ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
+                        ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
+                    });
             }
         });
         dirty
@@ -1070,7 +1094,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 218.0 } else { 254.0 };
+    let height = if width < 650.0 { 205.0 } else { 232.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1160,11 +1184,12 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
 }
 
 fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
-    ui.label(RichText::new(eyebrow).size(10.0).color(PRIMARY).strong());
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(eyebrow).size(9.5).color(PRIMARY).strong());
+        ui.heading(RichText::new(title).size(18.0).strong());
+        ui.label(RichText::new(subtitle).size(10.5).color(MUTED));
+    });
     ui.add_space(6.0);
-    ui.heading(RichText::new(title).size(23.0).strong());
-    ui.label(RichText::new(subtitle).size(12.0).color(MUTED));
-    ui.add_space(12.0);
 }
 
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
@@ -1172,18 +1197,24 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(12))
-        .inner_margin(11)
+        .corner_radius(egui::CornerRadius::same(11))
+        .inner_margin(10)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(number).color(PRIMARY).strong().size(11.0));
-                ui.add_space(5.0);
-                ui.label(RichText::new(heading).strong().size(15.0));
+            ui.horizontal_wrapped(|ui| {
+                egui::Frame::default()
+                    .fill(SELECTED_NAV)
+                    .corner_radius(egui::CornerRadius::same(5))
+                    .inner_margin(egui::Margin::symmetric(6, 2))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(number).color(PRIMARY).strong().size(10.0));
+                    });
+                ui.label(RichText::new(heading).strong().size(13.0));
+                if !description.is_empty() {
+                    ui.label(RichText::new(description).color(MUTED).size(10.0));
+                }
             });
-            ui.add_space(3.0);
-            ui.label(RichText::new(description).color(MUTED).size(12.0));
-            ui.add_space(7.0);
+            ui.add_space(4.0);
             content(ui);
         });
 }
@@ -1191,14 +1222,12 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
     egui::Frame::group(ui.style()).fill(CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(12)).inner_margin(11)
+        .corner_radius(egui::CornerRadius::same(11)).inner_margin(9)
         .show(ui, |ui| {
-            ui.set_min_width(ui.available_width().min(180.0));
-            ui.label(RichText::new(label).color(MUTED).size(12.0));
-            ui.add_space(5.0);
-            ui.label(RichText::new(value).color(accent).size(23.0).strong());
-            ui.add_space(3.0);
-            ui.label(RichText::new(note).color(MUTED).size(11.0));
+            ui.set_min_width(ui.available_width().min(145.0));
+            ui.label(RichText::new(label).color(MUTED).size(10.5));
+            ui.label(RichText::new(value).color(accent).size(21.0).strong());
+            ui.label(RichText::new(note).color(MUTED).size(10.0));
         });
 }
 
@@ -1213,12 +1242,12 @@ impl eframe::App for Calculator {
         self.sidebar(ctx);
         let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG).inner_margin(12))
+            .frame(egui::Frame::default().fill(BG).inner_margin(8))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.add_space(10.0);
+                        ui.add_space(5.0);
                         match self.view_mode {
                             ViewMode::Calculator => {
                                 self.dashboard(ui);
@@ -1229,7 +1258,7 @@ impl eframe::App for Calculator {
                                         ui.label(RichText::new("SIMULATION SETTINGS")
                                             .color(PRIMARY).size(10.0).strong());
                                         ui.heading(RichText::new("시뮬레이션 설정")
-                                            .size(27.0).strong());
+                                            .size(19.0).strong());
                                         ui.label(RichText::new(
                                             "목표, 천장, 보유 재화와 게임별 환급 가정을 변경합니다."
                                         ).color(MUTED));
@@ -1242,14 +1271,28 @@ impl eframe::App for Calculator {
                                         },
                                     );
                                 });
-                                ui.add_space(20.0);
-                                settings_changed |= self.targets(ui);
-                                ui.add_space(12.0);
-                                settings_changed |= self.pity(ui);
-                                ui.add_space(12.0);
-                                settings_changed |= self.resources(ui);
-                                ui.add_space(12.0);
-                                settings_changed |= self.feedback_controls(ui);
+                                ui.add_space(7.0);
+                                // Two compact input rows on desktop; no settings
+                                // are removed, and narrow viewports stack safely.
+                                if ui.available_width() >= 910.0 {
+                                    ui.columns(2, |cols| {
+                                        settings_changed |= self.targets(&mut cols[0]);
+                                        settings_changed |= self.pity(&mut cols[1]);
+                                    });
+                                    ui.add_space(6.0);
+                                    ui.columns(2, |cols| {
+                                        settings_changed |= self.resources(&mut cols[0]);
+                                        settings_changed |= self.feedback_controls(&mut cols[1]);
+                                    });
+                                } else {
+                                    settings_changed |= self.targets(ui);
+                                    ui.add_space(6.0);
+                                    settings_changed |= self.pity(ui);
+                                    ui.add_space(6.0);
+                                    settings_changed |= self.resources(ui);
+                                    ui.add_space(6.0);
+                                    settings_changed |= self.feedback_controls(ui);
+                                }
                             }
                             ViewMode::TrackerSources => {
                                 page_intro(ui, "TRACKER EVIDENCE",
@@ -1262,7 +1305,7 @@ impl eframe::App for Calculator {
                                 self.observation_validation(ui);
                             }
                         }
-                        ui.add_space(25.0);
+                        ui.add_space(12.0);
                     });
             });
         if settings_changed {
@@ -1315,13 +1358,13 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
     ctx.style_mut(|style| {
-        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-        style.spacing.button_padding = egui::vec2(10.0, 5.0);
-        style.spacing.interact_size.y = 27.0;
+        style.spacing.item_spacing = egui::vec2(7.0, 5.0);
+        style.spacing.button_padding = egui::vec2(9.0, 4.0);
+        style.spacing.interact_size.y = 25.0;
         style.text_styles.insert(egui::TextStyle::Body,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Button,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Small,
             egui::FontId::proportional(11.0));
     });
