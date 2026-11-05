@@ -10,13 +10,14 @@ use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDa
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-const BG: Color32 = Color32::from_rgb(13, 19, 33);
-const CARD: Color32 = Color32::from_rgb(24, 34, 51);
-const MUTED: Color32 = Color32::from_rgb(154, 171, 193);
-const PRIMARY: Color32 = Color32::from_rgb(108, 187, 255);
-const MINT: Color32 = Color32::from_rgb(98, 223, 176);
-const GOLD: Color32 = Color32::from_rgb(255, 183, 102);
-const BORDER: Color32 = Color32::from_rgb(46, 60, 78);
+// Compact, high-contrast editorial dashboard palette shared by Windows/Linux.
+const BG: Color32 = Color32::from_rgb(11, 17, 27);
+const CARD: Color32 = Color32::from_rgb(21, 30, 43);
+const MUTED: Color32 = Color32::from_rgb(158, 174, 192);
+const PRIMARY: Color32 = Color32::from_rgb(140, 172, 255);
+const MINT: Color32 = Color32::from_rgb(99, 223, 178);
+const GOLD: Color32 = Color32::from_rgb(246, 195, 124);
+const BORDER: Color32 = Color32::from_rgb(43, 57, 75);
 
 struct Computed {
     character: Distribution,
@@ -185,9 +186,9 @@ impl Calculator {
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.add_space(9.0);
+            ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("◈  GACHA LAB").strong().size(20.0).color(PRIMARY));
+                ui.label(RichText::new("◈  GACHA LAB").strong().size(16.0).color(PRIMARY));
                 ui.separator();
                 ui.menu_button(format!("{} ▾", self.setup.game.label()), |ui| {
                     for game in Game::ALL {
@@ -223,10 +224,10 @@ impl Calculator {
                     ui.hyperlink_to("GitHub 저장소", "https://github.com/P-JSL/gacha_pickup_calculator");
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new("RUST · EXACT DP + REFUND ESTIMATE").color(MUTED).size(10.0));
+                    ui.label(RichText::new("DP  /  MONTE CARLO").color(MUTED).size(10.0));
                 });
             });
-            ui.add_space(8.0);
+            ui.add_space(4.0);
         });
         dirty
     }
@@ -678,10 +679,10 @@ impl Calculator {
                     "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
             }
         });
-        ui.add_space(10.0);
+        ui.add_space(6.0);
         section(ui, "06", "달성 확률별 필요 재화", "DP 분위수는 정확 모델값, 환급 분위수는 모의실험의 추정치입니다.", |ui| {
             egui::Grid::new("quantiles").num_columns(6).striped(true)
-                .spacing([32.0, 8.0]).show(ui, |ui| {
+                .spacing([23.0, 5.0]).show(ui, |ui| {
                     ui.strong("달성률"); ui.strong("캐릭터");
                     ui.strong("무기"); ui.strong("합산 원시");
                     ui.strong("환급 후 자유 재화"); ui.strong("포인트 충당 표본"); ui.end_row();
@@ -988,7 +989,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 262.0 } else { 320.0 };
+    let height = if width < 650.0 { 215.0 } else { 248.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -997,7 +998,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         egui::pos2(bounds.left() + 49.0, bounds.top() + 12.0),
         egui::pos2(bounds.right() - 10.0, bounds.bottom() - 34.0),
     );
-    painter.rect_filled(bounds, 8.0, Color32::from_rgb(18, 28, 44));
+    painter.rect_filled(bounds, 9.0, Color32::from_rgb(17, 25, 37));
     for edge in [
         [graph.left_top(), graph.right_top()],
         [graph.left_bottom(), graph.right_bottom()],
@@ -1018,7 +1019,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         let y = project(0, probability).y;
         painter.line_segment(
             [egui::pos2(graph.left(), y), egui::pos2(graph.right(), y)],
-            egui::Stroke::new(1.0_f32, BORDER),
+            egui::Stroke::new(0.8_f32, BORDER),
         );
         painter.text(
             egui::pos2(graph.left() - 7.0, y),
@@ -1082,29 +1083,35 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(10))
-        .inner_margin(13)
+        .corner_radius(egui::CornerRadius::same(11))
+        .inner_margin(10)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(number).color(PRIMARY).strong().size(12.0));
-                ui.label(RichText::new(heading).strong().size(16.0));
+            ui.horizontal_wrapped(|ui| {
+                egui::Frame::default()
+                    .fill(Color32::from_rgb(31, 44, 64))
+                    .corner_radius(egui::CornerRadius::same(5))
+                    .inner_margin(egui::Margin::symmetric(7, 3))
+                    .show(ui, |ui| {
+                        ui.label(RichText::new(number).color(PRIMARY).strong().size(10.0));
+                    });
+                ui.label(RichText::new(heading).strong().size(13.5));
+                if !description.is_empty() {
+                    ui.label(RichText::new(description).color(MUTED).size(10.0));
+                }
             });
-            ui.label(RichText::new(description).color(MUTED).size(11.0));
-            ui.add_space(7.0);
+            ui.add_space(4.0);
             content(ui);
         });
 }
 
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
     egui::Frame::group(ui.style()).fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(10)).inner_margin(12)
+        .corner_radius(egui::CornerRadius::same(11)).inner_margin(10)
         .show(ui, |ui| {
-            ui.set_min_width(220.0);
-            ui.label(RichText::new(label).color(MUTED).size(12.0));
-            ui.add_space(6.0);
-            ui.label(RichText::new(value).color(accent).size(24.0).strong());
-            ui.add_space(2.0);
+            ui.set_width(ui.available_width());
+            ui.label(RichText::new(label).color(MUTED).size(10.5));
+            ui.label(RichText::new(value).color(accent).size(21.0).strong());
             ui.label(RichText::new(note).color(MUTED).size(10.0));
         });
 }
@@ -1193,25 +1200,25 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     let mut visuals = egui::Visuals::dark();
     visuals.panel_fill = BG;
     visuals.window_fill = CARD;
-    visuals.extreme_bg_color = Color32::from_rgb(17, 25, 40);
+    visuals.extreme_bg_color = Color32::from_rgb(14, 22, 33);
     visuals.override_text_color = Some(Color32::from_rgb(231, 239, 249));
     visuals.widgets.noninteractive.fg_stroke.color = MUTED;
     visuals.widgets.inactive.bg_fill = CARD;
-    visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 58, 79);
-    visuals.widgets.active.bg_fill = Color32::from_rgb(43, 73, 99);
-    visuals.selection.bg_fill = Color32::from_rgb(39, 102, 158);
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(40, 53, 75);
+    visuals.widgets.active.bg_fill = Color32::from_rgb(47, 67, 96);
+    visuals.selection.bg_fill = Color32::from_rgb(74, 104, 169);
     // Both dark visual slots and the current theme are explicitly set so a
     // Windows light OS theme won't reintroduce light native widget styling.
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
     ctx.style_mut(|style| {
-        style.spacing.item_spacing = egui::vec2(9.0, 8.0);
-        style.spacing.button_padding = egui::vec2(11.0, 6.0);
-        style.spacing.interact_size.y = 27.0;
+        style.spacing.item_spacing = egui::vec2(7.0, 5.0);
+        style.spacing.button_padding = egui::vec2(9.0, 4.0);
+        style.spacing.interact_size.y = 25.0;
         style.text_styles.insert(egui::TextStyle::Body,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Button,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Small,
             egui::FontId::proportional(11.0));
     });
@@ -1241,8 +1248,8 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1230.0, 940.0])
-            .with_min_inner_size([840.0, 650.0])
+            .with_inner_size([1280.0, 830.0])
+            .with_min_inner_size([820.0, 620.0])
             .with_title("Gacha Lab — Rust 확률 분석기"),
         ..Default::default()
     };
