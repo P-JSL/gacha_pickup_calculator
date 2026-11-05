@@ -96,13 +96,13 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
     wash(ui, r, base, Color32::from_rgb(17, 43, 67));
     metric_icon(ui.painter(), egui::pos2(r.left()+34.0,r.top()+47.0), kind, color);
     let left = r.left()+66.0;
-    ui.painter().text(egui::pos2(left,r.top()+18.0),
+    ui.painter_at(r).text(egui::pos2(left,r.top()+18.0),
         egui::Align2::LEFT_TOP, label, egui::FontId::proportional(12.0),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+43.0),
+    ui.painter_at(r).text(egui::pos2(left,r.top()+43.0),
         egui::Align2::LEFT_TOP, value, egui::FontId::proportional(27.0),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+94.0),
+    ui.painter_at(r).text(egui::pos2(left,r.top()+94.0),
         egui::Align2::LEFT_TOP, note, egui::FontId::proportional(10.0),
         MUTED);
 }
@@ -275,10 +275,9 @@ impl Calculator {
             .inner_margin(13)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("☷").color(CYAN).size(19.0));
                     ui.label(RichText::new("Simulation Settings").size(16.0).strong());
-                    ui.add_space(19.0);
                     ui.label(RichText::new("Game").color(MUTED).size(12.0));
                     for (game, title) in [
                         (Game::StarRail, "✦  HSR"),
@@ -324,7 +323,7 @@ impl Calculator {
                             });
                     });
                 } else {
-                    ui.columns(4, |cols| {
+                    ui.columns(2, |cols| {
                         setting_tile(&mut cols[0], "♧",
                             &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
                                 dirty |= edit_ticket_inventory(
@@ -338,12 +337,14 @@ impl Calculator {
                                     ui, &mut self.setup, TicketRole::Weapon
                                 );
                             });
-                        setting_tile(&mut cols[2], "◆",
+                    });
+                    ui.columns(2, |cols| {
+                        setting_tile(&mut cols[0], "◆",
                             &format!("공용 재화 · {}", game.currency_name()), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
                                     .range(0..=100_000_000).speed(1)).changed();
                             });
-                        setting_tile(&mut cols[3], "◌",
+                        setting_tile(&mut cols[1], "◌",
                             &format!("환급 · {}", game.exchange_points_name()), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                                     .range(0..=1_000_000)).changed();
@@ -357,7 +358,7 @@ impl Calculator {
                     }
                 }
                 ui.add_space(8.0);
-                ui.columns(4, |cols| {
+                ui.columns(2, |cols| {
                     setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
                         self.catalog_selector(ui, catalog::Kind::Character);
                         egui::ComboBox::from_id_salt("workspace_character_goal")
@@ -390,7 +391,9 @@ impl Calculator {
                                     }
                                 });
                         });
-                    setting_tile(&mut cols[2], "⚑", "Pity (Current)", |ui| {
+                });
+                ui.columns(2, |cols| {
+                    setting_tile(&mut cols[0], "⚑", "Pity (Current)", |ui| {
                         let hard = match &self.setup.character.rule {
                             BannerRule::Standard { rarity, .. } => rarity.hard,
                             BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
@@ -399,7 +402,7 @@ impl Calculator {
                         dirty |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
                             .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
                     });
-                    setting_tile(&mut cols[3], "♧", "Rate-up Guarantee", |ui| {
+                    setting_tile(&mut cols[1], "♧", "Rate-up Guarantee", |ui| {
                         if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
                             if *featured_share < 1.0 {
                                 ui.horizontal(|ui| {
