@@ -1,6 +1,6 @@
 [package]
 name = "gacha_pickup_calculator"
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 license = "MIT"
 description = "Exact finite-state gacha probability calculator for four games"
@@ -8,6 +8,7 @@ description = "Exact finite-state gacha probability calculator for four games"
 [dependencies]
 eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 egui_plot = "0.31.0"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 
 [profile.release]
 lto = "thin"

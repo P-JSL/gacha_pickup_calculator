@@ -55,22 +55,23 @@ jobs:
           set -euo pipefail
           sudo apt-get install -y scrot xdotool python3-pil fonts-noto-cjk
           mkdir -p ci-artifacts
-          xvfb-run -a -s '-screen 0 1440x960x24' bash -c '
+          xvfb-run -a -s '-screen 0 1536x864x24' bash -c '
             set -eu
             LIBGL_ALWAYS_SOFTWARE=1 ./target/release/gacha_pickup_calculator >/tmp/gacha-chart.log 2>&1 &
             app=$!
             trap "kill $app 2>/dev/null || true" EXIT
             sleep 9
+            xdotool mousemove 1470 27
             kill -0 "$app" || { cat /tmp/gacha-chart.log; exit 1; }
             scrot -q 90 ci-artifacts/initial.png
             # Settings is the second entry in the persistent navigation rail.
             # Capture its compact 2x2 editor layout before returning to charts.
-            xdotool mousemove 90 147 click 1
+            xdotool mousemove 95 225 click 1
             sleep 2
             scrot -q 90 ci-artifacts/settings.png
-            xdotool mousemove 90 104 click 1
+            xdotool mousemove 95 167 click 1
             sleep 2
-            xdotool mousemove 850 700
+            xdotool mousemove 1470 27
             xdotool click --repeat 7 --delay 125 5
             sleep 2
             scrot -q 90 ci-artifacts/overview.png
@@ -83,7 +84,7 @@ jobs:
           python3 - <<'PY'
           from PIL import Image
           image = Image.open("ci-artifacts/chart.png").convert("RGB")
-          assert image.width >= 1200 and image.height >= 900, "Invalid screenshot"
+          assert image.width >= 1200 and image.height >= 800, "Invalid screenshot"
           core = image.crop((150, 60, 1150, 850)).resize((100, 79))
           pixels = list(core.getdata())
           dark = sum(max(p) < 155 for p in pixels) / len(pixels)
