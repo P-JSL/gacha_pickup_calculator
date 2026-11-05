@@ -457,7 +457,34 @@ impl Calculator {
         if self.stats_game == Some(self.setup.game) { self.stats.as_ref() } else { None }
     }
 
-    /// Selection controls all reuse the catalog; target rarity remains a five-star model.
+    /// Measure the selected name, preserving UTF-8 boundaries and the full catalog identity.
+    /// The picker itself continues to show the unabridged item name.
+    fn truncate_selector_name(
+        name: &str, max_width: f32, mut measure: impl FnMut(&str) -> f32,
+    ) -> String {
+        if measure(name) <= max_width {
+            return name.to_owned();
+        }
+        let suffix = "...";
+        if measure(suffix) > max_width {
+            return suffix.to_owned();
+        }
+        let boundaries: Vec<usize> = name.char_indices()
+            .map(|(offset, _)| offset).chain(std::iter::once(name.len())).collect();
+        let (mut low, mut high) = (0, boundaries.len() - 1);
+        while low < high {
+            let middle = (low + high + 1) / 2;
+            let candidate = format!("{}{suffix}", &name[..boundaries[middle]]);
+            if measure(&candidate) <= max_width {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        format!("{}{suffix}", &name[..boundaries[low]])
+    }
+
+    /// Shared character/weapon picker: a long selection never widens its parent tile.
     fn catalog_selector(&mut self, ui: &mut egui::Ui, kind: catalog::Kind) {
         let game = self.setup.game;
         let id = match kind {
@@ -470,8 +497,22 @@ impl Calculator {
                 self.catalog_ui.image(ui, item, 30.0);
             }
             let name = item.map(|x| x.name.as_str()).unwrap_or("대상 선택");
-            if ui.add(egui::Button::new(format!("{name}  ▾"))
-                .min_size(egui::vec2(108.0, 27.0))).clicked() {
+            // Reserve text padding and the dropdown arrow inside the remaining tile width.
+            let button_width = ui.available_width().max(52.0);
+            let font = egui::FontId::proportional(12.0);
+            let measure = |text: &str| {
+                ui.painter().layout_no_wrap(
+                    text.to_owned(), font.clone(), Color32::WHITE,
+                ).size().x
+            };
+            let arrow = "  ▾";
+            let name_width = (button_width - measure(arrow) - 22.0).max(0.0);
+            let shown = Self::truncate_selector_name(name, name_width, measure);
+            let response = ui.add_sized(
+                [button_width, 27.0],
+                egui::Button::new(RichText::new(format!("{shown}{arrow}")).size(12.0)),
+            ).on_hover_text(name);
+            if response.clicked() {
                 self.picker_kind = Some(kind);
                 self.picker_filter.clear();
             }
@@ -2183,6 +2224,18 @@ fn main() -> eframe::Result {
 #[cfg(test)]
 mod chart_tests {
     use super::*;
+    #[test]
+    fn catalog_selection_truncates_only_the_display_text_at_utf8_boundaries() {
+        let long = "가나다라마바사";
+        let shortened = Calculator::truncate_selector_name(long, 6.0,
+            |text| text.chars().count() as f32);
+        assert_eq!(shortened, "가나다...");
+        assert_eq!(Calculator::truncate_selector_name("Short", 20.0,
+            |text| text.chars().count() as f32), "Short");
+        assert_eq!(Calculator::truncate_selector_name(long, 3.0,
+            |text| text.chars().count() as f32), "...");
+    }
+
     #[test]
     fn automatic_recalculation_is_disabled_by_default() {
         let prefs = UiPreferences::default();
