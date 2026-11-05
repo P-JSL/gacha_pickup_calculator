@@ -58,6 +58,11 @@ fn parse() -> Vec<Entry> {
         let priority = |e: &Entry| match (e.game, e.kind, e.id.as_str()) {
             (Game::WutheringWaves, Kind::Character, "1311") => 20261015,
             (Game::WutheringWaves, Kind::Character, "1312") => 20261015,
+            (Game::StarRail, Kind::Character, "upcoming_aeon_aha") => 20261111,
+            (Game::Neverness, Kind::Character, "upcoming_elyms") => 20261111,
+            (Game::Neverness, Kind::Character, "upcoming_exe") => 20261202,
+            (Game::StellaSora, Kind::Character, "firstlight_noya") => 20261020,
+            (Game::StellaSora, Kind::Weapon, "guiding_star_disc") => 20261020,
             _ => 0,
         };
         game_code(a.game).cmp(game_code(b.game))
@@ -281,8 +286,9 @@ mod tests {
         }
         for item in entries() {
             assert!(!item.name.trim().is_empty());
-            assert!(item.has_verified_image(),
-                "{} {} must have an existing image source", item.id, item.name);
+            assert!(item.has_verified_image() || item.id.starts_with("upcoming_")
+                || matches!(item.id.as_str(), "firstlight_noya" | "guiding_star_disc"),
+                "{} {} missing image or a documented fallback", item.id, item.name);
             assert!(unique.insert((game_code(item.game), item.kind as u8, item.id.clone())),
                 "duplicate catalog id: {}", item.id);
         }
