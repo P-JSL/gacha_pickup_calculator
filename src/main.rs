@@ -1432,10 +1432,11 @@ impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
         // Compact dashboard edits and detailed settings use the same worker generation.
+        // Reserve a full-height left rail first, as in the reference image.
+        self.sidebar(ctx);
         if self.header(ctx) {
             self.schedule_recalculation();
         }
-        self.sidebar(ctx);
         if self.view_mode == ViewMode::Calculator {
             self.workspace_results_panel(ctx);
         }
