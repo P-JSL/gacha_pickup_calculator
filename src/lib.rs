@@ -208,7 +208,9 @@ impl Banner {
                             else { (natural_featured, natural_any) };
                         if copies + 1 == k { pmf[batch * 10] += mass * p_feat; }
                         else { next[(copies + 1) * stride] += mass * p_feat; }
-                        next[copies * stride + (pickup_pity + 1) * 6] += mass * (p_any - p_feat);
+                        if p_any > p_feat {
+                            next[copies * stride + (pickup_pity + 1) * 6] += mass * (p_any - p_feat);
+                        }
                         if p_any < 1.0 {
                             next[copies * stride + (pickup_pity + 1) * 6 + any_pity + 1] += mass * (1.0 - p_any);
                         }
