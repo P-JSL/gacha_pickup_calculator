@@ -206,34 +206,6 @@ jobs:
           path: dist/Image/
           if-no-files-found: error
 
-  docs_ui:
-    name: Commit verified native README screenshots to PR branch
-    needs: ui_docs
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/offline-image-package-v014-20261106' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: gacha-readme-screenshots-v014
-          path: docs/screenshots/v0.1.14/
-      - name: Verify screenshots and publish to source branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(find docs/screenshots/v0.1.14 -maxdepth 1 -name '*.png' | wc -l)" -eq 9
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots/v0.1.14/
-          if ! git diff --cached --quiet; then
-            git commit -m "docs(ui): publish nine verified real GUI screenshots [skip ci]"
-            git push origin "HEAD:refs/heads/${{ github.head_ref }}"
-          fi
-
   ui_docs:
     name: Capture latest-character GUI for README
     needs: [verify, images]
