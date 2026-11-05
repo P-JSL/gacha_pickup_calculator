@@ -586,39 +586,67 @@ impl Calculator {
             }
         });
 
-        ui.columns(3, |cols| {
-            metric(&mut cols[0], "전체 기대 소모 · 환급 전", format!("{:.1}뽑", stats.combined.mean),
-                "정확 DP / 배너 독립", PRIMARY);
-            if let Some(ref feedback) = stats.feedback {
-                let n = if self.query_mode == QueryMode::RequiredBudget {
-                    feedback.quantile(q)
-                } else { self.n_query };
-                metric(&mut cols[1],
-                    if self.query_mode == QueryMode::RequiredBudget { "목표 확률에 필요한 자유 재화" }
-                    else { "입력한 추가 자유 재화" },
-                    format!("{n}뽑"), "전용권 별도 · 순차 환급 재투입", GOLD);
-                let (p, low, high) = feedback.probability(n);
-                metric(&mut cols[2],
-                    if self.query_mode == QueryMode::RequiredBudget { "계산된 성공 확률" }
-                    else { "N뽑 내 최종 성공 확률" },
-                    format!("{:.2}%", p * 100.0),
-                    &format!("95% 신뢰구간 {:.2}~{:.2}%", low * 100.0, high * 100.0), MINT);
-            } else if self.query_mode == QueryMode::RequiredBudget {
-                metric(&mut cols[1], &format!("{}% 달성 필요", self.confidence),
-                    format!("{raw_quantile}뽑"), "환급 전 · 전체 합계", GOLD);
-                metric(&mut cols[2], "보유권 조건 성공 확률",
-                    format!("{current_probability:.2}%", current_probability = current_probability * 100.0),
-                    "환급 없는 정확 DP", MINT);
-            } else {
-                let a = optimal_allocation(&stats.character, &stats.weapon,
-                    self.setup.character_dedicated, self.setup.weapon_dedicated, self.n_query);
-                metric(&mut cols[1], "추가 자유 배분 재화", format!("{}뽑", self.n_query),
-                    "전용권 별도", GOLD);
-                metric(&mut cols[2], "N뽑 내 최종 성공 확률",
-                    format!("{:.2}%", a.success_probability * 100.0),
-                    "환급 없는 정확 DP", MINT);
+        let mut summary = vec![(
+            "전체 기대 소모 · 환급 전".to_owned(),
+            format!("{:.1}뽑", stats.combined.mean),
+            "정확 DP / 배너 독립".to_owned(),
+            PRIMARY,
+        )];
+        if let Some(ref feedback) = stats.feedback {
+            let n = if self.query_mode == QueryMode::RequiredBudget {
+                feedback.quantile(q)
+            } else { self.n_query };
+            let (p, low, high) = feedback.probability(n);
+            summary.push((
+                if self.query_mode == QueryMode::RequiredBudget {
+                    "목표 확률에 필요한 자유 재화".to_owned()
+                } else { "입력한 추가 자유 재화".to_owned() },
+                format!("{n}뽑"),
+                "전용권 별도 · 순차 환급 재투입".to_owned(), GOLD,
+            ));
+            summary.push((
+                if self.query_mode == QueryMode::RequiredBudget {
+                    "계산된 성공 확률".to_owned()
+                } else { "N뽑 내 최종 성공 확률".to_owned() },
+                format!("{:.2}%", p * 100.0),
+                format!("95% 신뢰구간 {:.2}~{:.2}%", low * 100.0, high * 100.0), MINT,
+            ));
+        } else if self.query_mode == QueryMode::RequiredBudget {
+            summary.push((
+                format!("{}% 달성 필요", self.confidence),
+                format!("{raw_quantile}뽑"),
+                "환급 전 · 전체 합계".to_owned(), GOLD,
+            ));
+            summary.push((
+                "보유권 조건 성공 확률".to_owned(),
+                format!("{:.2}%", current_probability * 100.0),
+                "환급 없는 정확 DP".to_owned(), MINT,
+            ));
+        } else {
+            let a = optimal_allocation(&stats.character, &stats.weapon,
+                self.setup.character_dedicated, self.setup.weapon_dedicated, self.n_query);
+            summary.push((
+                "추가 자유 배분 재화".to_owned(),
+                format!("{}뽑", self.n_query), "전용권 별도".to_owned(), GOLD,
+            ));
+            summary.push((
+                "N뽑 내 최종 성공 확률".to_owned(),
+                format!("{:.2}%", a.success_probability * 100.0),
+                "환급 없는 정확 DP".to_owned(), MINT,
+            ));
+        }
+        if ui.available_width() >= 760.0 {
+            ui.columns(3, |cols| {
+                for (i, (label, value, note, color)) in summary.iter().enumerate() {
+                    metric(&mut cols[i], label, value.clone(), note, *color);
+                }
+            });
+        } else {
+            for (label, value, note, color) in summary {
+                metric(ui, &label, value, &note, color);
+                ui.add_space(8.0);
             }
-        });
+        };
         ui.add_space(8.0);
         let secondary_name = self.setup.game.secondary_banner_name();
         let secondary_heading = format!("{secondary_name} 목표 확률");
