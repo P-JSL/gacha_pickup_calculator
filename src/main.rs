@@ -1121,6 +1121,14 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     });
 }
 
+fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
+    ui.label(RichText::new(eyebrow).size(10.0).color(PRIMARY).strong());
+    ui.add_space(6.0);
+    ui.heading(RichText::new(title).size(27.0).strong());
+    ui.label(RichText::new(subtitle).size(12.0).color(MUTED));
+    ui.add_space(22.0);
+}
+
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
 fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
@@ -1156,50 +1164,67 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
-        let mut dirty = self.header(ctx);
+        // Input edits occur only on the Settings page; game / model selection
+        // is global and invalidates the calculation regardless of current view.
+        if self.header(ctx) {
+            self.schedule_recalculation();
+        }
+        self.sidebar(ctx);
+        let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG))
+            .frame(egui::Frame::default().fill(BG).inner_margin(19))
             .show(ctx, |ui| {
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                ui.add_space(16.0);
-                ui.heading(RichText::new(self.setup.game.label()).size(25.0).strong());
-                ui.label(RichText::new(self.setup.game.special_notes()).color(MUTED));
-                ui.add_space(14.0);
-                match self.view_mode {
-                    ViewMode::Calculator => {
-                        dirty |= self.targets(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.pity(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.resources(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.feedback_controls(ui);
-                        // Keep the currently visible result synchronized before drawing it.
-                        if dirty { self.schedule_recalculation(); }
-                        self.dashboard(ui);
-                    }
-                    ViewMode::TrackerSources => {
-                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
-                            self.view_mode = ViewMode::Calculator;
-                        }
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
                         ui.add_space(10.0);
-                        self.tracker_sources(ui);
-                    }
-                    ViewMode::ObservedDistribution => {
-                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
-                            self.view_mode = ViewMode::Calculator;
+                        match self.view_mode {
+                            ViewMode::Calculator => {
+                                self.dashboard(ui);
+                            }
+                            ViewMode::Settings => {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("SIMULATION SETTINGS")
+                                            .color(PRIMARY).size(10.0).strong());
+                                        ui.heading(RichText::new("시뮬레이션 설정")
+                                            .size(27.0).strong());
+                                        ui.label(RichText::new(
+                                            "목표, 천장, 보유 재화와 게임별 환급 가정을 변경합니다."
+                                        ).color(MUTED));
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui.button("대시보드 보기 →").clicked() {
+                                                self.view_mode = ViewMode::Calculator;
+                                            }
+                                        },
+                                    );
+                                });
+                                ui.add_space(20.0);
+                                settings_changed |= self.targets(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.pity(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.resources(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.feedback_controls(ui);
+                            }
+                            ViewMode::TrackerSources => {
+                                page_intro(ui, "TRACKER EVIDENCE",
+                                    "트래커 교차 검증", "기준 확률과 날짜가 표시된 외부 관측값을 비교합니다.");
+                                self.tracker_sources(ui);
+                            }
+                            ViewMode::ObservedDistribution => {
+                                page_intro(ui, "OBSERVATION DATA",
+                                    "CSV 실측 분석", "로컬에서 스택별 관측 데이터를 분석합니다.");
+                                self.observation_validation(ui);
+                            }
                         }
-                        ui.add_space(10.0);
-                        self.observation_validation(ui);
-                    }
-                }
-                ui.add_space(25.0);
+                        ui.add_space(25.0);
+                    });
             });
-        });
-        // Header game/model changes can happen while viewing tracker pages.
-        // They must still invalidate the calculator, otherwise returning to the
-        // dashboard would show probabilities for the previous game.
-        if dirty && self.view_mode != ViewMode::Calculator {
+        if settings_changed {
             self.schedule_recalculation();
         }
         if let Some(edited_at) = self.pending_since {
