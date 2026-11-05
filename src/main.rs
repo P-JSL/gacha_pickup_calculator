@@ -758,15 +758,15 @@ impl Calculator {
                 .include_x(0.0).include_x(model.hard as f64)
                 .allow_zoom(true).allow_drag(true)
                 .show(ui, |plot| {
-                    plot.line(Line::new(PlotPoints::from_iter(observed_pts.into_iter()))
-                        .name("실측 누적 확률 · KM").color(MINT).width(3.0));
-                    plot.line(Line::new(PlotPoints::from_iter(predicted_pts.into_iter()))
-                        .name("선택한 모델").color(PRIMARY).width(2.5));
+                    plot.line(Line::new(PlotPoints::from_iter(observed_pts))
+                        .name("실측 누적 확률 · KM").color(MINT).width(3.0_f32));
+                    plot.line(Line::new(PlotPoints::from_iter(predicted_pts))
+                        .name("선택한 모델").color(PRIMARY).width(2.5_f32));
                     if data.quality.is_censor_aware() {
-                        plot.line(Line::new(PlotPoints::from_iter(lower_pts.into_iter()))
-                            .name("실측 95% 하한").color(GOLD).width(1.0));
-                        plot.line(Line::new(PlotPoints::from_iter(upper_pts.into_iter()))
-                            .name("실측 95% 상한").color(GOLD).width(1.0));
+                        plot.line(Line::new(PlotPoints::from_iter(lower_pts))
+                            .name("실측 95% 하한").color(GOLD).width(1.0_f32));
+                        plot.line(Line::new(PlotPoints::from_iter(upper_pts))
+                            .name("실측 95% 상한").color(GOLD).width(1.0_f32));
                     }
                 });
             egui::CollapsingHeader::new("스택별 순간 5성 확률 비교 (위험집합 20건 이상)")
@@ -774,10 +774,10 @@ impl Calculator {
                     Plot::new("survival_observed_hazard").legend(Legend::default())
                         .height(220.0).include_y(0.0).include_y(100.0)
                         .show(ui, |plot| {
-                            plot.line(Line::new(PlotPoints::from_iter(observed_hazard.into_iter()))
-                                .name("실측 위험률").color(MINT).width(2.0));
-                            plot.line(Line::new(PlotPoints::from_iter(predicted_hazard.into_iter()))
-                                .name("모델 위험률").color(PRIMARY).width(2.0));
+                            plot.line(Line::new(PlotPoints::from_iter(observed_hazard))
+                                .name("실측 위험률").color(MINT).width(2.0_f32));
+                            plot.line(Line::new(PlotPoints::from_iter(predicted_hazard))
+                                .name("모델 위험률").color(PRIMARY).width(2.0_f32));
                         });
                 });
             ui.colored_label(GOLD, "주의: Kaplan–Meier는 독립적인 기록 중단만 보정합니다. 임의 계정 업로드, 오래된 이력 누락, 다른 배너 혼합, 최초 스택 불명은 보정하지 않습니다.");
