@@ -1,5 +1,10 @@
 name: Rust CI and Release
 
+# A new commit supersedes earlier image downloads and UI builds on the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
