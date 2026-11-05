@@ -143,6 +143,30 @@ fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[Cha
         });
 }
 
+/// Inset card used by each quick editor, matching the mockup's two-row tiles.
+fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
+    inner: impl FnOnce(&mut egui::Ui)) {
+    egui::Frame::group(ui.style())
+        .fill(Color32::from_rgb(28, 59, 83))
+        .stroke(egui::Stroke::new(1.0_f32, BORDER))
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(9)
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.set_min_height(57.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(icon).size(16.0).color(Color32::WHITE));
+                ui.label(RichText::new(label).size(10.5).color(Color32::WHITE).strong());
+            });
+            ui.scope(|ui| {
+                ui.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(13, 35, 55);
+                ui.visuals_mut().widgets.hovered.bg_fill = Color32::from_rgb(23, 63, 91);
+                ui.visuals_mut().widgets.active.bg_fill = Color32::from_rgb(23, 85, 115);
+                inner(ui);
+            });
+        });
+}
+
 impl Calculator {
     /// Reference-style overview. All visible values come from the active model, never from demo data.
     pub(super) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
@@ -228,120 +252,158 @@ impl Calculator {
         dirty
     }
 
+    /// The first screen repeats the input grouping and visual hierarchy of the supplied mockup.
     fn workspace_quick_settings(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
-        dashboard_card(ui, "⚙  Simulation Settings", |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("Game").color(MUTED).size(11.0));
-                for (game, short) in [
-                    (Game::StarRail, "✦  HSR"),
-                    (Game::WutheringWaves, "◈  Wuthering Waves"),
-                    (Game::StellaSora, "✧  Stella Sora"),
-                    (Game::Neverness, "✺  Yihuan"),
-                ] {
-                    if ui.add(
-                        egui::Button::new(RichText::new(short).size(12.0))
-                            .selected(self.setup.game == game)
-                            .corner_radius(9)
-                    ).clicked() && self.setup.game != game {
-                        self.change_game(game);
-                        dirty = true;
-                    }
-                }
-            });
-            ui.add_space(8.0);
-            ui.separator();
-            ui.add_space(8.0);
-            ui.columns(3, |cols| {
-                cols[0].label(RichText::new("Owned Tickets · 자유 배분권").color(MUTED).size(11.0));
-                dirty |= cols[0].add(
-                    egui::DragValue::new(&mut self.setup.flexible).range(0..=100_000).suffix("뽑")
-                ).changed();
-                cols[1].label(RichText::new(format!("Premium Currency · {}", self.setup.game.currency_name()))
-                    .color(MUTED).size(11.0));
-                dirty |= cols[1].add(
-                    egui::DragValue::new(&mut self.setup.premium_currency)
-                        .range(0..=100_000_000).speed(1)
-                ).changed();
-                cols[2].label(RichText::new(format!("Refund Currency · {}", self.setup.game.exchange_points_name()))
-                    .color(MUTED).size(11.0));
-                dirty |= cols[2].add(
-                    egui::DragValue::new(&mut self.feedback_cfg.initial_points)
-                        .range(0..=1_000_000)
-                ).changed();
-            });
-            ui.add_space(9.0);
-            ui.columns(4, |cols| {
-                cols[0].label(RichText::new("Target Character").color(MUTED).size(11.0));
-                egui::ComboBox::from_id_salt("workspace_character")
-                    .width(cols[0].available_width().min(155.0))
-                    .selected_text(format!("E{} / {}장", self.target_eid, self.target_eid + 1))
-                    .show_ui(&mut cols[0], |ui| {
-                        for level in 0..=6 {
-                            dirty |= ui.selectable_value(&mut self.target_eid, level,
-                                format!("E{level} / {}장", level + 1)).changed();
+        egui::Frame::group(ui.style())
+            .fill(Color32::from_rgb(14, 39, 58))
+            .stroke(egui::Stroke::new(1.0_f32, BORDER))
+            .corner_radius(egui::CornerRadius::same(14))
+            .inner_margin(13)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("☷").color(CYAN).size(19.0));
+                    ui.label(RichText::new("Simulation Settings").size(16.0).strong());
+                    ui.add_space(19.0);
+                    ui.label(RichText::new("Game").color(MUTED).size(12.0));
+                    for (game, title) in [
+                        (Game::StarRail, "✦  HSR"),
+                        (Game::WutheringWaves, "◈  Wuthering Waves"),
+                        (Game::StellaSora, "✧  Stella Sora"),
+                        (Game::Neverness, "✦  Yihuan"),
+                    ] {
+                        let active = self.setup.game == game;
+                        let text = RichText::new(title).size(11.0)
+                            .color(if active { Color32::from_rgb(4, 29, 44) }
+                                else { Color32::WHITE });
+                        let b = egui::Button::new(text)
+                            .fill(if active { CYAN } else { DEEP_CARD })
+                            .stroke(egui::Stroke::new(1.0_f32,
+                                if active { CYAN } else { BORDER }))
+                            .corner_radius(8)
+                            .min_size(egui::vec2(
+                                if game == Game::WutheringWaves { 124.0 } else { 90.0 }, 32.0));
+                        if ui.add(b).clicked() && !active {
+                            self.change_game(game);
+                            dirty = true;
                         }
-                    });
-                cols[1].label(RichText::new(format!("Target {}", self.setup.game.secondary_banner_name()))
-                    .color(MUTED).size(11.0));
-                egui::ComboBox::from_id_salt("workspace_weapon")
-                    .width(cols[1].available_width().min(155.0))
-                    .selected_text(if self.target_refine == 0 { "선택 안 함".to_owned() }
-                        else { format!("S{} / {}장", self.target_refine, self.target_refine) })
-                    .show_ui(&mut cols[1], |ui| {
-                        for level in 0..=5 {
-                            let name = if level == 0 { "필요 없음".to_owned() }
-                                else { format!("S{level} / {level}장") };
-                            dirty |= ui.selectable_value(&mut self.target_refine, level, name).changed();
-                        }
-                    });
-                cols[2].label(RichText::new("Character Pity").color(MUTED).size(11.0));
-                let hard = match &self.setup.character.rule {
-                    BannerRule::Standard { rarity, .. } => rarity.hard,
-                    BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
-                    BannerRule::NteArcBatch => 8,
-                };
-                dirty |= cols[2].add(
-                    egui::DragValue::new(&mut self.setup.character.pity)
-                        .range(0..=hard.saturating_sub(1)).suffix("회")
-                ).changed();
-                cols[3].label(RichText::new("Rate-up Guarantee").color(MUTED).size(11.0));
-                if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
-                    if *featured_share < 1.0 {
-                        dirty |= cols[3].checkbox(&mut self.setup.character.guaranteed, "픽업 확정").changed();
-                    } else {
-                        cols[3].label(RichText::new("항상 픽업 확정").color(SUCCESS).size(11.0));
-                    }
-                } else {
-                    cols[3].label(RichText::new("별도 규칙 적용").color(MUTED).size(11.0));
-                }
-            });
-            ui.add_space(11.0);
-            ui.separator();
-            ui.add_space(7.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(format!(
-                    "전용권·무기 천장·환급 상세 조건은 시뮬레이션 설정에서 편집 · 교환 {}개당 1뽑",
-                    self.feedback_cfg.points_per_ticket
-                )).size(10.5).color(MUTED));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.add(egui::Button::new(RichText::new("▶  Run Simulation").strong())
-                        .fill(Color32::from_rgb(28, 143, 197))
-                        .min_size(egui::vec2(146.0, 33.0))
-                        .corner_radius(10)).clicked() {
-                        dirty = true;
-                    }
-                    if ui.button("상세 설정  →").clicked() {
-                        self.view_mode = ViewMode::Settings;
-                    }
-                    if ui.button("↻  Reset").clicked() {
-                        let game = self.setup.game;
-                        self.change_game(game);
-                        dirty = true;
                     }
                 });
+                ui.add_space(11.0);
+                ui.separator();
+                ui.add_space(9.0);
+                ui.columns(3, |cols| {
+                    setting_tile(&mut cols[0], "♧", "Owned Tickets", |ui| {
+                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
+                            .range(0..=100_000).suffix("뽑")).changed();
+                    });
+                    setting_tile(&mut cols[1], "◇",
+                        &format!("Premium Currency · {}", self.setup.game.currency_name()), |ui| {
+                            dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                                .range(0..=100_000_000).speed(1)).changed();
+                        });
+                    setting_tile(&mut cols[2], "◌",
+                        &format!("Refund Currency · {}", self.setup.game.exchange_points_name()), |ui| {
+                            dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
+                                .range(0..=1_000_000)).changed();
+                        });
+                });
+                ui.add_space(10.0);
+                ui.columns(4, |cols| {
+                    setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
+                        egui::ComboBox::from_id_salt("workspace_character")
+                            .width(ui.available_width().min(175.0))
+                            .selected_text(format!("E{} / {}장",
+                                self.target_eid, self.target_eid + 1))
+                            .show_ui(ui, |ui| {
+                                for level in 0..=6 {
+                                    dirty |= ui.selectable_value(&mut self.target_eid, level,
+                                        format!("E{level} / {}장", level + 1)).changed();
+                                }
+                            });
+                    });
+                    setting_tile(&mut cols[1], "⚔",
+                        &format!("Target {}", self.setup.game.secondary_banner_name()), |ui| {
+                            egui::ComboBox::from_id_salt("workspace_weapon")
+                                .width(ui.available_width().min(175.0))
+                                .selected_text(if self.target_refine == 0 {
+                                    "선택 안 함".to_owned()
+                                } else {
+                                    format!("S{} / {}장", self.target_refine, self.target_refine)
+                                })
+                                .show_ui(ui, |ui| {
+                                    for level in 0..=5 {
+                                        let label = if level == 0 { "필요 없음".to_owned() }
+                                            else { format!("S{level} / {level}장") };
+                                        dirty |= ui.selectable_value(
+                                            &mut self.target_refine, level, label
+                                        ).changed();
+                                    }
+                                });
+                        });
+                    setting_tile(&mut cols[2], "⚑", "Pity (Current)", |ui| {
+                        let hard = match &self.setup.character.rule {
+                            BannerRule::Standard { rarity, .. } => rarity.hard,
+                            BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
+                            BannerRule::NteArcBatch => 8,
+                        };
+                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
+                            .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
+                    });
+                    setting_tile(&mut cols[3], "♧", "Rate-up Guarantee", |ui| {
+                        if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
+                            if *featured_share < 1.0 {
+                                ui.horizontal(|ui| {
+                                    let on = self.setup.character.guaranteed;
+                                    for (value, label) in [(true, "On"), (false, "Off")] {
+                                        let color = if on == value { CYAN } else { SURFACE };
+                                        if ui.add(
+                                            egui::Button::new(RichText::new(label).size(11.0)
+                                                .color(if on == value { BG } else { MUTED }))
+                                                .fill(color).corner_radius(6)
+                                                .min_size(egui::vec2(44.0, 24.0))
+                                        ).clicked() && on != value {
+                                            self.setup.character.guaranteed = value;
+                                            dirty = true;
+                                        }
+                                    }
+                                });
+                            } else {
+                                ui.label(RichText::new("Always On").color(SUCCESS));
+                            }
+                        } else {
+                            ui.label(RichText::new("게임별 별도 보장").color(MUTED).size(11.0));
+                        }
+                    });
+                });
+                ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(9.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("ⓘ  캐릭터·무기 목표와 환급 재투입을 계산합니다.\n     캐릭터/무기 단독 그래프는 자유권을 각각 전량 배정한 가정입니다.")
+                        .color(MUTED).size(10.0));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.add(
+                            egui::Button::new(RichText::new("▶   Run Simulation")
+                                .size(15.0).strong().color(BG))
+                                .fill(CYAN).corner_radius(11)
+                                .min_size(egui::vec2(206.0, 43.0))
+                        ).clicked() {
+                            dirty = true;
+                        }
+                        if ui.add(egui::Button::new("↻  Reset")
+                            .fill(DEEP_CARD).corner_radius(9)
+                            .min_size(egui::vec2(92.0, 40.0))).clicked() {
+                            self.change_game(self.setup.game);
+                            dirty = true;
+                        }
+                        if ui.button("상세 설정").clicked() {
+                            self.view_mode = ViewMode::Settings;
+                        }
+                    });
+                });
             });
-        });
         dirty
     }
 
