@@ -296,6 +296,12 @@ impl Calculator {
         app
     }
 
+    /// Last completed charts remain visible until the worker finishes for the same game.
+    /// A game change never displays distributions from a different game.
+    fn visible_stats(&self) -> Option<&Computed> {
+        if self.stats_game == Some(self.setup.game) { self.stats.as_ref() } else { None }
+    }
+
     fn change_game(&mut self, game: Game) {
         self.setup = GameSetup::new(game);
         self.feedback_cfg = FeedbackConfig::for_game(game);
@@ -531,6 +537,44 @@ impl Calculator {
                 ui.add_space(13.0);
                 sidebar_nav(ui, &mut self.view_mode, ViewMode::Preferences, "Settings");
             });
+    }
+
+    /// UI-only preferences are independent of the gacha input/worker state.
+    fn desktop_settings(&mut self, ui: &mut egui::Ui) {
+        page_intro(ui, "APPLICATION SETTINGS", "화면 및 동작 설정",
+            "시뮬레이터의 목표·보유권이 아닌 프로그램의 표시 방식과 계산 갱신을 설정합니다.");
+        ui.add_space(12.0);
+        section(ui, "01", "실시간 계산", "입력한 값이 바뀌어도 차트는 지우지 않고 백그라운드에서 갱신합니다.", |ui| {
+            ui.checkbox(&mut self.ui_preferences.auto_recalculate,
+                "입력 변경 시 자동으로 결과 갱신");
+            ui.horizontal(|ui| {
+                ui.label("연속 입력 대기시간");
+                ui.add(egui::Slider::new(&mut self.ui_preferences.debounce_ms, 100..=1000)
+                    .step_by(50.0).suffix(" ms"));
+            });
+            if !self.ui_preferences.auto_recalculate {
+                ui.label(RichText::new(
+                    "자동 계산을 꺼도 입력값은 즉시 모든 탭에 반영됩니다. Run Simulation 버튼으로 계산을 갱신하세요."
+                ).color(MUTED).size(11.0));
+                if self.input_needs_calculation && ui.button("현재 입력으로 계산 실행").clicked() {
+                    self.manual_calculation_requested = true;
+                }
+            }
+        });
+        ui.add_space(10.0);
+        section(ui, "02", "대시보드 표시", "UI 표시를 변경합니다. 확률 계산값 자체는 변경하지 않습니다.", |ui| {
+            ui.checkbox(&mut self.ui_preferences.show_result_panel, "오른쪽 결과 및 이력 패널 표시");
+            ui.checkbox(&mut self.ui_preferences.show_chart_fill, "확률 그래프 아래 반투명 영역 표시");
+            ui.checkbox(&mut self.ui_preferences.show_hover_guides, "그래프 마우스 위치 및 확률 툴팁 표시");
+            ui.checkbox(&mut self.ui_preferences.compact_spacing, "화면 내부 간격을 컴팩트하게 표시");
+        });
+        ui.add_space(12.0);
+        if ui.button("화면 설정 기본값 복원").clicked() {
+            self.ui_preferences = UiPreferences::default();
+        }
+        ui.label(RichText::new(
+            "화면 설정은 프로그램 실행 중에만 유지됩니다. 종료 시 기본값으로 돌아갑니다."
+        ).color(MUTED).size(11.0));
     }
 
     fn targets(&mut self, ui: &mut egui::Ui) -> bool {
@@ -816,7 +860,7 @@ impl Calculator {
     }
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
-        let Some(stats) = &self.stats else {
+        let Some(stats) = self.visible_stats() else {
             if self.calculating {
                 ui.horizontal(|ui| {
                     ui.spinner();
@@ -1536,6 +1580,11 @@ impl eframe::App for Calculator {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
+                        if self.ui_preferences.compact_spacing {
+                            ui.spacing_mut().item_spacing.y = 5.0;
+                        } else {
+                            ui.spacing_mut().item_spacing.y = 10.0;
+                        }
                         if self.view_mode != ViewMode::Calculator { ui.add_space(5.0); }
                         match self.view_mode {
                             ViewMode::Calculator => {
@@ -1563,6 +1612,9 @@ impl eframe::App for Calculator {
                                 settings_changed |= self.targets(ui);
                                 ui.add_space(10.0);
                                 settings_changed |= self.pity(ui);
+                            }
+                            ViewMode::Preferences => {
+                                self.desktop_settings(ui);
                             }
                             ViewMode::Settings => {
                                 ui.horizontal_wrapped(|ui| {
