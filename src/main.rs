@@ -1308,7 +1308,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
-    let height = if width < 650.0 { 145.0 } else { 196.0 };
+    let height = if width < 650.0 { 136.0 } else { 187.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
