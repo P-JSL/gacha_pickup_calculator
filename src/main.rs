@@ -211,6 +211,7 @@ struct Computed {
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
+    feedback_wavebands: Option<FeedbackEstimate>,
 }
 
 struct CalculationRequest {
@@ -232,7 +233,13 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     let feedback = if request.feedback_config.enabled {
         Some(estimate(&request.setup, request.mode, &request.feedback_config)?)
     } else { None };
-    Ok(Computed { character, weapon, combined, feedback })
+    let feedback_wavebands =
+        if request.setup.game == Game::WutheringWaves && request.feedback_config.enabled {
+            let mut waveband_config = request.feedback_config.clone();
+            waveband_config.waveband_limit = 2;
+            Some(estimate(&request.setup, request.mode, &waveband_config)?)
+        } else { None };
+    Ok(Computed { character, weapon, combined, feedback, feedback_wavebands })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1337,6 +1344,41 @@ impl Calculator {
                     ui.small("현재 보유 교환 포인트는 환급 시뮬레이션의 최초 잔액에 이미 포함되어 있으며, 중복 차감하지 않습니다.");
                 }
             });
+        }
+        if self.setup.game == Game::WutheringWaves {
+            if let (Some(tickets), Some(wavebands)) =
+                (stats.feedback.as_ref(), stats.feedback_wavebands.as_ref())
+            {
+                let probability = self.confidence as f64 / 100.0;
+                section(ui, "05-W", "명조 · 산호 사용 방식 비교",
+                    "동일 입력·목표에 산호 교환 정책만 다르게 적용한 몬테카를로 추정치입니다.", |ui| {
+                        egui::Grid::new("wuwa_waveband_compare").num_columns(4)
+                            .spacing([12.0, 6.0]).striped(true).show(ui, |ui| {
+                            ui.strong("환급 산호 사용");
+                            ui.strong(format!("{}% 최초 자유 재화", self.confidence));
+                            ui.strong("평균 실제 뽑기");
+                            ui.strong("구입 돌파");
+                            ui.end_row();
+                            ui.label("8산호 = 1뽑");
+                            ui.strong(format!("{}뽑", tickets.quantile(probability)));
+                            ui.label(format!("{:.1}뽑", tickets.average_raw));
+                            ui.label("0개");
+                            ui.end_row();
+                            ui.label("360산호 = 1돌파 (최대 2개)");
+                            ui.strong(format!("{}뽑", wavebands.quantile(probability)));
+                            ui.label(format!("{:.1}뽑", wavebands.average_raw));
+                            let buying = wavebands.scenario_at_quantile(probability)
+                                .map_or("—".to_owned(), |s| format!("{}개 · {}산호",
+                                    s.wavebands_bought, s.waveband_points_spent));
+                            ui.label(buying);
+                            ui.end_row();
+                        });
+                        ui.label(RichText::new(
+                            "돌파는 해당 픽업 공명자를 1장 이상 보유한 경우에만 구매하며,                             구매 가능한 산호가 충분할 때만 적용합니다. 부족한 산호는                             돌파용으로 우선 보류됩니다. 픽업 종료 후 상점 재고는 고려하지 않습니다."
+                        ).color(MUTED).size(11.0));
+                });
+                ui.add_space(10.0);
+            }
         }
         ui.add_space(10.0);
         section(ui, "06", "달성 확률별 필요 재화", "DP 분위수는 정확 모델값, 환급 분위수는 모의실험의 추정치입니다.", |ui| {
