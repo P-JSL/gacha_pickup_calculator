@@ -325,6 +325,7 @@ impl Calculator {
         egui::TopBottomPanel::top("header")
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(14))
             .show(ctx, |ui| {
+                ui.add_space(23.0);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new("Gacha Pickup Calculator").strong().size(22.0));
@@ -333,7 +334,7 @@ impl Calculator {
                     });
                     ui.add_space(24.0);
                     let search = ui.add(egui::TextEdit::singleline(&mut self.search_query)
-                        .desired_width(305.0)
+                        .desired_width(340.0)
                         .hint_text("⌕  Search games or sections..."));
                     if search.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
                         dirty |= self.activate_search();
@@ -348,7 +349,7 @@ impl Calculator {
                             dirty |= ui.radio_value(&mut self.mode,
                                 RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
                         });
-                        egui::ComboBox::from_id_salt("top_game").width(175.0)
+                        egui::ComboBox::from_id_salt("top_game").width(130.0)
                             .selected_text(self.setup.game.label())
                             .show_ui(ui, |ui| {
                                 for game in Game::ALL {
@@ -362,6 +363,7 @@ impl Calculator {
                             });
                     });
                 });
+                ui.add_space(20.0);
             });
         dirty
     }
@@ -369,10 +371,10 @@ impl Calculator {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(194.0)
+            .exact_width(222.0)
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
-                ui.add_space(14.0);
+                ui.add_space(12.0);
                 let (logo, painter) = ui.allocate_painter(
                     egui::vec2(ui.available_width(), 82.0), egui::Sense::hover(),
                 );
@@ -404,7 +406,7 @@ impl Calculator {
                 ] {
                     let active = self.view_mode == view;
                     let (rect, response) = ui.allocate_exact_size(
-                        egui::vec2(ui.available_width(), 39.0), egui::Sense::click(),
+                        egui::vec2(ui.available_width(), 45.0), egui::Sense::click(),
                     );
                     let background = if active { SELECTED_NAV }
                         else if response.hovered() { CARD }
@@ -421,9 +423,9 @@ impl Calculator {
                     if response.clicked() {
                         self.view_mode = view;
                     }
-                    ui.add_space(5.0);
+                    ui.add_space(4.0);
                 }
-                ui.add_space(22.0);
+                ui.add_space(11.0);
                 ui.separator();
                 ui.add_space(13.0);
                 ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0).strong());
@@ -1263,7 +1265,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
-    let height = if width < 650.0 { 166.0 } else { 218.0 };
+    let height = if width < 650.0 { 174.0 } else { 216.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1272,7 +1274,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         egui::pos2(bounds.left() + 49.0, bounds.top() + 12.0),
         egui::pos2(bounds.right() - 10.0, bounds.bottom() - 34.0),
     );
-    painter.rect_filled(bounds, 10.0, SURFACE);
+    painter.rect_filled(bounds, 10.0, Color32::from_rgb(12, 35, 53));
     for edge in [
         [graph.left_top(), graph.right_top()],
         [graph.left_bottom(), graph.right_bottom()],
@@ -1288,8 +1290,8 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
             graph.bottom() - probability.clamp(0.0, 1.0) as f32 * graph.height(),
         )
     };
-    for step in 0..=4 {
-        let probability = step as f64 / 4.0;
+    for step in 0..=5 {
+        let probability = step as f64 / 5.0;
         let y = project(0, probability).y;
         painter.line_segment(
             [egui::pos2(graph.left(), y), egui::pos2(graph.right(), y)],
@@ -1297,7 +1299,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         );
         painter.text(
             egui::pos2(graph.left() - 7.0, y),
-            egui::Align2::RIGHT_CENTER, format!("{}%", step * 25),
+            egui::Align2::RIGHT_CENTER, format!("{}%", step * 20),
             egui::FontId::proportional(11.0), MUTED,
         );
     }
@@ -1442,12 +1444,12 @@ impl eframe::App for Calculator {
         }
         let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG).inner_margin(8))
+            .frame(egui::Frame::default().fill(BG).inner_margin(10))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.add_space(5.0);
+                        if self.view_mode != ViewMode::Calculator { ui.add_space(5.0); }
                         match self.view_mode {
                             ViewMode::Calculator => {
                                 settings_changed |= self.workspace_dashboard(ui);
@@ -1617,8 +1619,8 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1440.0, 870.0])
-            .with_min_inner_size([1000.0, 680.0])
+            .with_inner_size([1536.0, 864.0])
+            .with_min_inner_size([1080.0, 700.0])
             .with_title("Gacha Pickup Calculator"),
         ..Default::default()
     };
