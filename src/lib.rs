@@ -8,6 +8,7 @@
 
 pub mod games;
 pub mod feedback;
+pub mod tracker;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RateMode {
