@@ -1721,7 +1721,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 /// and Linux. No OS-native chart controls or persistence are involved.
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
     let end = chart_domain_end(series);
-    let width = ui.available_width().max(190.0);
+    let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
@@ -1899,7 +1899,10 @@ impl eframe::App for Calculator {
         if self.header(ctx) {
             self.schedule_recalculation();
         }
-        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel {
+        // Reserve a usable central editing width. The optional right sidebar
+        // collapses on smaller windows rather than overlapping input controls.
+        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel
+            && ctx.available_rect().width() >= 1_270.0 {
             self.workspace_results_panel(ctx);
         }
         let mut settings_changed = false;
