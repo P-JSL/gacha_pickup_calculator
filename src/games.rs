@@ -27,7 +27,15 @@ impl Game {
             Self::StarRail => "성옥",
             Self::WutheringWaves => "별의 소리",
             Self::Neverness => "Annulith",
-            Self::StellaSora => "Stellanite Dust (캐릭터/디스크 별도)",
+            Self::StellaSora => "Stellanite Dust",
+        }
+    }
+    pub fn secondary_banner_name(self) -> &'static str {
+        match self {
+            Self::StarRail => "광추",
+            Self::WutheringWaves => "무기",
+            Self::Neverness => "Arc",
+            Self::StellaSora => "레코드",
         }
     }
     pub fn exchange_points_name(self) -> &'static str {
