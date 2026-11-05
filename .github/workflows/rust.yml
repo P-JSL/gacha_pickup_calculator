@@ -32,6 +32,22 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Build release
         run: cargo build --release
+      - name: Linux GUI startup smoke (virtual display)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libxkbcommon-x11-0
+          set +e
+          timeout 8s xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 ./target/release/gacha_pickup_calculator > /tmp/gacha-gui-smoke.log 2>&1
+          result=$?
+          set -e
+          if [ "$result" != 124 ]; then
+            echo "::error::GUI process did not remain running for the expected smoke-test interval; exit code $result"
+            cat /tmp/gacha-gui-smoke.log
+            exit 1
+          fi
+          echo "GUI stayed alive under virtual X11 display without crashing."
       - name: Upload Windows app
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4

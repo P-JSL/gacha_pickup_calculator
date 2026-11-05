@@ -3,10 +3,11 @@
 //! `pity` is the number of completed attempts without the relevant success.
 //! A rate schedule's `chance(next)` takes the 1-based attempt since reset.
 //! All probability distributions describe *additional* attempts, not lifetime pulls.
-//! Currency rebates are deliberately excluded from exact distributions: they depend
-//! on account-specific duplicate history and cannot be inferred from banner odds.
+//! Currency rebates are handled separately by a clearly labeled path simulation.
+//! Raw first-passage distributions are calculated by deterministic DP.
 
 pub mod games;
+pub mod feedback;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RateMode {
@@ -66,8 +67,8 @@ pub enum BannerRule {
     /// Pity counts *featured successes* and is NOT reset by off-banner rare items.
     FeaturedCounter { featured_rate: f64, hard_featured: usize },
     /// The NTE Arc banner draws one batch of 10 Arcs at a time.
-    /// This is a batch approximation: it does not count multiple featured Arcs
-    /// appearing within the same batch. Guarantees are at batches 6 and 8.
+    /// Exact independent natural draw counts per batch; guarantee substitution
+    /// is a documented approximation because its precise internal ordering is unknown.
     NteArcBatch,
 }
 
@@ -95,10 +96,23 @@ impl Banner {
         if self.target_copies == 0 { return 0; }
         match &self.rule {
             BannerRule::Standard { rarity, featured_share } => {
-                (self.target_copies * if *featured_share < 1.0 { 2 } else { 1 }) * rarity.hard
+                let first_rare = rarity.hard - self.pity;
+                let first = if self.guaranteed || *featured_share >= 1.0 {
+                    first_rare
+                } else { first_rare + rarity.hard };
+                let later = if *featured_share >= 1.0 { rarity.hard } else { 2 * rarity.hard };
+                first + (self.target_copies - 1) * later
             }
-            BannerRule::FeaturedCounter { hard_featured, .. } => self.target_copies * hard_featured,
-            BannerRule::NteArcBatch => self.target_copies * 80,
+            BannerRule::FeaturedCounter { hard_featured, .. } => {
+                let normal = self.target_copies * hard_featured - self.pity;
+                if let Some(spark) = self.spark.as_ref().filter(|s| !s.used) {
+                    let remaining = spark.at.saturating_sub(spark.progress);
+                    let k_minus_one = (self.target_copies - 1)
+                        .saturating_mul(*hard_featured).saturating_sub(self.pity);
+                    normal.min(remaining.max(k_minus_one))
+                } else { normal }
+            },
+            BannerRule::NteArcBatch => self.target_copies * 80 - self.pity * 10,
         }
     }
 
@@ -160,12 +174,15 @@ impl Banner {
             }
         }
         let k = self.target_copies;
+        let claimed_at_start = self.spark.as_ref().is_some_and(|s| !s.used && s.progress >= s.at);
+        if claimed_at_start && k == 1 { return Ok(Distribution::new(vec![1.0])); }
+        let initial_copies = usize::from(claimed_at_start);
         let mut pmf = vec![0.0; self.max_additional_pulls() + 1];
         let mut cur = vec![0.0; k * hard];
-        cur[self.pity] = 1.0;
+        cur[initial_copies * hard + self.pity] = 1.0;
         for (step, completed_probability) in pmf.iter_mut().enumerate().skip(1) {
             let mut next = vec![0.0; cur.len()];
-            let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && s.progress + step == s.at);
+            let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && !claimed_at_start && s.progress + step == s.at);
             let bonus = usize::from(spark_at_step);
             for copies in 0..k {
                 for pity in 0..hard {
@@ -189,13 +206,16 @@ impl Banner {
         if self.pity >= 8 || self.any_rare_pity >= 6 {
             return Err("이환 Arc 천장은 8회(픽업), 6회(S등급) 미만의 10연 단위로 입력해야 합니다.".into());
         }
+        // The whole ten-pull batch is paid for even when the desired copy appears early.
+        // Natural outcomes are multinomial(10, featured=0.0075, off=0.0225, lower=0.97).
+        // Published batch guarantees are applied after natural outcomes. The exact
+        // in-batch guarantee substitution order is not disclosed by the game.
         let k = self.target_copies;
         let stride = 8 * 6;
         let mut cur = vec![0.0; k * stride];
         cur[self.pity * 6 + self.any_rare_pity] = 1.0;
-        let mut pmf = vec![0.0; (self.target_copies * 8 + 1) * 10];
-        let natural_any = 1.0_f64 - (1.0_f64 - 0.03_f64).powi(10);
-        let natural_featured = 1.0_f64 - (1.0_f64 - 0.03_f64 * 0.25_f64).powi(10);
+        let mut pmf = vec![0.0; (k * 8 + 1) * 10];
+        let outcomes = arc_batch_outcomes();
         for batch in 1..=k * 8 {
             let mut next = vec![0.0; cur.len()];
             for copies in 0..k {
@@ -203,16 +223,33 @@ impl Banner {
                     for any_pity in 0..6 {
                         let mass = cur[copies * stride + pickup_pity * 6 + any_pity];
                         if mass == 0.0 { continue; }
-                        let (p_feat, p_any) = if pickup_pity == 7 { (1.0, 1.0) }
-                            else if any_pity == 5 { (0.25, 1.0) }
-                            else { (natural_featured, natural_any) };
-                        if copies + 1 == k { pmf[batch * 10] += mass * p_feat; }
-                        else { next[(copies + 1) * stride] += mass * p_feat; }
-                        if p_any > p_feat {
-                            next[copies * stride + (pickup_pity + 1) * 6] += mass * (p_any - p_feat);
-                        }
-                        if p_any < 1.0 {
-                            next[copies * stride + (pickup_pity + 1) * 6 + any_pity + 1] += mass * (1.0 - p_any);
+                        for &(natural_featured, natural_off, probability) in &outcomes {
+                            let rare = natural_featured + natural_off;
+                            let (featured, off) = if pickup_pity == 7 && natural_featured == 0 {
+                                // The eighth multi guarantees one featured S Arc.
+                                (1, natural_off)
+                            } else if any_pity == 5 && rare == 0 {
+                                // The sixth multi guarantees one S Arc, 25% featured.
+                                for (extra_featured, chance) in [(1_usize, 0.25), (0, 0.75)] {
+                                    let total_featured = natural_featured + extra_featured;
+                                    let total_copies = copies + total_featured;
+                                    let weight = mass * probability * chance;
+                                    if total_copies >= k { pmf[batch * 10] += weight; }
+                                    else {
+                                        let fp = if total_featured > 0 { 0 } else { pickup_pity + 1 };
+                                        next[total_copies * stride + fp * 6] += weight;
+                                    }
+                                }
+                                continue;
+                            } else { (natural_featured, natural_off) };
+                            let total_copies = copies + featured;
+                            let weight = mass * probability;
+                            if total_copies >= k { pmf[batch * 10] += weight; }
+                            else {
+                                let fp = if featured > 0 { 0 } else { pickup_pity + 1 };
+                                let ap = if featured + off > 0 { 0 } else { any_pity + 1 };
+                                next[total_copies * stride + fp * 6 + ap] += weight;
+                            }
                         }
                     }
                 }
@@ -221,6 +258,27 @@ impl Banner {
         }
         Ok(Distribution::new(pmf))
     }
+}
+
+/// The analytical multinomial distribution of featured and non-featured S-Arcs
+/// within ten independent natural draws (before batch guarantees).
+fn arc_batch_outcomes() -> Vec<(usize, usize, f64)> {
+    let mut outcome = vec![(0, 0, 1.0)];
+    for _ in 0..10 {
+        let mut next = vec![vec![0.0; 11]; 11];
+        for &(featured, off, p) in &outcome {
+            next[featured][off] += p * 0.97;
+            next[featured + 1][off] += p * 0.0075;
+            next[featured][off + 1] += p * 0.0225;
+        }
+        outcome.clear();
+        for (f, row) in next.iter().enumerate() {
+            for (o, &probability) in row.iter().enumerate() {
+                if probability > 0.0 { outcome.push((f, o, probability)); }
+            }
+        }
+    }
+    outcome
 }
 
 fn valid_probability(x: f64) -> bool { x.is_finite() && (0.0..=1.0).contains(&x) }
@@ -250,7 +308,11 @@ impl Distribution {
     }
 
     pub fn quantile(&self, chance: f64) -> usize {
-        self.cdf.iter().position(|&p| p + 1e-10 >= chance).unwrap_or(self.cdf.len().saturating_sub(1))
+        // A mathematical guarantee must never be shortened by floating-point
+        // accumulation or by a tolerance intended for ordinary quantiles.
+        if chance >= 1.0 { return self.pmf.len().saturating_sub(1); }
+        if chance <= 0.0 { return 0; }
+        self.cdf.iter().position(|&p| p >= chance).unwrap_or(self.cdf.len().saturating_sub(1))
     }
 
     /// Exact convolution of independent *first-passage* (stopping-time) distributions.
@@ -282,13 +344,29 @@ pub fn optimal_allocation(
     dedicated_weapon: usize,
     flexible: usize,
 ) -> Allocation {
-    let mut answer = Allocation::default();
-    for given_to_character in 0..=flexible {
-        let c = dedicated_character.saturating_add(given_to_character);
-        let w = dedicated_weapon.saturating_add(flexible - given_to_character);
-        let success = character.at(c) * weapon.at(w);
-        if success > answer.success_probability || given_to_character == 0 {
-            answer = Allocation { character_pulls: c, weapon_pulls: w, success_probability: success };
+    // Tickets can be reassigned once a banner goal is met. A fixed split is
+    // suboptimal: success iff (Tc-Dc)+ + (Tw-Dw)+ <= flexible.
+    // Condition on Tc to compute the exact adaptive success probability.
+    let mut success_probability = 0.0;
+    for (draws, &mass) in character.pmf.iter().enumerate() {
+        if mass == 0.0 { continue; }
+        let used_flexible = draws.saturating_sub(dedicated_character);
+        if used_flexible <= flexible {
+            success_probability += mass * weapon.at(dedicated_weapon.saturating_add(flexible - used_flexible));
+        }
+    }
+    // Show the best static split as an illustration; success_probability above
+    // is the adaptive strategy, not the static allocation's probability.
+    let mut answer = Allocation { success_probability: success_probability.clamp(0.0, 1.0), ..Allocation::default() };
+    let mut best_fixed = -1.0_f64;
+    for allotted in 0..=flexible {
+        let c = dedicated_character.saturating_add(allotted);
+        let w = dedicated_weapon.saturating_add(flexible - allotted);
+        let fixed = character.at(c) * weapon.at(w);
+        if fixed > best_fixed {
+            best_fixed = fixed;
+            answer.character_pulls = c;
+            answer.weapon_pulls = w;
         }
     }
     answer
@@ -377,6 +455,101 @@ mod tests {
         assert_eq!(alloc.character_pulls, 2);
         assert_eq!(alloc.weapon_pulls, 3);
         assert!((alloc.success_probability - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn adaptive_budget_beats_fixed_split() {
+        // One success per banner with geometric waiting times and three tickets.
+        let a = Banner { rule: BannerRule::Standard { rarity: RateSchedule {
+            base: 0.5, hard: 4, soft: SoftPity::None }, featured_share: 1.0 },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0 };
+        let dist = a.distribution(RateMode::PublishedOnly).unwrap();
+        let allocation = optimal_allocation(&dist, &dist, 0, 0, 3);
+        assert!((allocation.success_probability - 0.5).abs() < 1e-12);
+        assert!(allocation.success_probability > dist.at(1) * dist.at(2));
+    }
+
+    #[test]
+    fn guaranteed_maximum_is_not_a_float_quantile() {
+        let mut a = always_rare(1.0, false, 1).distribution(RateMode::PublishedOnly).unwrap();
+        a.pmf = vec![0.0, 1.0 - 1e-12, 1e-12];
+        a.cdf = vec![0.0, 1.0 - 1e-12, 1.0];
+        assert_eq!(a.quantile(1.0), 2);
+    }
+
+    #[test]
+    fn arc_batch_can_award_multiple_featured() {
+        let events = arc_batch_outcomes();
+        let total: f64 = events.iter().map(|e| e.2).sum();
+        assert!((total - 1.0).abs() < 1e-12);
+        assert!(events.iter().any(|&(f, _, p)| f >= 2 && p > 0.0));
+        let dist = Banner { rule: BannerRule::NteArcBatch, pity: 0,
+            guaranteed: false, target_copies: 2, spark: None, any_rare_pity: 0 }
+            .distribution(RateMode::PublishedOnly).unwrap();
+        assert!(dist.at(10) > 0.0);
+    }
+
+    #[test]
+    fn already_unclaimed_spark_requires_zero_additional_pulls() {
+        let b = Banner { rule: BannerRule::FeaturedCounter { featured_rate: 0.01, hard_featured: 160 },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: Some(Spark { at: 120, progress: 120, used: false }), any_rare_pity: 0 };
+        let dist = b.distribution(RateMode::PublishedOnly).unwrap();
+        assert_eq!(dist.at(0), 1.0);
+    }
+
+    #[test]
+    fn all_game_profiles_have_normalized_first_passage_distributions() {
+        for game in games::Game::ALL {
+            let profile = games::GameSetup::new(game);
+            for banner in [&profile.character, &profile.weapon] {
+                let dist = banner.distribution(RateMode::CommunityEstimate).unwrap();
+                let total: f64 = dist.pmf.iter().sum();
+                assert!((total - 1.0).abs() < 1e-8, "{game:?}: {total}");
+                assert!(dist.cdf.windows(2).all(|w| w[0] <= w[1] + 1e-11));
+                assert!(dist.mean.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn star_rail_e6_s5_independent_reference_mean() {
+        let profile = games::GameSetup::new(games::Game::StarRail);
+        let ch = profile.character.distribution(RateMode::CommunityEstimate).unwrap();
+        let lc = profile.weapon.distribution(RateMode::CommunityEstimate).unwrap();
+        let both = ch.combine(&lc);
+        // Independent Python DP cross-check for 3 pity, first limited guaranteed.
+        assert!((ch.mean - 621.0719).abs() < 1e-3);
+        assert!((lc.mean - 333.8191).abs() < 1e-3);
+        assert!((both.mean - 954.891).abs() < 1e-3);
+        assert_eq!(both.quantile(0.9), 1126);
+    }
+
+    #[test]
+    fn nte_base_is_not_consolidated_rate() {
+        let profile = games::GameSetup::new(games::Game::Neverness);
+        if let BannerRule::Standard { ref rarity, .. } = profile.character.rule {
+            assert_eq!(rarity.chance(70, RateMode::PublishedOnly), 0.0099);
+            assert_eq!(rarity.chance(71, RateMode::PublishedOnly), 0.1959);
+            assert_eq!(rarity.chance(90, RateMode::PublishedOnly), 1.0);
+        } else { panic!("expected NTE character board rule"); }
+    }
+
+    #[test]
+    fn one_time_stella_spark_shortens_true_hard_guarantee() {
+        for (copies, maximum) in [(1, 120), (2, 160), (3, 320)] {
+            let banner = Banner {
+                rule: BannerRule::FeaturedCounter { featured_rate: 0.0, hard_featured: 160 },
+                pity: 0, guaranteed: false, target_copies: copies,
+                spark: Some(Spark { at: 120, progress: 0, used: false }),
+                any_rare_pity: 0,
+            };
+            assert_eq!(banner.max_additional_pulls(), maximum);
+            let dist = banner.distribution(RateMode::PublishedOnly).unwrap();
+            assert_eq!(dist.quantile(1.0), maximum);
+            assert_eq!(dist.at(maximum), 1.0);
+        }
     }
 
     #[test]

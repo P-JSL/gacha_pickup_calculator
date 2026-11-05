@@ -37,7 +37,7 @@ impl Game {
         match self {
             Self::StarRail => "일반 한정 캐릭터 90회/50:50, 광추 80회/75:25; 픽업 실패 후 다음 5성 확정. 소프트 천장 증가는 비공식 모델.",
             Self::WutheringWaves => "한정 공명자 80회/50:50, 픽업 무기 80회/100%. 명조의 소프트 천장은 공개 실측 추정만 사용.",
-            Self::Neverness => "한정 캐릭터는 70회 이후 보드 변화(19.59%), 90회 확정/픽업 100%. Arc는 10개씩 뽑는 배너이며, 6번째 묶음 S급·8번째 묶음 픽업 확정. 배치 안의 복수 S급은 근사 처리.",
+            Self::Neverness => "한정 캐릭터는 70회 이후 보드 변화(19.59%), 90회 확정/픽업 100%. Arc는 10개씩 뽑는 배너이며, 6번째 묶음 S급·8번째 묶음 픽업 확정. 자연 발생 복수 S급은 집계하며, 10연 내부 보장 개입 시점은 근사 처리.",
             Self::StellaSora => "일반 픽업 캐릭터 160회 확정, 픽업 약 1%/회. 동일 배너 누적 120회에 픽업 1장 별도 수령 가능(일회·배너 종료 시 만료·천장 미초기화). 일반 디스크 픽업 1.5%/회, 120회 픽업 확정. 일부 특별/기념 배너는 규칙이 다름.",
         }
     }
@@ -54,6 +54,7 @@ impl Game {
             Self::Neverness => &[
                 ("Prydwen NTE 가챠", "https://www.prydwen.gg/neverness-to-everness/guides/gacha-system"),
                 ("NTE 무기 Arc 확률", "https://gamewith.net/nte/74412"),
+                ("이환 기본/종합 확률 구분", "https://alkapa.gg/neverness-to-everness/guide/reroll"),
             ],
             Self::StellaSora => &[
                 ("공식 2.0 스페셜 모집", "https://stellasora.global/news/4926"),
