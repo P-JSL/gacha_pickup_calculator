@@ -212,41 +212,40 @@ impl Calculator {
         self.calculating = true;
     }
 
-    /// Slim top toolbar. Views are selected from the permanent navigation
-    /// rail rather than an overcrowded dropdown menu.
+    /// Compact Windows desktop header matching the dashboard reference.
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(14))
             .show(ctx, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(17.0));
-                    ui.label(RichText::new("LAB").strong().size(17.0));
-                    ui.label(RichText::new(" /  ANALYTICS WORKSPACE")
-                        .color(MUTED).size(11.0));
-                    ui.add_space(12.0);
-                    ui.label(RichText::new("게임").color(MUTED).size(12.0));
-                    egui::ComboBox::from_id_salt("top_game")
-                        .width(150.0).selected_text(self.setup.game.label())
-                        .show_ui(ui, |ui| {
-                            for game in Game::ALL {
-                                if ui.selectable_label(self.setup.game == game, game.label()).clicked()
-                                    && self.setup.game != game
-                                {
-                                    self.change_game(game);
-                                    dirty = true;
-                                }
-                            }
-                        });
-                    ui.separator();
-                    ui.menu_button("확률 모델 ▾", |ui| {
-                        dirty |= ui.radio_value(&mut self.mode,
-                            RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
-                        dirty |= ui.radio_value(&mut self.mode,
-                            RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Gacha Pickup Calculator").strong().size(22.0));
+                        ui.label(RichText::new("Probability & Refund Simulator")
+                            .color(MUTED).size(11.0));
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("도움말").clicked() { self.show_help = true; }
+                        if ui.button("ⓘ  Help").clicked() {
+                            self.show_help = true;
+                        }
+                        ui.menu_button("◈  확률 모델", |ui| {
+                            dirty |= ui.radio_value(&mut self.mode,
+                                RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
+                            dirty |= ui.radio_value(&mut self.mode,
+                                RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                        });
+                        egui::ComboBox::from_id_salt("top_game").width(175.0)
+                            .selected_text(self.setup.game.label())
+                            .show_ui(ui, |ui| {
+                                for game in Game::ALL {
+                                    if ui.selectable_label(
+                                        self.setup.game == game, game.label()
+                                    ).clicked() && self.setup.game != game {
+                                        self.change_game(game);
+                                        dirty = true;
+                                    }
+                                }
+                            });
                     });
                 });
             });
@@ -256,49 +255,52 @@ impl Calculator {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(150.0)
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
+            .exact_width(194.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
-                ui.add_space(8.0);
-                ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
-                ui.add_space(8.0);
+                ui.add_space(14.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(RichText::new("✧").color(PRIMARY).size(45.0).strong());
+                    ui.label(RichText::new("GACHA LAB").color(MUTED).size(11.0).strong());
+                });
+                ui.add_space(25.0);
                 for (view, title) in [
-                    (ViewMode::Calculator, "01   확률 대시보드"),
-                    (ViewMode::Settings, "02   시뮬레이션 설정"),
-                    (ViewMode::TrackerSources, "03   트래커 교차 검증"),
-                    (ViewMode::ObservedDistribution, "04   실측 CSV 분석"),
+                    (ViewMode::Calculator, "⌂   Dashboard"),
+                    (ViewMode::Settings, "⚙   Simulator"),
+                    (ViewMode::Analytics, "▥   Analytics"),
+                    (ViewMode::TrackerSources, "☷   Sources"),
+                    (ViewMode::ObservedDistribution, "▧   CSV Analysis"),
                 ] {
                     let active = self.view_mode == view;
-                    let label = RichText::new(title).size(13.0)
-                        .color(if active { Color32::WHITE } else { MUTED })
-                        .strong();
-                    let button = egui::Button::new(label)
-                        .fill(if active { SELECTED_NAV } else { SIDEBAR })
-                        .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
-                        .corner_radius(9);
-                    if ui.add_sized([ui.available_width(), 30.0], button).clicked() {
+                    let button = egui::Button::new(
+                        RichText::new(title).size(14.0)
+                            .color(if active { Color32::WHITE } else { MUTED }).strong()
+                    ).fill(if active { SELECTED_NAV } else { SIDEBAR })
+                        .stroke(egui::Stroke::new(if active { 1.0 } else { 0.0 }, BORDER))
+                        .corner_radius(11);
+                    if ui.add_sized([ui.available_width(), 39.0], button).clicked() {
                         self.view_mode = view;
                     }
-                    ui.add_space(3.0);
+                    ui.add_space(5.0);
                 }
-                ui.add_space(12.0);
+                ui.add_space(22.0);
                 ui.separator();
-                ui.add_space(8.0);
-                ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0));
+                ui.add_space(13.0);
+                ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0).strong());
                 ui.add_space(5.0);
                 ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
                 ui.label(RichText::new(format!(
-                    "캐릭터 E{}  ·  {} S{}",
-                    self.target_eid, self.setup.game.secondary_banner_name(),
-                    self.target_refine
+                    "캐릭터 E{} · {} S{}",
+                    self.target_eid, self.setup.game.secondary_banner_name(), self.target_refine
                 )).color(MUTED).size(11.0));
-                ui.add_space(7.0);
-                ui.label(RichText::new("정확 DP · 조건부 환급 추정")
+                ui.add_space(16.0);
+                ui.label(RichText::new("정확 DP + 순차 환급 시뮬레이션")
                     .color(MUTED).size(10.0));
-                ui.add_space(12.0);
-                ui.hyperlink_to("GitHub / Source", "https://github.com/P-JSL/gacha_pickup_calculator");
+                ui.add_space(9.0);
+                ui.hyperlink_to("GitHub / Source",
+                    "https://github.com/P-JSL/gacha_pickup_calculator");
                 ui.add_space(5.0);
-                ui.label(RichText::new("v0.1.10  ·  DESKTOP").color(MUTED).size(10.0));
+                ui.label(RichText::new("v0.1.9 · DESKTOP").color(MUTED).size(10.0));
             });
     }
 
