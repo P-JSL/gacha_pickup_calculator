@@ -30,6 +30,14 @@ impl Game {
             Self::StellaSora => "Stellanite Dust (캐릭터/디스크 별도)",
         }
     }
+    pub fn exchange_points_name(self) -> &'static str {
+        match self {
+            Self::StarRail => "꺼지지 않는 스타라이트",
+            Self::WutheringWaves => "여파의 산호",
+            Self::Neverness => "Warp Pieces",
+            Self::StellaSora => "탐험 전문가 증명서",
+        }
+    }
     pub fn cost_per_pull(self) -> usize {
         if self == Self::StellaSora { 300 } else { 160 }
     }
