@@ -21,6 +21,10 @@ pub struct FeedbackConfig {
     pub character_four_star_rate: f64,
     pub weapon_four_star_rate: f64,
     pub four_star_hard: usize,
+    /// Current 4★ or higher pity on the character banner.
+    pub character_four_star_pity: usize,
+    /// Current 4★ or higher pity on the weapon banner.
+    pub weapon_four_star_pity: usize,
     pub samples: usize,
 }
 
@@ -32,15 +36,15 @@ impl FeedbackConfig {
                 featured_first: 0, featured_duplicate: 40,
                 off_banner_rare: 0, weapon_rare: 40,
                 four_star_reward: 8, character_four_star_rate: 0.051,
-                weapon_four_star_rate: 0.066, four_star_hard: 10,
+                weapon_four_star_rate: 0.066, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000,
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
                 featured_first: 15, featured_duplicate: 15,
-                off_banner_rare: 45, weapon_rare: 15,
+                off_banner_rare: 15, weapon_rare: 15,
                 four_star_reward: 3, character_four_star_rate: 0.06,
-                weapon_four_star_rate: 0.06, four_star_hard: 10,
+                weapon_four_star_rate: 0.06, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000,
             },
             Game::Neverness | Game::StellaSora => Self {
@@ -50,7 +54,7 @@ impl FeedbackConfig {
                 featured_first: 0, featured_duplicate: 0,
                 off_banner_rare: 0, weapon_rare: 0,
                 four_star_reward: 0, character_four_star_rate: 0.0,
-                weapon_four_star_rate: 0.0, four_star_hard: 10,
+                weapon_four_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000,
             },
         }
@@ -59,6 +63,8 @@ impl FeedbackConfig {
     pub fn validate(&self) -> Result<(), String> {
         if self.points_per_ticket == 0 || self.samples == 0 || self.samples > 200_000
             || self.four_star_hard == 0 || self.four_star_hard > 20
+            || self.character_four_star_pity >= self.four_star_hard
+            || self.weapon_four_star_pity >= self.four_star_hard
             || !valid_probability(self.character_four_star_rate)
             || !valid_probability(self.weapon_four_star_rate) {
             return Err("환급 설정의 가격·확률·표본 수가 허용 범위를 벗어났습니다.".to_owned());
@@ -157,7 +163,6 @@ fn maybe_four_star(rng: &mut SplitMix64, model: &FeedbackConfig, kind: BannerKin
         BannerKind::Character => model.character_four_star_rate,
         BannerKind::Weapon => model.weapon_four_star_rate,
     };
-    if chance <= 0.0 { return false; }
     let hit = *four_pity + 1 >= model.four_star_hard || rng.hits(chance);
     if hit { *four_pity = 0; } else { *four_pity += 1; }
     hit
@@ -180,7 +185,10 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     let mut pity = rule.pity;
     let mut guaranteed = rule.guaranteed;
     let mut won = 0;
-    let mut four_pity = 0;
+    let mut four_pity = match kind {
+        BannerKind::Character => model.character_four_star_pity,
+        BannerKind::Weapon => model.weapon_four_star_pity,
+    };
     while won < rule.target_copies {
         wallet.pay(dedicated);
         let rare = rng.hits(rarity.chance(pity + 1, mode));
@@ -207,7 +215,10 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     let BannerRule::FeaturedCounter { featured_rate, hard_featured } = &rule.rule else { return; };
     let mut pity = rule.pity;
     let mut won = 0;
-    let mut four_pity = 0;
+    let mut four_pity = match kind {
+        BannerKind::Character => model.character_four_star_pity,
+        BannerKind::Weapon => model.weapon_four_star_pity,
+    };
     let already_unclaimed = rule.spark.as_ref().is_some_and(|s| !s.used && s.progress >= s.at);
     if already_unclaimed { won += 1; }
     let mut progress = rule.spark.as_ref().map_or(0, |s| s.progress);
@@ -235,7 +246,7 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
     let mut featured_pity = rule.pity;
     let mut any_pity = rule.any_rare_pity;
     let mut won = 0;
-    let mut four_pity = 0;
+    let mut four_pity = model.weapon_four_star_pity;
     while won < rule.target_copies {
         // Arc is purchased as an indivisible ten-pull. Refunds from the
         // current pack must not finance any of its remaining nine pulls.
@@ -322,7 +333,7 @@ mod tests {
         let conf = FeedbackConfig { enabled: true, points_per_ticket: 1, initial_points: 0,
             featured_first: 1, featured_duplicate: 1, off_banner_rare: 0,
             weapon_rare: 1, four_star_reward: 0, character_four_star_rate: 0.0,
-            weapon_four_star_rate: 0.0, four_star_hard: 10, samples: 10 };
+            weapon_four_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10 };
         let mut w = Wallet::new(&conf);
         let mut d = 0;
         w.pay(&mut d);
@@ -374,4 +385,28 @@ mod tests {
         let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         assert_eq!(result.quantile(1.0), 1);
     }
+    #[test]
+    fn four_star_guarantee_applies_at_zero_base_rate() {
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.character_four_star_rate = 0.0;
+        cfg.character_four_star_pity = 9;
+        let mut pity = cfg.character_four_star_pity;
+        let mut rng = SplitMix64(17);
+        assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false));
+        assert_eq!(pity, 0);
+        assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false));
+    }
+
+    #[test]
+    fn four_star_pity_outside_range_is_rejected() {
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.weapon_four_star_pity = cfg.four_star_hard;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn off_banner_wuthering_rare_uses_conservative_default() {
+        assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 15);
+    }
+
 }
