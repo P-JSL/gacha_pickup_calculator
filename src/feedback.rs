@@ -350,7 +350,10 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
             if won + wallet.wavebands_bought >= rule.target_copies { break; }
         }
         let reserve = if matches!(kind, BannerKind::Character) {
-            model.waveband_limit.saturating_sub(wallet.wavebands_bought)
+            let eligible = owned.saturating_add(rule.target_copies)
+                .saturating_sub(1).min(rule.target_copies);
+            model.waveband_limit.min(eligible)
+                .saturating_sub(wallet.wavebands_bought)
                 .saturating_mul(model.waveband_price)
         } else { 0 };
         wallet.pay_reserved(dedicated, reserve);
@@ -556,7 +559,10 @@ mod tests {
         let tickets = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         cfg.waveband_limit = 2;
         let wavebands = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
-        assert!(wavebands.quantile(1.0) < tickets.quantile(1.0));
+        assert!(wavebands.average_raw < tickets.average_raw);
+        // Purchasing upgrades costs coral; fewer draws does not automatically
+        // imply a lower external-currency budget when tickets were plentiful.
+        assert!(wavebands.quantile(1.0) >= tickets.quantile(1.0));
         assert!(wavebands.scenarios.iter().all(|s| s.wavebands_bought == 2));
         assert!(tickets.scenarios.iter().all(|s| s.wavebands_bought == 0));
     }
