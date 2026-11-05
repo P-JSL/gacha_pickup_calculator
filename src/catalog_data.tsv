@@ -677,3 +677,7 @@ nte	w	arc-51	물망산	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Asse
 
 wuwa	c	RoverAeroMale	Rover: Aero	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/RoverAeroMale.png
 wuwa	c	Roverelectromale	Rover: Electro	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Roverelectromale.png
+# Officially announced additions without a verified icon URL; use a safe placeholder.
+nte	c	upcoming_elyms	Elyms	5	
+nte	c	upcoming_exe	Exe	5	
+sora	c	firstlight_noya	Firstlight Noya	5	
