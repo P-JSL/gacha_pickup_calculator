@@ -257,7 +257,7 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
                         .range(0..=7).speed(1).suffix("장")).changed();
                 });
-                cols[1].label(RichText::new("무기·광추 재련 목표").color(MUTED));
+                cols[1].label(RichText::new(format!("{} 재련 목표", self.setup.game.secondary_banner_name())).color(MUTED));
                 egui::ComboBox::from_id_salt("refine").width(175.0)
                     .selected_text(if self.target_refine == 0 { "필요 없음".to_owned() }
                         else { format!("S{} · 총 {}장", self.target_refine, self.target_refine) })
@@ -312,7 +312,7 @@ impl Calculator {
                 &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
                 &mut self.setup.character.any_rare_pity);
             ui.separator();
-            dirty |= Self::banner_controls(ui, "무기·광추", &mut self.setup.weapon.rule,
+            dirty |= Self::banner_controls(ui, self.setup.game.secondary_banner_name(), &mut self.setup.weapon.rule,
                 &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
                 &mut self.setup.weapon.any_rare_pity);
             if let Some(spark) = self.setup.character.spark.as_mut() {
@@ -340,7 +340,7 @@ impl Calculator {
                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_dedicated)
                     .range(0..=100_000).suffix("뽑")).changed();
                 ui.separator();
-                ui.label("무기 전용권");
+                ui.label(format!("{} 전용권", self.setup.game.secondary_banner_name()));
                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_dedicated)
                     .range(0..=100_000).suffix("뽑")).changed();
                 ui.separator();
@@ -420,10 +420,10 @@ impl Calculator {
                     ui.label("픽뚫 최고 등급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.off_banner_rare)
                         .range(0..=100_000)).changed();
-                    ui.label("무기·레코드 첫 장");
+                    ui.label(format!("{} 첫 장", self.setup.game.secondary_banner_name()));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_first)
                         .range(0..=100_000)).changed();
-                    ui.label("무기·레코드 중복 장당");
+                    ui.label(format!("{} 중복 장당", self.setup.game.secondary_banner_name()));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_rare)
                         .range(0..=100_000)).changed();
                 });
@@ -431,7 +431,7 @@ impl Calculator {
                     ui.label("캐릭터 4성 평균 환급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_reward)
                         .range(0..=100_000)).changed();
-                    ui.label("무기·레코드 4성 평균 환급");
+                    ui.label(format!("{} 4성 평균 환급", self.setup.game.secondary_banner_name()));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_reward)
                         .range(0..=100_000)).changed();
                     ui.label("캐릭터 4성 기본률(%)");
@@ -1014,7 +1014,7 @@ fn draw_probability_chart(
     }
     ui.horizontal_wrapped(|ui| {
         ui.colored_label(PRIMARY, "● 캐릭터 목표");
-        ui.colored_label(MINT, "● 무기·광추 목표");
+        ui.colored_label(MINT, format!("● {} 목표", self.setup.game.secondary_banner_name()));
         ui.colored_label(GOLD, "● 합산 · 환급 전");
         if show_feedback && feedback.is_some() {
             ui.colored_label(refund_color, "● 환급 반영");
