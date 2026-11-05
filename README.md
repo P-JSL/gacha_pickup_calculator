@@ -155,3 +155,17 @@ NTE Warp Exchange의 Solid Dice 및 Tri-Key는 각각 Warp Pieces 24개로 구�
 - 모든 그래프는 동일한 네이티브 egui Painter를 사용합니다. 계산 엔진과 확률 분포, 환급 모델 및 기존 입력값은 수정하지 않습니다.
 - Windows GitHub Actions 빌드에서 실사용 GUI 실행 및 스크린샷 캡처를 **시도**합니다. 호스팅 러너에 그래픽 데스크톱이 없는 경우 별도 경고로 처리하며 빌드 자체를 실패시키지 않습니다.
 
+
+## v0.1.9: 미니멀 Analytics Workspace UI
+
+- Behance에서 널리 사용되는 모던 SaaS 데이터 대시보드 패턴(콘텐츠 위계, 조용한 다크 컬러, 카드형 KPI, 일관된 여백)을 참고해 **네이티브 egui로 자체 구현**했습니다. 특정 디자인 이미지/에셋을 복제하거나 포함하지 않습니다.
+- 좌측 고정 내비게이션: **확률 대시보드 / 시뮬레이션 설정 / 트래커 교차 검증 / 실측 CSV 분석**.
+- 상단의 게임 전환·확률 모델 선택·도움말은 어느 화면에서도 동일하게 동작합니다.
+- **첫 화면은 요약 KPI와 분리된 캐릭터·광추/무기/Arc/레코드 그래프를 먼저 표시**합니다. 목표·천장·환급·보유 재화 입력은 전용 설정 페이지로 이동했습니다.
+- 목표 확률별 정량 비교와 환급 경계 표본·순차 환급 내역은 기존 방식 그대로 제공하며 그래프 아래의 상세 정보에 배치합니다.
+- 카드 테두리·여백·반경·타이포그래피·버튼·차트 배경·왼쪽 선택 상태를 한 디자인 시스템으로 통일했습니다.
+- 작은 Windows 창과 고배율 모니터에서는 3개 KPI를 세로로 배치하고, 두 배너 차트도 자동으로 세로 배치합니다.
+- 계산 엔진, 최적 배분, 게임별 프리셋, 환급 Monte Carlo, 기존 변수 및 외부 입출력 규격은 변경하지 않았습니다.
+
+참고한 디자인 방향: [Behance – Modern Dark Analytics Dashboard](https://www.behance.net/gallery/241158287/Modern-Dark-Analytics-Dashboard-UI-Design-Admin-UXUI), [Behance – FlowTrack](https://www.behance.net/gallery/238810585/FlowTrack-FinTech-Dashboard-UIUX-Design). 최종 UI의 코드·컬러·컴포넌트는 프로젝트용으로 독립 구현했습니다.
+

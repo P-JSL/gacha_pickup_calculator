@@ -16,7 +16,10 @@ const MUTED: Color32 = Color32::from_rgb(154, 171, 193);
 const PRIMARY: Color32 = Color32::from_rgb(108, 187, 255);
 const MINT: Color32 = Color32::from_rgb(98, 223, 176);
 const GOLD: Color32 = Color32::from_rgb(255, 183, 102);
-const BORDER: Color32 = Color32::from_rgb(46, 60, 78);
+const BORDER: Color32 = Color32::from_rgb(45, 57, 76);
+const SIDEBAR: Color32 = Color32::from_rgb(14, 21, 35);
+const SELECTED_NAV: Color32 = Color32::from_rgb(33, 53, 76);
+const SURFACE: Color32 = Color32::from_rgb(18, 28, 44);
 
 struct Computed {
     character: Distribution,
@@ -53,7 +56,7 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Settings, TrackerSources, ObservedDistribution }
 
 struct Calculator {
     setup: GameSetup,
@@ -182,53 +185,94 @@ impl Calculator {
         self.calculating = true;
     }
 
+    /// Slim top toolbar. Views are selected from the permanent navigation
+    /// rail rather than an overcrowded dropdown menu.
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
-        egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.add_space(9.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("◈  GACHA LAB").strong().size(20.0).color(PRIMARY));
-                ui.separator();
-                ui.menu_button(format!("{} ▾", self.setup.game.label()), |ui| {
-                    for game in Game::ALL {
-                        if ui.selectable_label(self.setup.game == game, game.label()).clicked() {
-                            if self.setup.game != game { self.change_game(game); dirty = true; }
-                            ui.close_menu();
-                        }
-                    }
-                });
-                ui.menu_button("확률 모델 ▾", |ui| {
-                    dirty |= ui.radio_value(&mut self.mode, RateMode::PublishedOnly,
-                        "공개 기본 확률 + 확정 천장").changed();
-                    dirty |= ui.radio_value(&mut self.mode, RateMode::CommunityEstimate,
-                        "소프트 천장 추정 모델").changed();
-                });
-                ui.menu_button("분석 메뉴 ▾", |ui| {
-                    for (view, title) in [
-                        (ViewMode::Calculator, "확률 계산 · 대시보드"),
-                        (ViewMode::TrackerSources, "07 · 트래커 출처 교차 검증"),
-                        (ViewMode::ObservedDistribution, "08 · CSV 실측 분포 비교"),
-                    ] {
-                        if ui.selectable_label(self.view_mode == view, title).clicked() {
-                            self.view_mode = view;
-                            ui.close_menu();
-                        }
-                    }
-                });
-                ui.menu_button("사용법 / 출처 ▾", |ui| {
-                    if ui.button("모델과 출처 확인").clicked() {
-                        self.show_help = true;
-                        ui.close_menu();
-                    }
-                    ui.hyperlink_to("GitHub 저장소", "https://github.com/P-JSL/gacha_pickup_calculator");
-                });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new("RUST · EXACT DP + REFUND ESTIMATE").color(MUTED).size(10.0));
+        egui::TopBottomPanel::top("header")
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .show(ctx, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(17.0));
+                    ui.label(RichText::new("LAB").strong().size(17.0));
+                    ui.label(RichText::new(" /  ANALYTICS WORKSPACE")
+                        .color(MUTED).size(11.0));
+                    ui.add_space(12.0);
+                    ui.label(RichText::new("게임").color(MUTED).size(12.0));
+                    egui::ComboBox::from_id_salt("top_game")
+                        .width(150.0).selected_text(self.setup.game.label())
+                        .show_ui(ui, |ui| {
+                            for game in Game::ALL {
+                                if ui.selectable_label(self.setup.game == game, game.label()).clicked()
+                                    && self.setup.game != game
+                                {
+                                    self.change_game(game);
+                                    dirty = true;
+                                }
+                            }
+                        });
+                    ui.separator();
+                    ui.menu_button("확률 모델 ▾", |ui| {
+                        dirty |= ui.radio_value(&mut self.mode,
+                            RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
+                        dirty |= ui.radio_value(&mut self.mode,
+                            RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("도움말").clicked() { self.show_help = true; }
+                    });
                 });
             });
-            ui.add_space(8.0);
-        });
         dirty
+    }
+
+    fn sidebar(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("workspace_sidebar")
+            .resizable(false)
+            .exact_width(174.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .show(ctx, |ui| {
+                ui.add_space(20.0);
+                ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
+                ui.add_space(13.0);
+                for (view, title) in [
+                    (ViewMode::Calculator, "01   확률 대시보드"),
+                    (ViewMode::Settings, "02   시뮬레이션 설정"),
+                    (ViewMode::TrackerSources, "03   트래커 교차 검증"),
+                    (ViewMode::ObservedDistribution, "04   실측 CSV 분석"),
+                ] {
+                    let active = self.view_mode == view;
+                    let label = RichText::new(title).size(13.0)
+                        .color(if active { Color32::WHITE } else { MUTED })
+                        .strong();
+                    let button = egui::Button::new(label)
+                        .fill(if active { SELECTED_NAV } else { SIDEBAR })
+                        .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
+                        .corner_radius(9);
+                    if ui.add_sized([ui.available_width(), 34.0], button).clicked() {
+                        self.view_mode = view;
+                    }
+                    ui.add_space(4.0);
+                }
+                ui.add_space(22.0);
+                ui.separator();
+                ui.add_space(12.0);
+                ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0));
+                ui.add_space(5.0);
+                ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
+                ui.label(RichText::new(format!(
+                    "캐릭터 E{}  ·  {} S{}",
+                    self.target_eid, self.setup.game.secondary_banner_name(),
+                    self.target_refine
+                )).color(MUTED).size(11.0));
+                ui.add_space(12.0);
+                ui.label(RichText::new("정확 DP · 조건부 환급 추정")
+                    .color(MUTED).size(10.0));
+                ui.add_space(12.0);
+                ui.hyperlink_to("GitHub / Source", "https://github.com/P-JSL/gacha_pickup_calculator");
+                ui.add_space(5.0);
+                ui.label(RichText::new("v0.1.9  ·  DESKTOP").color(MUTED).size(10.0));
+            });
     }
 
     fn targets(&mut self, ui: &mut egui::Ui) -> bool {
@@ -509,11 +553,20 @@ impl Calculator {
             self.setup.character_dedicated, self.setup.weapon_dedicated, owned_flexible);
         let current_probability = stats.feedback.as_ref().map(|f| f.probability(owned_flexible).0)
             .unwrap_or(current_raw.success_probability);
-        ui.add_space(12.0);
-        ui.horizontal(|ui| {
-            ui.heading("확률 분석 대시보드");
-            ui.label(RichText::new("입력 상태 변경 시 자동 계산").color(MUTED).size(11.0));
+        page_intro(ui, "PROBABILITY OVERVIEW", "확률 분석 대시보드",
+            "캐릭터·무기 획득 목표, 누적 확률과 환급 반영 필요 재화를 한눈에 확인합니다.");
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(format!(
+                "{}  ·  E{} / {} S{}",
+                self.setup.game.label(), self.target_eid,
+                self.setup.game.secondary_banner_name(), self.target_refine,
+            )).color(PRIMARY).strong().size(12.0));
+            ui.separator();
+            if ui.button("목표 및 예산 변경").clicked() {
+                self.view_mode = ViewMode::Settings;
+            }
         });
+        ui.add_space(11.0);
         ui.horizontal_wrapped(|ui| {
             ui.selectable_value(&mut self.query_mode, QueryMode::RequiredBudget, "목표 확률 → 필요 n뽑");
             ui.selectable_value(&mut self.query_mode, QueryMode::AvailableBudget, "보유 N뽑 → 성공 확률");
@@ -533,39 +586,126 @@ impl Calculator {
             }
         });
 
-        ui.columns(3, |cols| {
-            metric(&mut cols[0], "전체 기대 소모 · 환급 전", format!("{:.1}뽑", stats.combined.mean),
-                "정확 DP / 배너 독립", PRIMARY);
-            if let Some(ref feedback) = stats.feedback {
-                let n = if self.query_mode == QueryMode::RequiredBudget {
-                    feedback.quantile(q)
-                } else { self.n_query };
-                metric(&mut cols[1],
-                    if self.query_mode == QueryMode::RequiredBudget { "목표 확률에 필요한 자유 재화" }
-                    else { "입력한 추가 자유 재화" },
-                    format!("{n}뽑"), "전용권 별도 · 순차 환급 재투입", GOLD);
-                let (p, low, high) = feedback.probability(n);
-                metric(&mut cols[2],
-                    if self.query_mode == QueryMode::RequiredBudget { "계산된 성공 확률" }
-                    else { "N뽑 내 최종 성공 확률" },
-                    format!("{:.2}%", p * 100.0),
-                    &format!("95% 신뢰구간 {:.2}~{:.2}%", low * 100.0, high * 100.0), MINT);
-            } else if self.query_mode == QueryMode::RequiredBudget {
-                metric(&mut cols[1], &format!("{}% 달성 필요", self.confidence),
-                    format!("{raw_quantile}뽑"), "환급 전 · 전체 합계", GOLD);
-                metric(&mut cols[2], "보유권 조건 성공 확률",
-                    format!("{current_probability:.2}%", current_probability = current_probability * 100.0),
-                    "환급 없는 정확 DP", MINT);
-            } else {
-                let a = optimal_allocation(&stats.character, &stats.weapon,
-                    self.setup.character_dedicated, self.setup.weapon_dedicated, self.n_query);
-                metric(&mut cols[1], "추가 자유 배분 재화", format!("{}뽑", self.n_query),
-                    "전용권 별도", GOLD);
-                metric(&mut cols[2], "N뽑 내 최종 성공 확률",
-                    format!("{:.2}%", a.success_probability * 100.0),
-                    "환급 없는 정확 DP", MINT);
+        let mut summary = vec![(
+            "전체 기대 소모 · 환급 전".to_owned(),
+            format!("{:.1}뽑", stats.combined.mean),
+            "정확 DP / 배너 독립".to_owned(),
+            PRIMARY,
+        )];
+        if let Some(ref feedback) = stats.feedback {
+            let n = if self.query_mode == QueryMode::RequiredBudget {
+                feedback.quantile(q)
+            } else { self.n_query };
+            let (p, low, high) = feedback.probability(n);
+            summary.push((
+                if self.query_mode == QueryMode::RequiredBudget {
+                    "목표 확률에 필요한 자유 재화".to_owned()
+                } else { "입력한 추가 자유 재화".to_owned() },
+                format!("{n}뽑"),
+                "전용권 별도 · 순차 환급 재투입".to_owned(), GOLD,
+            ));
+            summary.push((
+                if self.query_mode == QueryMode::RequiredBudget {
+                    "계산된 성공 확률".to_owned()
+                } else { "N뽑 내 최종 성공 확률".to_owned() },
+                format!("{:.2}%", p * 100.0),
+                format!("95% 신뢰구간 {:.2}~{:.2}%", low * 100.0, high * 100.0), MINT,
+            ));
+        } else if self.query_mode == QueryMode::RequiredBudget {
+            summary.push((
+                format!("{}% 달성 필요", self.confidence),
+                format!("{raw_quantile}뽑"),
+                "환급 전 · 전체 합계".to_owned(), GOLD,
+            ));
+            summary.push((
+                "보유권 조건 성공 확률".to_owned(),
+                format!("{:.2}%", current_probability * 100.0),
+                "환급 없는 정확 DP".to_owned(), MINT,
+            ));
+        } else {
+            let a = optimal_allocation(&stats.character, &stats.weapon,
+                self.setup.character_dedicated, self.setup.weapon_dedicated, self.n_query);
+            summary.push((
+                "추가 자유 배분 재화".to_owned(),
+                format!("{}뽑", self.n_query), "전용권 별도".to_owned(), GOLD,
+            ));
+            summary.push((
+                "N뽑 내 최종 성공 확률".to_owned(),
+                format!("{:.2}%", a.success_probability * 100.0),
+                "환급 없는 정확 DP".to_owned(), MINT,
+            ));
+        }
+        if ui.available_width() >= 760.0 {
+            ui.columns(3, |cols| {
+                for (i, (label, value, note, color)) in summary.iter().enumerate() {
+                    metric(&mut cols[i], label, value.clone(), note, *color);
+                }
+            });
+        } else {
+            for (label, value, note, color) in summary {
+                metric(ui, &label, value, &note, color);
+                ui.add_space(8.0);
+            }
+        };
+        ui.add_space(8.0);
+        let secondary_name = self.setup.game.secondary_banner_name();
+        let secondary_heading = format!("{secondary_name} 목표 확률");
+        let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
+        ui.add_space(10.0);
+        // On a wide display the two independent banners are displayed next
+        // to each other. On narrow/HiDPI Windows viewports they stack, so no
+        // graph extends beyond the available logical width.
+        if ui.available_width() >= 790.0 {
+            ui.columns(2, |cols| {
+                section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
+                    draw_probability_chart(ui, &[ChartSeries {
+                        label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
+                    }]);
+                });
+                section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
+                    draw_probability_chart(ui, &[ChartSeries {
+                        label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
+                    }]);
+                });
+            });
+        } else {
+            section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
+                draw_probability_chart(ui, &[ChartSeries {
+                    label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
+                }]);
+            });
+            ui.add_space(8.0);
+            section(ui, "05-B", &secondary_heading, single_description, |ui| {
+                draw_probability_chart(ui, &[ChartSeries {
+                    label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
+                }]);
+            });
+        }
+        ui.add_space(10.0);
+        section(ui, "05-C", "전체 목표 합산 및 환급 확률",
+            "합산: 전체 두 목표를 달성할 누적 확률 · 환급: 최초 필요한 자유 배분권 기준 (서로 다른 비용 축).", |ui| {
+            let mut curves = vec![ChartSeries {
+                label: "전체 · 환급 전",
+                source: ChartSource::Exact(&stats.combined), color: GOLD,
+            }];
+            let comparable = self.setup.character_dedicated == 0
+                && self.setup.weapon_dedicated == 0;
+            if comparable {
+                if let Some(ref feedback) = stats.feedback {
+                    curves.push(ChartSeries {
+                        label: "환급 반영 · 자유 재화",
+                        source: ChartSource::Refund(feedback),
+                        color: Color32::from_rgb(203, 158, 255),
+                    });
+                }
+            }
+            draw_probability_chart(ui, &curves);
+            if stats.feedback.is_some() && !comparable {
+                ui.colored_label(GOLD,
+                    "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
             }
         });
+        ui.add_space(12.0);
         if let Some(ref feedback) = stats.feedback {
             let target_budget = if self.query_mode == QueryMode::RequiredBudget {
                 feedback.quantile(q)
@@ -620,68 +760,10 @@ impl Calculator {
                 }
             });
         }
-        ui.add_space(8.0);
-        let secondary_name = self.setup.game.secondary_banner_name();
-        let secondary_heading = format!("{secondary_name} 목표 확률");
-        let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
-        ui.add_space(10.0);
-        // On a wide display the two independent banners are displayed next
-        // to each other. On narrow/HiDPI Windows viewports they stack, so no
-        // graph extends beyond the available logical width.
-        if ui.available_width() >= 1080.0 {
-            ui.columns(2, |cols| {
-                section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
-                    draw_probability_chart(ui, &[ChartSeries {
-                        label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                    }]);
-                });
-                section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
-                    draw_probability_chart(ui, &[ChartSeries {
-                        label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                    }]);
-                });
-            });
-        } else {
-            section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
-                draw_probability_chart(ui, &[ChartSeries {
-                    label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                }]);
-            });
-            ui.add_space(8.0);
-            section(ui, "05-B", &secondary_heading, single_description, |ui| {
-                draw_probability_chart(ui, &[ChartSeries {
-                    label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                }]);
-            });
-        }
-        ui.add_space(10.0);
-        section(ui, "05-C", "전체 목표 합산 및 환급 확률",
-            "합산: 전체 두 목표를 달성할 누적 확률 · 환급: 최초 필요한 자유 배분권 기준 (서로 다른 비용 축).", |ui| {
-            let mut curves = vec![ChartSeries {
-                label: "전체 · 환급 전",
-                source: ChartSource::Exact(&stats.combined), color: GOLD,
-            }];
-            let comparable = self.setup.character_dedicated == 0
-                && self.setup.weapon_dedicated == 0;
-            if comparable {
-                if let Some(ref feedback) = stats.feedback {
-                    curves.push(ChartSeries {
-                        label: "환급 반영 · 자유 재화",
-                        source: ChartSource::Refund(feedback),
-                        color: Color32::from_rgb(203, 158, 255),
-                    });
-                }
-            }
-            draw_probability_chart(ui, &curves);
-            if stats.feedback.is_some() && !comparable {
-                ui.colored_label(GOLD,
-                    "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
-            }
-        });
         ui.add_space(10.0);
         section(ui, "06", "달성 확률별 필요 재화", "DP 분위수는 정확 모델값, 환급 분위수는 모의실험의 추정치입니다.", |ui| {
             egui::Grid::new("quantiles").num_columns(6).striped(true)
-                .spacing([32.0, 8.0]).show(ui, |ui| {
+                .spacing([20.0, 6.0]).show(ui, |ui| {
                     ui.strong("달성률"); ui.strong("캐릭터");
                     ui.strong("무기"); ui.strong("합산 원시");
                     ui.strong("환급 후 자유 재화"); ui.strong("포인트 충당 표본"); ui.end_row();
@@ -988,7 +1070,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 262.0 } else { 320.0 };
+    let height = if width < 650.0 { 218.0 } else { 254.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -997,7 +1079,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         egui::pos2(bounds.left() + 49.0, bounds.top() + 12.0),
         egui::pos2(bounds.right() - 10.0, bounds.bottom() - 34.0),
     );
-    painter.rect_filled(bounds, 8.0, Color32::from_rgb(18, 28, 44));
+    painter.rect_filled(bounds, 10.0, SURFACE);
     for edge in [
         [graph.left_top(), graph.right_top()],
         [graph.left_bottom(), graph.right_bottom()],
@@ -1077,85 +1159,113 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     });
 }
 
+fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
+    ui.label(RichText::new(eyebrow).size(10.0).color(PRIMARY).strong());
+    ui.add_space(6.0);
+    ui.heading(RichText::new(title).size(23.0).strong());
+    ui.label(RichText::new(subtitle).size(12.0).color(MUTED));
+    ui.add_space(12.0);
+}
+
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
 fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(10))
-        .inner_margin(13)
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(11)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.label(RichText::new(number).color(PRIMARY).strong().size(12.0));
-                ui.label(RichText::new(heading).strong().size(16.0));
+                ui.label(RichText::new(number).color(PRIMARY).strong().size(11.0));
+                ui.add_space(5.0);
+                ui.label(RichText::new(heading).strong().size(15.0));
             });
-            ui.label(RichText::new(description).color(MUTED).size(11.0));
+            ui.add_space(3.0);
+            ui.label(RichText::new(description).color(MUTED).size(12.0));
             ui.add_space(7.0);
             content(ui);
         });
 }
 
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
-    egui::Frame::group(ui.style()).fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .corner_radius(egui::CornerRadius::same(10)).inner_margin(12)
+    egui::Frame::group(ui.style()).fill(CARD)
+        .stroke(egui::Stroke::new(1.0_f32, BORDER))
+        .corner_radius(egui::CornerRadius::same(12)).inner_margin(11)
         .show(ui, |ui| {
-            ui.set_min_width(220.0);
+            ui.set_min_width(ui.available_width().min(180.0));
             ui.label(RichText::new(label).color(MUTED).size(12.0));
-            ui.add_space(6.0);
-            ui.label(RichText::new(value).color(accent).size(24.0).strong());
-            ui.add_space(2.0);
-            ui.label(RichText::new(note).color(MUTED).size(10.0));
+            ui.add_space(5.0);
+            ui.label(RichText::new(value).color(accent).size(23.0).strong());
+            ui.add_space(3.0);
+            ui.label(RichText::new(note).color(MUTED).size(11.0));
         });
 }
 
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
-        let mut dirty = self.header(ctx);
+        // Input edits occur only on the Settings page; game / model selection
+        // is global and invalidates the calculation regardless of current view.
+        if self.header(ctx) {
+            self.schedule_recalculation();
+        }
+        self.sidebar(ctx);
+        let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG))
+            .frame(egui::Frame::default().fill(BG).inner_margin(12))
             .show(ctx, |ui| {
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                ui.add_space(16.0);
-                ui.heading(RichText::new(self.setup.game.label()).size(25.0).strong());
-                ui.label(RichText::new(self.setup.game.special_notes()).color(MUTED));
-                ui.add_space(14.0);
-                match self.view_mode {
-                    ViewMode::Calculator => {
-                        dirty |= self.targets(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.pity(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.resources(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.feedback_controls(ui);
-                        // Keep the currently visible result synchronized before drawing it.
-                        if dirty { self.schedule_recalculation(); }
-                        self.dashboard(ui);
-                    }
-                    ViewMode::TrackerSources => {
-                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
-                            self.view_mode = ViewMode::Calculator;
-                        }
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
                         ui.add_space(10.0);
-                        self.tracker_sources(ui);
-                    }
-                    ViewMode::ObservedDistribution => {
-                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
-                            self.view_mode = ViewMode::Calculator;
+                        match self.view_mode {
+                            ViewMode::Calculator => {
+                                self.dashboard(ui);
+                            }
+                            ViewMode::Settings => {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("SIMULATION SETTINGS")
+                                            .color(PRIMARY).size(10.0).strong());
+                                        ui.heading(RichText::new("시뮬레이션 설정")
+                                            .size(27.0).strong());
+                                        ui.label(RichText::new(
+                                            "목표, 천장, 보유 재화와 게임별 환급 가정을 변경합니다."
+                                        ).color(MUTED));
+                                    });
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui.button("대시보드 보기 →").clicked() {
+                                                self.view_mode = ViewMode::Calculator;
+                                            }
+                                        },
+                                    );
+                                });
+                                ui.add_space(20.0);
+                                settings_changed |= self.targets(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.pity(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.resources(ui);
+                                ui.add_space(12.0);
+                                settings_changed |= self.feedback_controls(ui);
+                            }
+                            ViewMode::TrackerSources => {
+                                page_intro(ui, "TRACKER EVIDENCE",
+                                    "트래커 교차 검증", "기준 확률과 날짜가 표시된 외부 관측값을 비교합니다.");
+                                self.tracker_sources(ui);
+                            }
+                            ViewMode::ObservedDistribution => {
+                                page_intro(ui, "OBSERVATION DATA",
+                                    "CSV 실측 분석", "로컬에서 스택별 관측 데이터를 분석합니다.");
+                                self.observation_validation(ui);
+                            }
                         }
-                        ui.add_space(10.0);
-                        self.observation_validation(ui);
-                    }
-                }
-                ui.add_space(25.0);
+                        ui.add_space(25.0);
+                    });
             });
-        });
-        // Header game/model changes can happen while viewing tracker pages.
-        // They must still invalidate the calculator, otherwise returning to the
-        // dashboard would show probabilities for the previous game.
-        if dirty && self.view_mode != ViewMode::Calculator {
+        if settings_changed {
             self.schedule_recalculation();
         }
         if let Some(edited_at) = self.pending_since {
@@ -1205,8 +1315,8 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
     ctx.style_mut(|style| {
-        style.spacing.item_spacing = egui::vec2(9.0, 8.0);
-        style.spacing.button_padding = egui::vec2(11.0, 6.0);
+        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+        style.spacing.button_padding = egui::vec2(10.0, 5.0);
         style.spacing.interact_size.y = 27.0;
         style.text_styles.insert(egui::TextStyle::Body,
             egui::FontId::proportional(14.0));
@@ -1241,8 +1351,8 @@ fn install_korean_font(ctx: &egui::Context) {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1230.0, 940.0])
-            .with_min_inner_size([840.0, 650.0])
+            .with_inner_size([1240.0, 800.0])
+            .with_min_inner_size([820.0, 620.0])
             .with_title("Gacha Lab — Rust 확률 분석기"),
         ..Default::default()
     };
