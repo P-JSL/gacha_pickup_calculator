@@ -347,6 +347,10 @@ impl Calculator {
         } else if query.contains("weapon") || query.contains("무기") || query.contains("광추")
             || query.contains("arc") || query.contains("레코드") {
             self.view_mode = ViewMode::Weapons;
+        } else if query.contains("tracker") || query.contains("트래커") {
+            self.view_mode = ViewMode::TrackerSources;
+        } else if query.contains("csv") || query.contains("실측") {
+            self.view_mode = ViewMode::ObservedDistribution;
         } else if query.contains("analytics") || query.contains("분석") {
             self.view_mode = ViewMode::Analytics;
         } else if query.contains("simulator") || query.contains("설정") {
