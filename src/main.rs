@@ -16,7 +16,10 @@ const MUTED: Color32 = Color32::from_rgb(154, 171, 193);
 const PRIMARY: Color32 = Color32::from_rgb(108, 187, 255);
 const MINT: Color32 = Color32::from_rgb(98, 223, 176);
 const GOLD: Color32 = Color32::from_rgb(255, 183, 102);
-const BORDER: Color32 = Color32::from_rgb(46, 60, 78);
+const BORDER: Color32 = Color32::from_rgb(45, 57, 76);
+const SIDEBAR: Color32 = Color32::from_rgb(14, 21, 35);
+const SELECTED_NAV: Color32 = Color32::from_rgb(33, 53, 76);
+const SURFACE: Color32 = Color32::from_rgb(18, 28, 44);
 
 struct Computed {
     character: Distribution,
@@ -53,7 +56,7 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Settings, TrackerSources, ObservedDistribution }
 
 struct Calculator {
     setup: GameSetup,
@@ -182,53 +185,94 @@ impl Calculator {
         self.calculating = true;
     }
 
+    /// Slim top toolbar. Views are selected from the permanent navigation
+    /// rail rather than an overcrowded dropdown menu.
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
-        egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.add_space(9.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("◈  GACHA LAB").strong().size(20.0).color(PRIMARY));
-                ui.separator();
-                ui.menu_button(format!("{} ▾", self.setup.game.label()), |ui| {
-                    for game in Game::ALL {
-                        if ui.selectable_label(self.setup.game == game, game.label()).clicked() {
-                            if self.setup.game != game { self.change_game(game); dirty = true; }
-                            ui.close_menu();
-                        }
-                    }
-                });
-                ui.menu_button("확률 모델 ▾", |ui| {
-                    dirty |= ui.radio_value(&mut self.mode, RateMode::PublishedOnly,
-                        "공개 기본 확률 + 확정 천장").changed();
-                    dirty |= ui.radio_value(&mut self.mode, RateMode::CommunityEstimate,
-                        "소프트 천장 추정 모델").changed();
-                });
-                ui.menu_button("분석 메뉴 ▾", |ui| {
-                    for (view, title) in [
-                        (ViewMode::Calculator, "확률 계산 · 대시보드"),
-                        (ViewMode::TrackerSources, "07 · 트래커 출처 교차 검증"),
-                        (ViewMode::ObservedDistribution, "08 · CSV 실측 분포 비교"),
-                    ] {
-                        if ui.selectable_label(self.view_mode == view, title).clicked() {
-                            self.view_mode = view;
-                            ui.close_menu();
-                        }
-                    }
-                });
-                ui.menu_button("사용법 / 출처 ▾", |ui| {
-                    if ui.button("모델과 출처 확인").clicked() {
-                        self.show_help = true;
-                        ui.close_menu();
-                    }
-                    ui.hyperlink_to("GitHub 저장소", "https://github.com/P-JSL/gacha_pickup_calculator");
-                });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new("RUST · EXACT DP + REFUND ESTIMATE").color(MUTED).size(10.0));
+        egui::TopBottomPanel::top("header")
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(15))
+            .show(ctx, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(20.0));
+                    ui.label(RichText::new("LAB").strong().size(20.0));
+                    ui.label(RichText::new(" /  ANALYTICS WORKSPACE")
+                        .color(MUTED).size(11.0));
+                    ui.add_space(26.0);
+                    ui.label(RichText::new("게임").color(MUTED).size(12.0));
+                    egui::ComboBox::from_id_salt("top_game")
+                        .width(165.0).selected_text(self.setup.game.label())
+                        .show_ui(ui, |ui| {
+                            for game in Game::ALL {
+                                if ui.selectable_label(self.setup.game == game, game.label()).clicked() {
+                                    if self.setup.game != game {
+                                        self.change_game(game);
+                                        dirty = true;
+                                    }
+                                }
+                            }
+                        });
+                    ui.separator();
+                    ui.menu_button("확률 모델 ▾", |ui| {
+                        dirty |= ui.radio_value(&mut self.mode,
+                            RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
+                        dirty |= ui.radio_value(&mut self.mode,
+                            RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("도움말").clicked() { self.show_help = true; }
+                    });
                 });
             });
-            ui.add_space(8.0);
-        });
         dirty
+    }
+
+    fn sidebar(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("workspace_sidebar")
+            .resizable(false)
+            .exact_width(202.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(13))
+            .show(ctx, |ui| {
+                ui.add_space(20.0);
+                ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
+                ui.add_space(13.0);
+                for (view, title) in [
+                    (ViewMode::Calculator, "◫  확률 대시보드"),
+                    (ViewMode::Settings, "⚙  시뮬레이션 설정"),
+                    (ViewMode::TrackerSources, "▤  트래커 교차 검증"),
+                    (ViewMode::ObservedDistribution, "◷  실측 CSV 분석"),
+                ] {
+                    let active = self.view_mode == view;
+                    let label = RichText::new(title).size(13.0)
+                        .color(if active { Color32::WHITE } else { MUTED })
+                        .strong();
+                    let button = egui::Button::new(label)
+                        .fill(if active { SELECTED_NAV } else { SIDEBAR })
+                        .stroke(egui::Stroke::new(if active { 1.0 } else { 0.0 }, BORDER))
+                        .corner_radius(9);
+                    if ui.add_sized([ui.available_width(), 40.0], button).clicked() {
+                        self.view_mode = view;
+                    }
+                    ui.add_space(4.0);
+                }
+                ui.add_space(22.0);
+                ui.separator();
+                ui.add_space(12.0);
+                ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0));
+                ui.add_space(5.0);
+                ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
+                ui.label(RichText::new(format!(
+                    "캐릭터 E{}  ·  {} S{}",
+                    self.target_eid, self.setup.game.secondary_banner_name(),
+                    self.target_refine
+                )).color(MUTED).size(11.0));
+                ui.add_space(12.0);
+                ui.label(RichText::new("정확 DP · 조건부 환급 추정")
+                    .color(MUTED).size(10.0));
+                ui.add_space(12.0);
+                ui.hyperlink_to("GitHub / Source", "https://github.com/P-JSL/gacha_pickup_calculator");
+                ui.add_space(5.0);
+                ui.label(RichText::new("v0.1.9  ·  DESKTOP").color(MUTED).size(10.0));
+            });
     }
 
     fn targets(&mut self, ui: &mut egui::Ui) -> bool {
