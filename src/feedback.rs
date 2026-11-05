@@ -13,6 +13,10 @@ pub struct FeedbackConfig {
     pub enabled: bool,
     pub points_per_ticket: usize,
     pub initial_points: usize,
+    /// Wuthering Waves: reserve coral for up to two character Wavebands.
+    /// Zero means spend coral on tickets instead.
+    pub waveband_limit: usize,
+    pub waveband_price: usize,
     pub featured_first: usize,
     pub featured_duplicate: usize,
     pub off_banner_rare: usize,
@@ -42,6 +46,7 @@ impl FeedbackConfig {
         match game {
             Game::StarRail => Self {
                 enabled: true, points_per_ticket: 20, initial_points: 0,
+                waveband_limit: 0, waveband_price: 360,
                 featured_first: 0, featured_duplicate: 40,
                 off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 8, weapon_four_star_reward: 8, character_four_star_rate: 0.051,
@@ -52,6 +57,7 @@ impl FeedbackConfig {
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
+                waveband_limit: 0, waveband_price: 360,
                 featured_first: 15, featured_duplicate: 15,
                 off_banner_rare: 15, weapon_first: 15, weapon_rare: 15,
                 four_star_reward: 3, weapon_four_star_reward: 3, character_four_star_rate: 0.06,
@@ -64,6 +70,7 @@ impl FeedbackConfig {
                 // Warp Pieces can buy dice / Tri-Keys. The 24-piece price and
                 // missing board-tile rewards remain community assumptions.
                 enabled: true, points_per_ticket: 24, initial_points: 0,
+                waveband_limit: 0, waveband_price: 360,
                 featured_first: 0, featured_duplicate: 40,
                 off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 6, weapon_four_star_reward: 4,
@@ -78,6 +85,7 @@ impl FeedbackConfig {
                 // First-time featured 5★ collections award no duplicate permits.
                 // The 4★ return assumes all 4★ results are already owned.
                 enabled: true, points_per_ticket: 100, initial_points: 0,
+                waveband_limit: 0, waveband_price: 360,
                 featured_first: 0, featured_duplicate: 200,
                 off_banner_rare: 200, weapon_first: 0, weapon_rare: 200,
                 four_star_reward: 40, weapon_four_star_reward: 40,
@@ -90,7 +98,8 @@ impl FeedbackConfig {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.points_per_ticket == 0 || self.samples == 0 || self.samples > 200_000
+        if self.points_per_ticket == 0 || self.waveband_price == 0
+            || self.waveband_limit > 2 || self.samples == 0 || self.samples > 200_000
             || self.four_star_hard == 0 || self.four_star_hard > 20
             || self.character_four_star_pity >= self.four_star_hard
             || self.weapon_four_star_pity >= self.four_star_hard
@@ -119,17 +128,21 @@ pub struct RefundScenario {
     pub initial_flexible_required: usize,
     /// All earned points, including the final pull's unspendable reward.
     pub earned_points: usize,
+    pub wavebands_bought: usize,
+    pub waveband_points_spent: usize,
 }
 impl RefundScenario {
     fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
         let dedicated_used = wallet.raw_pulls - wallet.common_spent;
-        let points_funded_pulls = wallet.common_spent - wallet.initial_flexible_required;
+        let points_funded_pulls = wallet.point_funded_pulls;
         let scenario = Self {
             raw_pulls: wallet.raw_pulls,
             dedicated_used,
             points_funded_pulls,
             initial_flexible_required: wallet.initial_flexible_required,
             earned_points: wallet.points - starting_points,
+            wavebands_bought: wallet.wavebands_bought,
+            waveband_points_spent: wallet.waveband_points_spent,
         };
         debug_assert_eq!(scenario.raw_pulls,
             scenario.dedicated_used + scenario.points_funded_pulls
@@ -235,29 +248,61 @@ impl SplitMix64 {
 }
 
 struct Wallet {
+    /// Cumulative earned plus initially owned coral (for statistics only).
     points: usize,
+    /// Actual remaining coral after ticket and Waveband purchases.
+    balance: usize,
     price: usize,
     common_spent: usize,
+    point_funded_pulls: usize,
     initial_flexible_required: usize,
     raw_pulls: usize,
+    wavebands_bought: usize,
+    waveband_points_spent: usize,
 }
 impl Wallet {
     fn new(model: &FeedbackConfig) -> Self {
-        Self { points: model.initial_points, price: model.points_per_ticket,
-            common_spent: 0, initial_flexible_required: 0, raw_pulls: 0 }
+        Self { points: model.initial_points, balance: model.initial_points,
+            price: model.points_per_ticket, common_spent: 0,
+            point_funded_pulls: 0, initial_flexible_required: 0,
+            raw_pulls: 0, wavebands_bought: 0, waveband_points_spent: 0 }
     }
-    /// The ticket for the current pull is payable only with returns obtained *before* that pull.
-    fn pay(&mut self, dedicated_remaining: &mut usize) {
+    /// No refund from this draw can pay for the same draw.
+    /// When the Waveband strategy is active, coral is reserved first.
+    fn pay_reserved(&mut self, dedicated_remaining: &mut usize, reserve: usize) {
         self.raw_pulls += 1;
-        if *dedicated_remaining > 0 { *dedicated_remaining -= 1; }
-        else {
+        if *dedicated_remaining > 0 {
+            *dedicated_remaining -= 1;
+        } else {
             self.common_spent += 1;
-            let recycled_so_far = self.points / self.price;
-            self.initial_flexible_required = self.initial_flexible_required.max(
-                self.common_spent.saturating_sub(recycled_so_far));
+            if self.balance >= reserve.saturating_add(self.price) {
+                self.balance -= self.price;
+                self.point_funded_pulls += 1;
+            } else {
+                self.initial_flexible_required += 1;
+            }
         }
     }
-    fn refund(&mut self, reward: usize) { self.points += reward; }
+    fn pay(&mut self, dedicated_remaining: &mut usize) {
+        self.pay_reserved(dedicated_remaining, 0);
+    }
+    fn refund(&mut self, reward: usize) {
+        self.points = self.points.saturating_add(reward);
+        self.balance = self.balance.saturating_add(reward);
+    }
+    fn buy_wavebands(&mut self, model: &FeedbackConfig, character_owned: usize,
+                     gacha_won: usize, remaining_target: usize) {
+        if character_owned + gacha_won == 0 { return; }
+        let max_purchase = model.waveband_limit.min(remaining_target).min(2);
+        while self.wavebands_bought < max_purchase
+            && self.balance >= model.waveband_price
+            && gacha_won + self.wavebands_bought < remaining_target
+        {
+            self.balance -= model.waveband_price;
+            self.wavebands_bought += 1;
+            self.waveband_points_spent += model.waveband_price;
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -300,7 +345,15 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
         BannerKind::Weapon => model.weapon_four_star_pity,
     };
     while won < rule.target_copies {
-        wallet.pay(dedicated);
+        if matches!(kind, BannerKind::Character) {
+            wallet.buy_wavebands(model, owned, won, rule.target_copies);
+            if won + wallet.wavebands_bought >= rule.target_copies { break; }
+        }
+        let reserve = if matches!(kind, BannerKind::Character) {
+            model.waveband_limit.saturating_sub(wallet.wavebands_bought)
+                .saturating_mul(model.waveband_price)
+        } else { 0 };
+        wallet.pay_reserved(dedicated, reserve);
         let rare = rng.hits(rarity.chance(pity + 1, mode));
         if maybe_four_star(rng, model, kind, &mut four_pity, rare) {
             wallet.refund(match kind {
@@ -473,8 +526,45 @@ mod tests {
     use crate::{Banner, BannerRule, RateSchedule, SoftPity};
 
     #[test]
+    fn waveband_purchases_cannot_use_same_draw_returns() {
+        let mut cfg = FeedbackConfig::for_game(Game::WutheringWaves);
+        cfg.waveband_limit = 2;
+        let mut wallet = Wallet::new(&cfg);
+        wallet.refund(359);
+        wallet.buy_wavebands(&cfg, 1, 0, 6);
+        assert_eq!(wallet.wavebands_bought, 0);
+        wallet.refund(1);
+        wallet.buy_wavebands(&cfg, 1, 0, 6);
+        assert_eq!(wallet.wavebands_bought, 1);
+        assert_eq!(wallet.balance, 0);
+        assert_eq!(wallet.waveband_points_spent, 360);
+    }
+
+    #[test]
+    fn coral_ticket_vs_waveband_strategy_is_separate() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.character.target_copies = 3;
+        setup.weapon.target_copies = 0;
+        setup.character_owned = 1;
+        setup.character.rule = BannerRule::Standard {
+            rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+            featured_share: 1.0,
+        };
+        let mut cfg = FeedbackConfig::for_game(Game::WutheringWaves);
+        cfg.initial_points = 720;
+        cfg.samples = 10;
+        let tickets = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        cfg.waveband_limit = 2;
+        let wavebands = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert!(wavebands.quantile(1.0) < tickets.quantile(1.0));
+        assert!(wavebands.scenarios.iter().all(|s| s.wavebands_bought == 2));
+        assert!(tickets.scenarios.iter().all(|s| s.wavebands_bought == 0));
+    }
+
+    #[test]
     fn wallet_requires_ticket_before_earning_refund() {
         let conf = FeedbackConfig { enabled: true, points_per_ticket: 1, initial_points: 0,
+            waveband_limit: 0, waveband_price: 360,
             featured_first: 1, featured_duplicate: 1, off_banner_rare: 0,
             weapon_first: 1, weapon_rare: 1, four_star_reward: 0,
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
