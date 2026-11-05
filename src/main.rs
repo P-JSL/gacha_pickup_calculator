@@ -7,10 +7,12 @@ use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
+use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 mod dashboard_ui;
+mod catalog;
 
 const BG: Color32 = Color32::from_rgb(5, 23, 34);
 const CARD: Color32 = Color32::from_rgb(17, 42, 63);
@@ -35,7 +37,7 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
             painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
             painter.line_segment([p(6.0, 7.0), p(6.0, -1.0)], stroke);
         }
-        ViewMode::Settings => {
+        ViewMode::Settings | ViewMode::Preferences => {
             for (y, x) in [(-6.0, -3.0), (0.0, 5.0), (6.0, -1.0)] {
                 painter.line_segment([p(-8.0, y), p(8.0, y)], stroke);
                 painter.circle_filled(p(x, y), 2.6, color);
@@ -86,6 +88,72 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
     }
 }
 
+/// Crisp DPI-independent sci-fi star orbit and gacha pass artwork.
+/// All geometry is rendered as vectors. No blurry upscaled raster crops.
+fn paint_navigation_art(ui: &egui::Ui) {
+    let rect = ui.max_rect().expand(11.0);
+    let painter = ui.painter_at(rect);
+    let cyan = Color32::from_rgb(99, 232, 251);
+    let ice = Color32::from_rgb(195, 228, 255);
+    let navy = Color32::from_rgb(8, 40, 65);
+    let center = egui::pos2(rect.center().x, rect.top() + 79.0);
+    painter.rect_filled(
+        egui::Rect::from_min_max(rect.min,
+            egui::pos2(rect.right(), rect.top()+133.0)), 0.0, navy,
+    );
+    // Tilted orbit around the top four-point gacha sparkle.
+    let orbit: Vec<egui::Pos2> = (0..=84).map(|i| {
+        let t = std::f32::consts::TAU * (i as f32) / 84.0;
+        let (x, y) = (74.0*t.cos(), 24.0*t.sin());
+        egui::pos2(center.x + x*0.92-y*0.40, center.y + x*0.40+y*0.92)
+    }).collect();
+    painter.add(egui::Shape::line(orbit,
+        egui::Stroke::new(1.45_f32, Color32::from_rgb(84, 157, 214))));
+    let star = |r: f32| -> Vec<egui::Pos2> {
+        (0..8).map(|i| {
+            let t = std::f32::consts::TAU*i as f32/8.0;
+            let radius = if i%2==0 { r } else { r*0.19 };
+            egui::pos2(center.x + t.sin()*radius, center.y-t.cos()*radius)
+        }).collect()
+    };
+    painter.add(egui::Shape::convex_polygon(star(28.0),
+        cyan, egui::Stroke::new(1.3_f32,ice)));
+    painter.circle_filled(egui::pos2(center.x+41.0,center.y-39.0),2.0,ice);
+    painter.circle_filled(egui::pos2(center.x-65.0,center.y+41.0),1.7,cyan);
+
+    let ground = egui::Rect::from_min_max(
+        egui::pos2(rect.left(),rect.bottom()-286.0),rect.right_bottom());
+    painter.rect_filled(ground,0.0,Color32::from_rgb(6,34,57));
+    let p = |x: f32,y: f32| egui::pos2(rect.center().x+x,ground.bottom()+y);
+    let arc: Vec<egui::Pos2> = (0..=48).map(|i| {
+        let t = i as f32/48.0*std::f32::consts::PI*1.15;
+        p(-58.0 + 98.0*t.cos(), -81.0 - 96.0*t.sin())
+    }).collect();
+    painter.add(egui::Shape::line(arc,
+        egui::Stroke::new(1.2_f32,Color32::from_rgb(54,131,192))));
+    // A floating glossy draw pass; corners and edges stay sharp at any DPI.
+    let card = [p(-76.0,-79.0),p(45.0,-101.0),p(68.0,-43.0),p(-54.0,-22.0)];
+    painter.add(egui::Shape::convex_polygon(card.to_vec(),
+        Color32::from_rgb(36,85,144),
+        egui::Stroke::new(2.2_f32,Color32::from_rgb(132,198,252))));
+    let inner = [p(-62.0,-70.0),p(34.0,-87.0),p(50.0,-49.0),p(-44.0,-33.0)];
+    painter.add(egui::Shape::convex_polygon(inner.to_vec(),
+        Color32::from_rgb(25,56,110),
+        egui::Stroke::new(1.0_f32,ice)));
+    painter.line_segment([p(-8.0,-78.0),p(4.0,-60.0)],
+        egui::Stroke::new(3.0_f32,cyan));
+    painter.line_segment([p(4.0,-60.0),p(22.0,-64.0)],
+        egui::Stroke::new(2.0_f32,ice));
+    for (x,y,r) in [(-94.0,-172.0,2.7),(86.0,-147.0,3.3),
+                     (-58.0,-237.0,2.0),(70.0,-260.0,2.0)] {
+        painter.circle_filled(p(x,y),r,ice);
+        painter.line_segment([p(x-6.0,y),p(x+6.0,y)],
+            egui::Stroke::new(0.7_f32,cyan));
+        painter.line_segment([p(x,y-6.0),p(x,y+6.0)],
+            egui::Stroke::new(0.7_f32,cyan));
+    }
+}
+
 fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
     view: ViewMode, text: &str) {
     let active = *selected == view;
@@ -108,6 +176,33 @@ fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
     );
     if response.clicked() {
         *selected = view;
+    }
+}
+
+/// All quick/detailed ticket editors update the exact same GameSetup fields.
+#[derive(Clone, Copy)]
+enum TicketRole { Shared, Character, Weapon }
+
+fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketRole) -> bool {
+    match role {
+        TicketRole::Shared =>
+            ui.add(egui::DragValue::new(&mut setup.flexible)
+                .range(0..=100_000).speed(1).suffix("장")).changed(),
+        TicketRole::Character =>
+            ui.add(egui::DragValue::new(&mut setup.character_dedicated)
+                .range(0..=100_000).speed(1).suffix("장")).changed(),
+        TicketRole::Weapon => {
+            if setup.game == Game::StellaSora {
+                let mut discs = setup.weapon_ticket_inventory();
+                let changed = ui.add(egui::DragValue::new(&mut discs)
+                    .range(0..=30_000_000).speed(1).suffix("개")).changed();
+                if changed { setup.set_weapon_ticket_inventory(discs); }
+                changed
+            } else {
+                ui.add(egui::DragValue::new(&mut setup.weapon_dedicated)
+                    .range(0..=100_000).speed(1).suffix("개")).changed()
+            }
+        }
     }
 }
 
@@ -146,7 +241,53 @@ enum QueryMode { RequiredBudget, AvailableBudget }
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, Analytics, Settings, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
+enum ViewMode { Calculator, Analytics, Settings, Preferences, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
+
+/// Desktop display and interaction options. These never change the probability model.
+#[derive(Clone, Copy)]
+struct UiPreferences {
+    auto_recalculate: bool,
+    debounce_ms: u64,
+    show_result_panel: bool,
+    show_chart_fill: bool,
+    show_hover_guides: bool,
+    compact_spacing: bool,
+}
+impl Default for UiPreferences {
+    fn default() -> Self {
+        Self {
+            auto_recalculate: true,
+            debounce_ms: 350,
+            show_result_panel: true,
+            show_chart_fill: true,
+            show_hover_guides: true,
+            compact_spacing: true,
+        }
+    }
+}
+
+/// Each game's currency, targets and selected artwork are independent.
+#[derive(Clone)]
+struct GameSession {
+    setup: GameSetup,
+    feedback: FeedbackConfig,
+    eid: usize,
+    refine: usize,
+    character_id: String,
+    weapon_id: String,
+}
+
+impl GameSession {
+    fn defaults(game: Game) -> Self {
+        Self {
+            setup: GameSetup::new(game),
+            feedback: FeedbackConfig::for_game(game),
+            eid: 0, refine: 1,
+            character_id: catalog::first(game, catalog::Kind::Character),
+            weapon_id: catalog::first(game, catalog::Kind::Weapon),
+        }
+    }
+}
 
 struct HistoryEntry {
     game: Game,
@@ -165,6 +306,10 @@ struct Calculator {
     n_query: usize,
     feedback_cfg: FeedbackConfig,
     stats: Option<Computed>,
+    stats_game: Option<Game>,
+    input_needs_calculation: bool,
+    manual_calculation_requested: bool,
+    ui_preferences: UiPreferences,
     error: Option<String>,
     show_help: bool,
     view_mode: ViewMode,
@@ -180,8 +325,12 @@ struct Calculator {
     history: Vec<HistoryEntry>,
     show_history: bool,
     search_query: String,
-    sidebar_decor: Option<egui::TextureHandle>,
-    header_avatar: Option<egui::TextureHandle>,
+    catalog_ui: catalog::CatalogUi,
+    picker_kind: Option<catalog::Kind>,
+    picker_filter: String,
+    selected_character_id: String,
+    selected_weapon_id: String,
+    game_sessions: HashMap<Game, GameSession>,
 }
 
 impl Calculator {
@@ -190,28 +339,6 @@ impl Calculator {
         // preference could otherwise switch the UI back to Light on Windows.
         configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
-        // The user-supplied design artwork is bundled locally: no network access.
-        let sidebar_decor = image::load_from_memory(
-            include_bytes!("assets/sidebar_decor.jpg")
-        ).ok().map(|art| {
-            let rgba = art.to_rgba8();
-            let pixels = egui::ColorImage::from_rgba_unmultiplied(
-                [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
-            );
-            cc.egui_ctx.load_texture("sidebar_decor", pixels, egui::TextureOptions::LINEAR)
-        });
-        let header_avatar = image::load_from_memory(
-            include_bytes!("assets/header_avatar.jpg")
-        ).ok().map(|art| {
-            let rgba = art.to_rgba8();
-            cc.egui_ctx.load_texture(
-                "header_avatar",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
-                ),
-                egui::TextureOptions::LINEAR,
-            )
-        });
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
         // rejects out-of-generation responses to avoid showing outdated probabilities.
@@ -243,6 +370,10 @@ impl Calculator {
             n_query: 1_000,
             feedback_cfg: FeedbackConfig::for_game(Game::StarRail),
             stats: None,
+            stats_game: None,
+            input_needs_calculation: false,
+            manual_calculation_requested: false,
+            ui_preferences: UiPreferences::default(),
             error: None,
             show_help: false,
             view_mode: ViewMode::Calculator,
@@ -258,18 +389,98 @@ impl Calculator {
             history: Vec::new(),
             show_history: false,
             search_query: String::new(),
-            sidebar_decor,
-            header_avatar,
+            catalog_ui: catalog::CatalogUi::new(&cc.egui_ctx),
+            picker_kind: None,
+            picker_filter: String::new(),
+            selected_character_id: catalog::first(Game::StarRail, catalog::Kind::Character),
+            selected_weapon_id: catalog::first(Game::StarRail, catalog::Kind::Weapon),
+            game_sessions: HashMap::new(),
         };
         app.recalculate();
         app
     }
 
+    /// Last completed charts remain visible until the worker finishes for the same game.
+    /// A game change never displays distributions from a different game.
+    fn visible_stats(&self) -> Option<&Computed> {
+        if self.stats_game == Some(self.setup.game) { self.stats.as_ref() } else { None }
+    }
+
+    /// Selection controls all reuse the catalog; target rarity remains a five-star model.
+    fn catalog_selector(&mut self, ui: &mut egui::Ui, kind: catalog::Kind) {
+        let game = self.setup.game;
+        let id = match kind {
+            catalog::Kind::Character => self.selected_character_id.clone(),
+            catalog::Kind::Weapon => self.selected_weapon_id.clone(),
+        };
+        let item = catalog::by_id(game, kind, &id);
+        ui.horizontal(|ui| {
+            if let Some(item) = item {
+                self.catalog_ui.image(ui, item, 30.0);
+            }
+            let name = item.map(|x| x.name.as_str()).unwrap_or("대상 선택");
+            if ui.add(egui::Button::new(format!("{name}  ▾"))
+                .min_size(egui::vec2(108.0, 27.0))).clicked() {
+                self.picker_kind = Some(kind);
+                self.picker_filter.clear();
+            }
+        });
+    }
+
+    fn show_catalog_picker(&mut self, ctx: &egui::Context) {
+        let Some(kind) = self.picker_kind else { return; };
+        let mut open = true;
+        let current = match kind {
+            catalog::Kind::Character => &self.selected_character_id,
+            catalog::Kind::Weapon => &self.selected_weapon_id,
+        }.clone();
+        let choice = catalog::picker(ctx, &mut self.catalog_ui, self.setup.game, kind,
+            &mut open, &mut self.picker_filter, &current);
+        if let Some(id) = choice {
+            match kind {
+                catalog::Kind::Character => self.selected_character_id = id,
+                catalog::Kind::Weapon => self.selected_weapon_id = id,
+            }
+            self.picker_kind = None;
+        } else if !open {
+            self.picker_kind = None;
+        }
+    }
+
     fn change_game(&mut self, game: Game) {
-        self.setup = GameSetup::new(game);
-        self.feedback_cfg = FeedbackConfig::for_game(game);
-        self.target_eid = 0;
-        self.target_refine = 1;
+        if self.setup.game != game {
+            // Save all editable fields so switching between four games never loses
+            // inventory, target goals, pity state, selected item or refund assumptions.
+            self.game_sessions.insert(self.setup.game, GameSession {
+                setup: self.setup.clone(),
+                feedback: self.feedback_cfg.clone(),
+                eid: self.target_eid,
+                refine: self.target_refine,
+                character_id: self.selected_character_id.clone(),
+                weapon_id: self.selected_weapon_id.clone(),
+            });
+            let next = self.game_sessions.remove(&game)
+                .unwrap_or_else(|| GameSession::defaults(game));
+            self.setup = next.setup;
+            self.feedback_cfg = next.feedback;
+            self.target_eid = next.eid;
+            self.target_refine = next.refine;
+            self.selected_character_id = next.character_id;
+            self.selected_weapon_id = next.weapon_id;
+        } else {
+            // The reset action invokes change_game(current_game) to restore this
+            // game's default inputs without touching saved values for other games.
+            self.game_sessions.remove(&game);
+            let defaults = GameSession::defaults(game);
+            self.setup = defaults.setup;
+            self.feedback_cfg = defaults.feedback;
+            self.target_eid = defaults.eid;
+            self.target_refine = defaults.refine;
+            self.selected_character_id = defaults.character_id;
+            self.selected_weapon_id = defaults.weapon_id;
+        }
+        self.picker_kind = None;
+        self.picker_filter.clear();
         self.observation_data = None;
         self.observation_path.clear();
         self.observation_message.clear();
@@ -279,7 +490,8 @@ impl Calculator {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
         self.generation = self.generation.wrapping_add(1);
         self.calculating = true;
-        self.stats = None;
+        // Keep the last completed image on screen during background calculation.
+        self.input_needs_calculation = false;
         self.error = None;
         let request = CalculationRequest {
             generation: self.generation,
@@ -316,18 +528,20 @@ impl Calculator {
                     });
                     self.history.truncate(5);
                     self.stats = Some(stats);
+                    self.stats_game = Some(self.setup.game);
+                    self.input_needs_calculation = false;
                     self.error = None;
                 }
-                Err(message) => { self.stats = None; self.error = Some(message); }
+                Err(message) => { self.error = Some(message); }
             }
         }
     }
 
     fn schedule_recalculation(&mut self) {
         self.pending_since = Some(Instant::now());
-        self.stats = None;
         self.error = None;
         self.calculating = true;
+        self.input_needs_calculation = true;
     }
 
     /// Enter-driven navigation search; only actual sections and supported games are matched.
@@ -367,7 +581,9 @@ impl Calculator {
             self.view_mode = ViewMode::ObservedDistribution;
         } else if query.contains("analytics") || query.contains("분석") {
             self.view_mode = ViewMode::Analytics;
-        } else if query.contains("simulator") || query.contains("설정") {
+        } else if query.contains("settings") || query.contains("환경") || query.contains("화면 설정") {
+            self.view_mode = ViewMode::Preferences;
+        } else if query.contains("simulator") || query.contains("시뮬레이션") {
             self.view_mode = ViewMode::Settings;
         } else if query.contains("dashboard") || query.contains("대시보드") {
             self.view_mode = ViewMode::Calculator;
@@ -392,28 +608,28 @@ impl Calculator {
                     });
                     ui.with_layout(
                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let (avatar_rect, avatar_button) = ui.allocate_exact_size(
-                                egui::vec2(45.0, 45.0), egui::Sense::click(),
+                            // Native vector settings button replaces the removed avatar.
+                            let (rect, response) = ui.allocate_exact_size(
+                                egui::vec2(39.0, 39.0), egui::Sense::click(),
                             );
-                            ui.painter().circle_filled(avatar_rect.center(), 22.5,
-                                Color32::from_rgb(51, 72, 107));
-                            if let Some(ref avatar) = self.header_avatar {
-                                ui.painter().image(avatar.id(), avatar_rect.shrink(3.0),
-                                    egui::Rect::from_min_max(
-                                        egui::pos2(0.0,0.0), egui::pos2(1.0,1.0)),
-                                    Color32::WHITE);
-                            } else {
-                                ui.painter().circle_filled(avatar_rect.center(), 17.0,
-                                    Color32::from_rgb(92, 110, 156));
-                                ui.painter().text(avatar_rect.center(),
-                                    egui::Align2::CENTER_CENTER, "✧",
-                                    egui::FontId::proportional(25.0), Color32::WHITE);
+                            ui.painter().rect_filled(rect, 10.0,
+                                if response.hovered() { SELECTED_NAV } else { CARD });
+                            let center = rect.center();
+                            let stroke = egui::Stroke::new(1.8_f32, Color32::WHITE);
+                            ui.painter().circle_stroke(center, 6.0, stroke);
+                            ui.painter().circle_stroke(center, 2.5, stroke);
+                            for i in 0..8 {
+                                let angle = i as f32 * std::f32::consts::TAU / 8.0;
+                                let direction = egui::vec2(angle.cos(), angle.sin());
+                                ui.painter().line_segment(
+                                    [center + direction * 9.0, center + direction * 12.0],
+                                    stroke,
+                                );
                             }
-                            ui.painter().circle_filled(
-                                avatar_rect.right_bottom()-egui::vec2(4.0, 3.0),
-                                3.2, Color32::from_rgb(108, 232, 95),
-                            );
-                            if avatar_button.clicked() { self.show_help = true; }
+                            if response.on_hover_text("화면 및 동작 설정").clicked() {
+                                self.view_mode = ViewMode::Preferences;
+                            }
+
                             if ui.add(egui::Button::new("?")
                                 .fill(CARD).corner_radius(10)
                                 .min_size(egui::vec2(39.0, 39.0))).clicked() {
@@ -464,20 +680,7 @@ impl Calculator {
             .exact_width(222.0)
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
-                if let Some(ref art) = self.sidebar_decor {
-                    let area = ui.max_rect().expand(11.0);
-                    let split = 58.0 / 178.0;
-                    ui.painter().image(art.id(),
-                        egui::Rect::from_min_max(area.min,
-                            egui::pos2(area.right(), area.top()+130.0)),
-                        egui::Rect::from_min_max(egui::pos2(0.0,0.0),
-                            egui::pos2(1.0,split)), Color32::WHITE);
-                    ui.painter().image(art.id(),
-                        egui::Rect::from_min_max(
-                            egui::pos2(area.left(),area.bottom()-274.0),area.right_bottom()),
-                        egui::Rect::from_min_max(egui::pos2(0.0,split),
-                            egui::pos2(1.0,1.0)), Color32::WHITE);
-                }
+                paint_navigation_art(ui);
                 ui.add_space(136.0);
                 for (view, label) in [
                     (ViewMode::Calculator, "Dashboard"),
@@ -493,8 +696,46 @@ impl Calculator {
                 ui.add_space(6.0);
                 ui.separator();
                 ui.add_space(13.0);
-                sidebar_nav(ui, &mut self.view_mode, ViewMode::Settings, "Settings");
+                sidebar_nav(ui, &mut self.view_mode, ViewMode::Preferences, "Settings");
             });
+    }
+
+    /// UI-only preferences are independent of the gacha input/worker state.
+    fn desktop_settings(&mut self, ui: &mut egui::Ui) {
+        page_intro(ui, "APPLICATION SETTINGS", "화면 및 동작 설정",
+            "시뮬레이터의 목표·보유권이 아닌 프로그램의 표시 방식과 계산 갱신을 설정합니다.");
+        ui.add_space(12.0);
+        section(ui, "01", "실시간 계산", "입력한 값이 바뀌어도 차트는 지우지 않고 백그라운드에서 갱신합니다.", |ui| {
+            ui.checkbox(&mut self.ui_preferences.auto_recalculate,
+                "입력 변경 시 자동으로 결과 갱신");
+            ui.horizontal(|ui| {
+                ui.label("연속 입력 대기시간");
+                ui.add(egui::Slider::new(&mut self.ui_preferences.debounce_ms, 100..=1000)
+                    .step_by(50.0).suffix(" ms"));
+            });
+            if !self.ui_preferences.auto_recalculate {
+                ui.label(RichText::new(
+                    "자동 계산을 꺼도 입력값은 즉시 모든 탭에 반영됩니다. Run Simulation 버튼으로 계산을 갱신하세요."
+                ).color(MUTED).size(11.0));
+                if self.input_needs_calculation && ui.button("현재 입력으로 계산 실행").clicked() {
+                    self.manual_calculation_requested = true;
+                }
+            }
+        });
+        ui.add_space(10.0);
+        section(ui, "02", "대시보드 표시", "UI 표시를 변경합니다. 확률 계산값 자체는 변경하지 않습니다.", |ui| {
+            ui.checkbox(&mut self.ui_preferences.show_result_panel, "오른쪽 결과 및 이력 패널 표시");
+            ui.checkbox(&mut self.ui_preferences.show_chart_fill, "확률 그래프 아래 반투명 영역 표시");
+            ui.checkbox(&mut self.ui_preferences.show_hover_guides, "그래프 마우스 위치 및 확률 툴팁 표시");
+            ui.checkbox(&mut self.ui_preferences.compact_spacing, "화면 내부 간격을 컴팩트하게 표시");
+        });
+        ui.add_space(12.0);
+        if ui.button("화면 설정 기본값 복원").clicked() {
+            self.ui_preferences = UiPreferences::default();
+        }
+        ui.label(RichText::new(
+            "화면 설정은 프로그램 실행 중에만 유지됩니다. 종료 시 기본값으로 돌아갑니다."
+        ).color(MUTED).size(11.0));
     }
 
     fn targets(&mut self, ui: &mut egui::Ui) -> bool {
@@ -502,6 +743,7 @@ impl Calculator {
         section(ui, "01", "획득 목표", "목표 장수와 기존 보유 장수를 설정합니다.", |ui| {
             ui.columns(2, |cols| {
                 cols[0].label(RichText::new("캐릭터 돌파 목표").color(MUTED));
+                self.catalog_selector(&mut cols[0], catalog::Kind::Character);
                 egui::ComboBox::from_id_salt("eid").width(175.0)
                     .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
                     .show_ui(&mut cols[0], |ui| {
@@ -516,6 +758,7 @@ impl Calculator {
                         .range(0..=7).speed(1).suffix("장")).changed();
                 });
                 cols[1].label(RichText::new(format!("{} 재련 목표", self.setup.game.secondary_banner_name())).color(MUTED));
+                self.catalog_selector(&mut cols[1], catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("refine").width(175.0)
                     .selected_text(if self.target_refine == 0 { "필요 없음".to_owned() }
                         else { format!("S{} · 총 {}장", self.target_refine, self.target_refine) })
@@ -611,43 +854,64 @@ impl Calculator {
     }
 
     fn resources(&mut self, ui: &mut egui::Ui) -> bool {
-        let mut dirty = false;
-        section(ui, "03", "보유 티켓 및 사용 예산", "전용권은 다른 배너로 이전되지 않습니다.", |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.label("캐릭터 전용권");
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_dedicated)
-                    .range(0..=100_000).suffix("뽑")).changed();
+        let mut changed = false;
+        section(ui, "03", "보유 뽑기권 및 재화",
+            "한정 픽업 배너의 전용 재화만 집계합니다. 일반 배너용 티켓은 합산하지 않습니다.", |ui| {
+                let game = self.setup.game;
+                if game.shares_featured_ticket() {
+                    ui.label(RichText::new(format!(
+                        "캐릭터·광추 공용 · {}", game.character_ticket_name()
+                    )).color(PRIMARY).strong());
+                    changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
+                    ui.label(RichText::new(
+                        "스타레일 한정 캐릭터와 광추는 별의 궤도 전용 티켓을 함께 사용합니다."
+                    ).color(MUTED).size(11.0));
+                } else {
+                    ui.columns(2, |columns| {
+                        columns[0].label(RichText::new(format!(
+                            "캐릭터 · {}", game.character_ticket_name()
+                        )).color(PRIMARY));
+                        changed |= edit_ticket_inventory(
+                            &mut columns[0], &mut self.setup, TicketRole::Character
+                        );
+                        columns[1].label(RichText::new(format!(
+                            "{} · {}", game.secondary_banner_name(), game.weapon_ticket_name()
+                        )).color(PRIMARY));
+                        changed |= edit_ticket_inventory(
+                            &mut columns[1], &mut self.setup, TicketRole::Weapon
+                        );
+                    });
+                    if game == Game::StellaSora {
+                        ui.label(RichText::new(format!(
+                            "골든 디스크 300개 = 레코드 1뽑 · 현재 {}개 → {}뽑 (잔여 {}개)",
+                            self.setup.weapon_ticket_inventory(), self.setup.weapon_dedicated,
+                            self.setup.weapon_ticket_remainder
+                        )).color(MUTED).size(11.0));
+                    } else if game == Game::Neverness {
+                        ui.label(RichText::new(
+                            "Arc는 Tri-Key 10개로 10연만 가능합니다. 전용권은 캐릭터 모집에 사용되지 않습니다."
+                        ).color(MUTED).size(11.0));
+                    }
+                }
+                ui.add_space(7.0);
                 ui.separator();
-                ui.label(format!("{} 전용권", self.setup.game.secondary_banner_name()));
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_dedicated)
-                    .range(0..=100_000).suffix("뽑")).changed();
-                ui.separator();
-                ui.label("자유 배분권");
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
-                    .range(0..=100_000).suffix("뽑")).changed();
+                ui.horizontal_wrapped(|ui| {
+                    let currency = game.currency_name();
+                    let price = game.cost_per_pull();
+                    ui.label(format!("공용 전환 재화 · {currency}"));
+                    changed |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                        .range(0..=100_000_000).speed(1).suffix("개")).changed();
+                    ui.label(RichText::new(format!(
+                        "{}개 = 1뽑 · 전환 가능 {}뽑 (잔여 {}개)",
+                        price, self.setup.premium_currency / price,
+                        self.setup.premium_currency % price
+                    )).color(MINT));
+                });
+                ui.label(RichText::new(
+                    "전용권은 각 배너에만 사용하고, 공용 전환 재화는 계산 엔진이 두 배너에 배분합니다."
+                ).color(MUTED).size(11.0));
             });
-            ui.horizontal_wrapped(|ui| {
-                let currency = self.setup.game.currency_name();
-                let price = self.setup.game.cost_per_pull();
-                ui.label(format!("보유 {currency}"));
-                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
-                    .range(0..=100_000_000).speed(1).suffix(currency)).changed();
-                ui.separator();
-                ui.label(format!("1뽑 = {price}{currency}"));
-                ui.separator();
-                ui.label(RichText::new(format!(
-                    "자유 배분권 합계: {}뽑 (직접 {}뽑 + {currency} 전환 {}뽑, 잔여 {}{currency})",
-                    self.setup.available_flexible(), self.setup.flexible,
-                    self.setup.premium_currency / price,
-                    self.setup.premium_currency % price,
-                )).color(MINT));
-            });
-            if self.setup.game == Game::Neverness {
-                ui.label(RichText::new("이환 Arc 배너는 10연 단위이며, 배너 전용권의 10장 미만 잔여도 별도 보유권으로 처리됩니다.")
-                    .color(GOLD));
-            }
-        });
-        dirty
+        changed
     }
 
     fn feedback_controls(&mut self, ui: &mut egui::Ui) -> bool {
@@ -780,7 +1044,7 @@ impl Calculator {
     }
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
-        let Some(stats) = &self.stats else {
+        let Some(stats) = self.stats.as_ref().filter(|_| self.stats_game == Some(self.setup.game)) else {
             if self.calculating {
                 ui.horizontal(|ui| {
                     ui.spinner();
@@ -906,25 +1170,25 @@ impl Calculator {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                    }]);
+                    }], self.ui_preferences);
                 });
                 section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                    }]);
+                    }], self.ui_preferences);
                 });
             });
         } else {
             section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                }]);
+                }], self.ui_preferences);
             });
             ui.add_space(8.0);
             section(ui, "05-B", &secondary_heading, single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                }]);
+                }], self.ui_preferences);
             });
         }
         ui.add_space(10.0);
@@ -945,7 +1209,7 @@ impl Calculator {
                     });
                 }
             }
-            draw_probability_chart(ui, &curves);
+            draw_probability_chart(ui, &curves, self.ui_preferences);
             if stats.feedback.is_some() && !comparable {
                 ui.colored_label(GOLD,
                     "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
@@ -1313,7 +1577,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
-fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
+fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(190.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -1375,7 +1639,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
             }
         };
         // Area-gradient mesh: brighter at the CDF line, transparent at the baseline.
-        if points.len() >= 2 {
+        if appearance.show_chart_fill && points.len() >= 2 {
             let mut fill = egui::Mesh::default();
             for point in &points {
                 fill.vertices.push(egui::epaint::Vertex {
@@ -1404,6 +1668,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
         ));
     }
     if let Some(pointer) = response.hover_pos().filter(|pos| graph.contains(*pos)) {
+        if appearance.show_hover_guides {
         let fraction = (pointer.x - graph.left()) / graph.width();
         let x = ((fraction * end as f32).round() as usize).min(end);
         let px = project(x, 0.0).x;
@@ -1421,6 +1686,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
         response.clone().on_hover_text(tooltip);
+        }
     }
     // The compact dashboard uses one line per card. Keep legends only where
     // multiple curves must be distinguished in the detailed analytics view.
@@ -1484,13 +1750,14 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
+        self.catalog_ui.pump(ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
         if self.header(ctx) {
             self.schedule_recalculation();
         }
-        if self.view_mode == ViewMode::Calculator {
+        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel {
             self.workspace_results_panel(ctx);
         }
         let mut settings_changed = false;
@@ -1500,6 +1767,11 @@ impl eframe::App for Calculator {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
+                        if self.ui_preferences.compact_spacing {
+                            ui.spacing_mut().item_spacing.y = 5.0;
+                        } else {
+                            ui.spacing_mut().item_spacing.y = 10.0;
+                        }
                         if self.view_mode != ViewMode::Calculator { ui.add_space(5.0); }
                         match self.view_mode {
                             ViewMode::Calculator => {
@@ -1527,6 +1799,9 @@ impl eframe::App for Calculator {
                                 settings_changed |= self.targets(ui);
                                 ui.add_space(10.0);
                                 settings_changed |= self.pity(ui);
+                            }
+                            ViewMode::Preferences => {
+                                self.desktop_settings(ui);
                             }
                             ViewMode::Settings => {
                                 ui.horizontal_wrapped(|ui| {
@@ -1591,10 +1866,16 @@ impl eframe::App for Calculator {
                     });
             });
         if settings_changed {
+            self.input_needs_calculation = true;
+        }
+        if self.manual_calculation_requested {
+            self.manual_calculation_requested = false;
+            self.schedule_recalculation();
+        } else if settings_changed && self.ui_preferences.auto_recalculate {
             self.schedule_recalculation();
         }
         if let Some(edited_at) = self.pending_since {
-            if edited_at.elapsed() >= Duration::from_millis(300) {
+            if edited_at.elapsed() >= Duration::from_millis(self.ui_preferences.debounce_ms) {
                 self.pending_since = None;
                 self.recalculate();
             } else {
@@ -1604,6 +1885,7 @@ impl eframe::App for Calculator {
         if self.calculating {
             ctx.request_repaint_after(Duration::from_millis(120));
         }
+        self.show_catalog_picker(ctx);
         if self.show_history {
             egui::Window::new("Simulation History")
                 .open(&mut self.show_history)

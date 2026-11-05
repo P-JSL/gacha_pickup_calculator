@@ -4,7 +4,7 @@
 
 use crate::{Banner, BannerRule, RateSchedule, SoftPity, Spark};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Game {
     StarRail,
     WutheringWaves,
@@ -27,8 +27,31 @@ impl Game {
             Self::StarRail => "성옥",
             Self::WutheringWaves => "별의 소리",
             Self::Neverness => "Annulith",
-            Self::StellaSora => "Stellanite Dust",
+            Self::StellaSora => "별의 파편",
         }
+    }
+    /// Restricted featured-banners only. Standard passes are deliberately excluded.
+    pub fn shares_featured_ticket(self) -> bool { self == Self::StarRail }
+    pub fn character_ticket_name(self) -> &'static str {
+        match self {
+            Self::StarRail => "별의 궤도 전용 티켓",
+            Self::WutheringWaves => "금빛 파도의 무늬 (Radiant Tide)",
+            Self::Neverness => "Solid Dice (한정 캐릭터)",
+            Self::StellaSora => "하늘 티켓 (Cerulean Ticket)",
+        }
+    }
+    pub fn weapon_ticket_name(self) -> &'static str {
+        match self {
+            Self::StarRail => "별의 궤도 전용 티켓",
+            Self::WutheringWaves => "단조의 무늬 (Forging Tide)",
+            Self::Neverness => "Tri-Key (Arc)",
+            Self::StellaSora => "골든 디스크 (Gold Disc)",
+        }
+    }
+    /// Number of displayed inventory units consumed for one featured weapon pull.
+    /// Gold Disc is denominated in units rather than individual tickets.
+    pub fn weapon_ticket_units_per_pull(self) -> usize {
+        if self == Self::StellaSora { 300 } else { 1 }
     }
     pub fn secondary_banner_name(self) -> &'static str {
         match self {
@@ -89,6 +112,9 @@ pub struct GameSetup {
     pub weapon_owned: usize,
     pub character_dedicated: usize,
     pub weapon_dedicated: usize,
+    /// Stella Sora Gold Disc units below the 300-unit price for one recruitment.
+    /// Kept separately to preserve input remainders without changing draw counts.
+    pub weapon_ticket_remainder: usize,
     pub flexible: usize,
     /// Native premium-currency units (e.g. 성옥, 별의 소리, Annulith).
     /// The remainder below one full ticket remains unspent.
@@ -119,7 +145,19 @@ impl GameSetup {
             ),
         };
         Self { game, character, weapon, character_owned: 0, weapon_owned: 0,
-            character_dedicated: 0, weapon_dedicated: 0, flexible: 0, premium_currency: 0 }
+            character_dedicated: 0, weapon_dedicated: 0, weapon_ticket_remainder: 0, flexible: 0, premium_currency: 0 }
+    }
+
+    pub fn weapon_ticket_inventory(&self) -> usize {
+        self.weapon_dedicated
+            .saturating_mul(self.game.weapon_ticket_units_per_pull())
+            .saturating_add(self.weapon_ticket_remainder)
+    }
+
+    pub fn set_weapon_ticket_inventory(&mut self, units: usize) {
+        let per_pull = self.game.weapon_ticket_units_per_pull();
+        self.weapon_dedicated = units / per_pull;
+        self.weapon_ticket_remainder = units % per_pull;
     }
 
     /// Ticket-equivalent flexible budget. Leftover native currency is not a
@@ -160,6 +198,27 @@ mod currency_tests {
             assert_eq!(setup.additional_currency_for(6), 1);
             assert_eq!(setup.additional_currency_for(5), 0);
         }
+    }
+
+    #[test]
+    fn ticket_inventory_follows_game_specific_banner_restrictions() {
+        for game in Game::ALL {
+            assert_eq!(game.shares_featured_ticket(), game == Game::StarRail);
+            assert!(!game.character_ticket_name().is_empty());
+            assert!(!game.weapon_ticket_name().is_empty());
+        }
+        let mut sora = GameSetup::new(Game::StellaSora);
+        sora.set_weapon_ticket_inventory(899);
+        assert_eq!(sora.weapon_dedicated, 2);
+        assert_eq!(sora.weapon_ticket_remainder, 299);
+        assert_eq!(sora.weapon_ticket_inventory(), 899);
+        sora.set_weapon_ticket_inventory(900);
+        assert_eq!(sora.weapon_dedicated, 3);
+        assert_eq!(sora.weapon_ticket_remainder, 0);
+        let mut nte = GameSetup::new(Game::Neverness);
+        nte.set_weapon_ticket_inventory(11);
+        assert_eq!(nte.weapon_dedicated, 11);
+        assert_eq!(nte.weapon_ticket_inventory(), 11);
     }
 
     #[test]
