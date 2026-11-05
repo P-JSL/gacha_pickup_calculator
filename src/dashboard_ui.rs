@@ -301,8 +301,110 @@ impl Calculator {
     }
 
     /// The first screen repeats the input grouping and visual hierarchy of the supplied mockup.
+    /// All quick and detailed tabs edit identical GameSetup, feedback and target fields.
+    fn quick_resource_slot(&mut self, ui: &mut egui::Ui, index: usize) -> bool {
+        let mut changed = false;
+        let game = self.setup.game;
+        match (game.shares_featured_ticket(), index) {
+            (true, 0) => setting_tile(ui, "◇", game.character_ticket_name(), |ui| {
+                changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
+            }),
+            (false, 0) => setting_tile(ui, "♧",
+                &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
+                    changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Character);
+                }),
+            (false, 1) => setting_tile(ui, "⚔",
+                &format!("{} · {}", game.secondary_banner_name(),
+                    game.weapon_ticket_name()), |ui| {
+                    changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Weapon);
+                }),
+            (_, idx) if idx == if game.shares_featured_ticket() { 1 } else { 2 } =>
+                setting_tile(ui, "◆",
+                    &format!("공용 재화 · {}", game.currency_name()), |ui| {
+                        changed |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
+                            .range(0..=100_000_000).speed(1)).changed();
+                    }),
+            _ => setting_tile(ui, "◌",
+                &format!("환급 재화 · {}", game.exchange_points_name()), |ui| {
+                    changed |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
+                        .range(0..=1_000_000)).changed();
+                }),
+        }
+        changed
+    }
+
+    fn quick_goal_slot(&mut self, ui: &mut egui::Ui, index: usize) -> bool {
+        let mut changed = false;
+        match index {
+            0 => setting_tile(ui, "◉", "목표 캐릭터", |ui| {
+                self.catalog_selector(ui, catalog::Kind::Character);
+                egui::ComboBox::from_id_salt("workspace_character_goal")
+                    .width(ui.available_width().min(145.0))
+                    .selected_text(format!("E{} · {}장", self.target_eid, self.target_eid + 1))
+                    .show_ui(ui, |ui| {
+                        for level in 0..=6 {
+                            changed |= ui.selectable_value(&mut self.target_eid, level,
+                                format!("E{level} / {}장", level + 1)).changed();
+                        }
+                    });
+            }),
+            1 => setting_tile(ui, "⚔",
+                &format!("목표 {}", self.setup.game.secondary_banner_name()), |ui| {
+                    self.catalog_selector(ui, catalog::Kind::Weapon);
+                    egui::ComboBox::from_id_salt("workspace_weapon_goal")
+                        .width(ui.available_width().min(145.0))
+                        .selected_text(if self.target_refine == 0 {
+                            "선택 안 함".to_owned()
+                        } else {
+                            format!("S{} / {}장", self.target_refine, self.target_refine)
+                        })
+                        .show_ui(ui, |ui| {
+                            for level in 0..=5 {
+                                let label = if level == 0 { "필요 없음".to_owned() }
+                                    else { format!("S{level} / {level}장") };
+                                changed |= ui.selectable_value(&mut self.target_refine,
+                                    level, label).changed();
+                            }
+                        });
+                }),
+            2 => setting_tile(ui, "⚑", "현재 캐릭터 천장", |ui| {
+                let hard = match &self.setup.character.rule {
+                    BannerRule::Standard { rarity, .. } => rarity.hard,
+                    BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
+                    BannerRule::NteArcBatch => 8,
+                };
+                changed |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
+                    .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
+            }),
+            _ => setting_tile(ui, "♧", "다음 픽업 확정", |ui| {
+                if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
+                    if *featured_share < 1.0 {
+                        ui.horizontal(|ui| {
+                            let active = self.setup.character.guaranteed;
+                            for (value, label) in [(true, "On"), (false, "Off")] {
+                                if ui.add(egui::Button::new(label)
+                                    .fill(if active == value { CYAN } else { SURFACE })
+                                    .corner_radius(6)
+                                    .min_size(egui::vec2(42.0, 24.0))
+                                ).clicked() && active != value {
+                                    self.setup.character.guaranteed = value;
+                                    changed = true;
+                                }
+                            }
+                        });
+                    } else {
+                        ui.label(RichText::new("항상 확정").color(SUCCESS));
+                    }
+                } else {
+                    ui.label(RichText::new("별도 보장 규칙").color(MUTED).size(11.0));
+                }
+            }),
+        }
+        changed
+    }
+
     fn workspace_quick_settings(&mut self, ui: &mut egui::Ui) -> bool {
-        let mut dirty = false;
+        let mut changed = false;
         egui::Frame::group(ui.style())
             .fill(Color32::from_rgb(14, 39, 58))
             .stroke(egui::Stroke::new(1.0_f32, BORDER))
@@ -310,184 +412,93 @@ impl Calculator {
             .inner_margin(13)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("☷").color(CYAN).size(19.0));
-                    ui.label(RichText::new("Simulation Settings").size(16.0).strong());
-                    ui.add_space(19.0);
-                    ui.label(RichText::new("Game").color(MUTED).size(12.0));
+                // Wrapping prevents game buttons from overlapping on narrow window sizes.
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new("시뮬레이션 설정").size(16.0).strong());
+                    ui.label(RichText::new("게임 선택").color(MUTED).size(11.0));
                     for (game, title) in [
                         (Game::StarRail, "✦  HSR"),
-                        (Game::WutheringWaves, "◈  Wuthering Waves"),
-                        (Game::StellaSora, "✧  Stella Sora"),
-                        (Game::Neverness, "✦  Yihuan"),
+                        (Game::WutheringWaves, "◈  명조"),
+                        (Game::StellaSora, "✧  스텔라 소라"),
+                        (Game::Neverness, "✦  이환"),
                     ] {
                         let active = self.setup.game == game;
-                        let text = RichText::new(title).size(11.0)
-                            .color(if active { Color32::from_rgb(4, 29, 44) }
-                                else { Color32::WHITE });
-                        let b = egui::Button::new(text)
+                        if ui.add(egui::Button::new(RichText::new(title).size(11.0)
+                            .color(if active { BG } else { Color32::WHITE }))
                             .fill(if active { CYAN } else { DEEP_CARD })
                             .stroke(egui::Stroke::new(1.0_f32,
                                 if active { CYAN } else { BORDER }))
                             .corner_radius(8)
-                            .min_size(egui::vec2(
-                                if game == Game::WutheringWaves { 124.0 } else { 90.0 }, 32.0));
-                        if ui.add(b).clicked() && !active {
+                            .min_size(egui::vec2(84.0, 30.0))
+                        ).clicked() && !active {
                             self.change_game(game);
-                            dirty = true;
+                            changed = true;
                         }
                     }
                 });
-                ui.add_space(3.0);
+                ui.add_space(5.0);
                 ui.separator();
-                ui.add_space(3.0);
-                let game = self.setup.game;
-                if game.shares_featured_ticket() {
-                    ui.columns(3, |cols| {
-                        setting_tile(&mut cols[0], "◇", game.character_ticket_name(), |ui| {
-                            dirty |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
-                        });
-                        setting_tile(&mut cols[1], "◆",
-                            &format!("Premium Currency · {}", game.currency_name()), |ui| {
-                                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
-                                    .range(0..=100_000_000).speed(1)).changed();
-                            });
-                        setting_tile(&mut cols[2], "◌",
-                            &format!("Refund Currency · {}", game.exchange_points_name()), |ui| {
-                                dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
-                                    .range(0..=1_000_000)).changed();
-                            });
+                ui.add_space(5.0);
+
+                let columns = if ui.available_width() >= 880.0 { 4 }
+                    else if ui.available_width() >= 450.0 { 2 } else { 1 };
+                let resources = if self.setup.game.shares_featured_ticket() { 3 } else { 4 };
+                for start in (0..resources).step_by(columns) {
+                    let end = (start + columns).min(resources);
+                    ui.columns(end - start, |cells| {
+                        for (column, index) in (start..end).enumerate() {
+                            changed |= self.quick_resource_slot(&mut cells[column], index);
+                        }
                     });
-                } else {
-                    ui.columns(4, |cols| {
-                        setting_tile(&mut cols[0], "♧",
-                            &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
-                                dirty |= edit_ticket_inventory(
-                                    ui, &mut self.setup, TicketRole::Character
-                                );
-                            });
-                        setting_tile(&mut cols[1], "⚔",
-                            &format!("{} · {}", game.secondary_banner_name(),
-                                game.weapon_ticket_name()), |ui| {
-                                dirty |= edit_ticket_inventory(
-                                    ui, &mut self.setup, TicketRole::Weapon
-                                );
-                            });
-                        setting_tile(&mut cols[2], "◆",
-                            &format!("공용 재화 · {}", game.currency_name()), |ui| {
-                                dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
-                                    .range(0..=100_000_000).speed(1)).changed();
-                            });
-                        setting_tile(&mut cols[3], "◌",
-                            &format!("환급 · {}", game.exchange_points_name()), |ui| {
-                                dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
-                                    .range(0..=1_000_000)).changed();
-                            });
-                    });
-                    if game == Game::StellaSora {
-                        ui.label(RichText::new(format!(
-                            "골든 디스크 300개 = 레코드 1뽑 · {}뽑 + 잔여 {}개",
-                            self.setup.weapon_dedicated, self.setup.weapon_ticket_remainder
-                        )).color(MUTED).size(10.0));
-                    }
+                    if end < resources { ui.add_space(6.0); }
                 }
-                ui.add_space(8.0);
-                ui.columns(4, |cols| {
-                    setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
-                        self.catalog_selector(ui, catalog::Kind::Character);
-                        egui::ComboBox::from_id_salt("workspace_character_goal")
-                            .width(ui.available_width().min(145.0))
-                            .selected_text(format!("E{} · {}장", self.target_eid, self.target_eid + 1))
-                            .show_ui(ui, |ui| {
-                                for level in 0..=6 {
-                                    dirty |= ui.selectable_value(&mut self.target_eid, level,
-                                        format!("E{level} / {}장", level + 1)).changed();
-                                }
-                            });
-                    });
-                    setting_tile(&mut cols[1], "⚔",
-                        &format!("Target {}", self.setup.game.secondary_banner_name()), |ui| {
-                            self.catalog_selector(ui, catalog::Kind::Weapon);
-                            egui::ComboBox::from_id_salt("workspace_weapon_goal")
-                                .width(ui.available_width().min(145.0))
-                                .selected_text(if self.target_refine == 0 {
-                                    "선택 안 함".to_owned()
-                                } else {
-                                    format!("S{} / {}장", self.target_refine, self.target_refine)
-                                })
-                                .show_ui(ui, |ui| {
-                                    for level in 0..=5 {
-                                        let label = if level == 0 { "필요 없음".to_owned() }
-                                            else { format!("S{level} / {level}장") };
-                                        dirty |= ui.selectable_value(
-                                            &mut self.target_refine, level, label
-                                        ).changed();
-                                    }
-                                });
-                        });
-                    setting_tile(&mut cols[2], "⚑", "Pity (Current)", |ui| {
-                        let hard = match &self.setup.character.rule {
-                            BannerRule::Standard { rarity, .. } => rarity.hard,
-                            BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
-                            BannerRule::NteArcBatch => 8,
-                        };
-                        dirty |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
-                            .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
-                    });
-                    setting_tile(&mut cols[3], "♧", "Rate-up Guarantee", |ui| {
-                        if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
-                            if *featured_share < 1.0 {
-                                ui.horizontal(|ui| {
-                                    let on = self.setup.character.guaranteed;
-                                    for (value, label) in [(true, "On"), (false, "Off")] {
-                                        let color = if on == value { CYAN } else { SURFACE };
-                                        if ui.add(
-                                            egui::Button::new(RichText::new(label).size(11.0)
-                                                .color(if on == value { BG } else { MUTED }))
-                                                .fill(color).corner_radius(6)
-                                                .min_size(egui::vec2(44.0, 24.0))
-                                        ).clicked() && on != value {
-                                            self.setup.character.guaranteed = value;
-                                            dirty = true;
-                                        }
-                                    }
-                                });
-                            } else {
-                                ui.label(RichText::new("Always On").color(SUCCESS));
-                            }
-                        } else {
-                            ui.label(RichText::new("게임별 별도 보장").color(MUTED).size(11.0));
+                if self.setup.game == Game::StellaSora {
+                    ui.label(RichText::new(format!(
+                        "골든 디스크 300개 = 레코드 1뽑 · {}뽑 + 잔여 {}개",
+                        self.setup.weapon_dedicated, self.setup.weapon_ticket_remainder
+                    )).color(MUTED).size(10.0));
+                }
+                ui.add_space(7.0);
+                for start in (0..4).step_by(columns) {
+                    let end = (start + columns).min(4);
+                    ui.columns(end - start, |cells| {
+                        for (column, index) in (start..end).enumerate() {
+                            changed |= self.quick_goal_slot(&mut cells[column], index);
                         }
                     });
-                });
-                ui.add_space(5.0);
+                    if end < 4 { ui.add_space(6.0); }
+                }
+                ui.add_space(7.0);
                 ui.separator();
-                ui.add_space(5.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("ⓘ  캐릭터·무기 목표와 환급 재투입을 계산합니다.\n     캐릭터/무기 단독 그래프는 자유권을 각각 전량 배정한 가정입니다.")
-                        .color(MUTED).size(10.0));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add(
-                            egui::Button::new(RichText::new("▶   Run Simulation")
-                                .size(15.0).strong().color(BG))
-                                .fill(CYAN).corner_radius(11)
-                                .min_size(egui::vec2(206.0, 43.0))
-                        ).clicked() {
-                            self.manual_calculation_requested = true;
-                        }
-                        if ui.add(egui::Button::new("↻  Reset")
-                            .fill(DEEP_CARD).corner_radius(9)
-                            .min_size(egui::vec2(92.0, 40.0))).clicked() {
-                            self.change_game(self.setup.game);
-                            self.manual_calculation_requested = true;
-                        }
-                        if ui.button("상세 설정").clicked() {
-                            self.view_mode = ViewMode::Settings;
-                        }
-                    });
+                ui.add_space(7.0);
+                // Reserve the controls' own line when the settings area is narrow.
+                if ui.available_width() >= 680.0 {
+                    ui.label(RichText::new(
+                        "ⓘ  각 배너별 전용 재화와 환급 규칙을 반영하여 목표 달성 확률을 계산합니다."
+                    ).color(MUTED).size(10.0));
+                }
+                ui.horizontal_wrapped(|ui| {
+                    if ui.add(egui::Button::new(
+                        RichText::new("▶  시뮬레이션 실행").size(13.0).strong()
+                            .color(BG))
+                        .fill(CYAN).corner_radius(10)
+                        .min_size(egui::vec2(156.0, 37.0))
+                    ).clicked() {
+                        self.manual_calculation_requested = true;
+                    }
+                    if ui.add(egui::Button::new("↻  초기화")
+                        .fill(DEEP_CARD).corner_radius(9)
+                        .min_size(egui::vec2(78.0, 35.0))
+                    ).clicked() {
+                        self.change_game(self.setup.game);
+                        self.manual_calculation_requested = true;
+                    }
+                    if ui.button("상세 설정").clicked() {
+                        self.view_mode = ViewMode::Settings;
+                    }
                 });
             });
-        dirty
+        changed
     }
 
     /// User-facing summary and session history, attached to the right edge on wide screens.
