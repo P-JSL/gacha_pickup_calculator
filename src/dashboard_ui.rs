@@ -359,10 +359,10 @@ impl Calculator {
                 ui.add_space(8.0);
                 ui.columns(4, |cols| {
                     setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
-                        egui::ComboBox::from_id_salt("workspace_character")
-                            .width(ui.available_width().min(175.0))
-                            .selected_text(format!("E{} / {}장",
-                                self.target_eid, self.target_eid + 1))
+                        self.catalog_selector(ui, catalog::Kind::Character);
+                        egui::ComboBox::from_id_salt("workspace_character_goal")
+                            .width(ui.available_width().min(145.0))
+                            .selected_text(format!("E{} · {}장", self.target_eid, self.target_eid + 1))
                             .show_ui(ui, |ui| {
                                 for level in 0..=6 {
                                     dirty |= ui.selectable_value(&mut self.target_eid, level,
@@ -372,8 +372,9 @@ impl Calculator {
                     });
                     setting_tile(&mut cols[1], "⚔",
                         &format!("Target {}", self.setup.game.secondary_banner_name()), |ui| {
-                            egui::ComboBox::from_id_salt("workspace_weapon")
-                                .width(ui.available_width().min(175.0))
+                            self.catalog_selector(ui, catalog::Kind::Weapon);
+                            egui::ComboBox::from_id_salt("workspace_weapon_goal")
+                                .width(ui.available_width().min(145.0))
                                 .selected_text(if self.target_refine == 0 {
                                     "선택 안 함".to_owned()
                                 } else {
