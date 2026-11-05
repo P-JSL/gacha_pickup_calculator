@@ -62,3 +62,5 @@ NTE: https://ntetracker.com/
 Stella Sora: https://stelladb.pages.dev/
 
 Note: Data on these sites are not guaranteed to have the same scope, completeness, or acquisition mechanism.
+
+추가 제한: 여러 이력이 같은 계정에서 나오는 경우 관측 구간이 서로 독립적이지 않을 수 있으며, 일반 Greenwood 95% 구간은 계정별 군집 상관을 보정하지 않습니다. 위 파일에서 계정 ID를 수집하지 않기 때문에 계정 단위 부트스트랩은 아직 지원하지 않습니다.
