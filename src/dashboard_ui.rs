@@ -187,8 +187,11 @@ impl Calculator {
             let expected = stats.feedback.as_ref().map(|f| f.average_raw)
                 .unwrap_or(stats.combined.mean);
             let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
-            if self.input_needs_calculation || self.calculating {
-                ui.label(RichText::new("입력 반영 중 · 이전 계산 결과를 유지합니다.")
+            if self.input_needs_calculation && !self.calculating {
+                ui.label(RichText::new("입력 수정됨 · Run Simulation을 누르면 결과가 갱신됩니다.")
+                    .color(YELLOW).size(10.0));
+            } else if self.calculating {
+                ui.label(RichText::new("백그라운드 계산 중 · 이전 결과를 유지합니다.")
                     .color(YELLOW).size(10.0));
             }
             ui.columns(4, |columns| {
