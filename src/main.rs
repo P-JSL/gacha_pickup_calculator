@@ -203,11 +203,11 @@ impl Calculator {
                         .width(165.0).selected_text(self.setup.game.label())
                         .show_ui(ui, |ui| {
                             for game in Game::ALL {
-                                if ui.selectable_label(self.setup.game == game, game.label()).clicked() {
-                                    if self.setup.game != game {
-                                        self.change_game(game);
-                                        dirty = true;
-                                    }
+                                if ui.selectable_label(self.setup.game == game, game.label()).clicked()
+                                    && self.setup.game != game
+                                {
+                                    self.change_game(game);
+                                    dirty = true;
                                 }
                             }
                         });
