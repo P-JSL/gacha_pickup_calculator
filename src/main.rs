@@ -107,7 +107,7 @@ fn paint_navigation_art(ui: &egui::Ui) {
         egui::pos2(center.x + x*0.92-y*0.40, center.y + x*0.40+y*0.92)
     }).collect();
     painter.add(egui::Shape::line(orbit,
-        egui::Stroke::new(1.45, Color32::from_rgb(84, 157, 214))));
+        egui::Stroke::new(1.45_f32, Color32::from_rgb(84, 157, 214))));
     let star = |r: f32| -> Vec<egui::Pos2> {
         (0..8).map(|i| {
             let t = std::f32::consts::TAU*i as f32/8.0;
@@ -116,7 +116,7 @@ fn paint_navigation_art(ui: &egui::Ui) {
         }).collect()
     };
     painter.add(egui::Shape::convex_polygon(star(28.0),
-        cyan, egui::Stroke::new(1.3,ice)));
+        cyan, egui::Stroke::new(1.3_f32,ice)));
     painter.circle_filled(egui::pos2(center.x+41.0,center.y-39.0),2.0,ice);
     painter.circle_filled(egui::pos2(center.x-65.0,center.y+41.0),1.7,cyan);
 
@@ -129,27 +129,27 @@ fn paint_navigation_art(ui: &egui::Ui) {
         p(-58.0 + 98.0*t.cos(), -81.0 - 96.0*t.sin())
     }).collect();
     painter.add(egui::Shape::line(arc,
-        egui::Stroke::new(1.2,Color32::from_rgb(54,131,192))));
+        egui::Stroke::new(1.2_f32,Color32::from_rgb(54,131,192))));
     // A floating glossy draw pass; corners and edges stay sharp at any DPI.
     let card = [p(-76.0,-79.0),p(45.0,-101.0),p(68.0,-43.0),p(-54.0,-22.0)];
     painter.add(egui::Shape::convex_polygon(card.to_vec(),
         Color32::from_rgb(36,85,144),
-        egui::Stroke::new(2.2,Color32::from_rgb(132,198,252))));
+        egui::Stroke::new(2.2_f32,Color32::from_rgb(132,198,252))));
     let inner = [p(-62.0,-70.0),p(34.0,-87.0),p(50.0,-49.0),p(-44.0,-33.0)];
     painter.add(egui::Shape::convex_polygon(inner.to_vec(),
         Color32::from_rgb(25,56,110),
-        egui::Stroke::new(1.0,ice)));
+        egui::Stroke::new(1.0_f32,ice)));
     painter.line_segment([p(-8.0,-78.0),p(4.0,-60.0)],
-        egui::Stroke::new(3.0,cyan));
+        egui::Stroke::new(3.0_f32,cyan));
     painter.line_segment([p(4.0,-60.0),p(22.0,-64.0)],
-        egui::Stroke::new(2.0,ice));
+        egui::Stroke::new(2.0_f32,ice));
     for (x,y,r) in [(-94.0,-172.0,2.7),(86.0,-147.0,3.3),
                      (-58.0,-237.0,2.0),(70.0,-260.0,2.0)] {
         painter.circle_filled(p(x,y),r,ice);
         painter.line_segment([p(x-6.0,y),p(x+6.0,y)],
-            egui::Stroke::new(0.7,cyan));
+            egui::Stroke::new(0.7_f32,cyan));
         painter.line_segment([p(x,y-6.0),p(x,y+6.0)],
-            egui::Stroke::new(0.7,cyan));
+            egui::Stroke::new(0.7_f32,cyan));
     }
 }
 
