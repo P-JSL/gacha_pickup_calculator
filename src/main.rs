@@ -903,31 +903,6 @@ fn draw_probability_chart(
     });
 }
 
-#[cfg(test)]
-mod chart_tests {
-    use super::*;
-    #[test]
-    fn sample_curve_has_endpoints_and_monotonic_probabilities() {
-        let dist = Distribution::new(vec![0.0, 0.2, 0.3, 0.5]);
-        let curve = sampled_cdf(&dist, 3);
-        assert_eq!(curve.first().copied(), Some((0, 0.0)));
-        assert_eq!(curve.last().copied(), Some((3, 1.0)));
-        assert!(curve.windows(2).all(|x| x[0].0 < x[1].0 && x[0].1 <= x[1].1));
-        let zero_goal = Distribution::new(vec![1.0]);
-        let immediate = sampled_cdf(&zero_goal, 0);
-        assert_eq!(immediate, vec![(0, 1.0), (1, 1.0)]);
-    }
-
-    #[test]
-    fn long_plot_curve_remains_bounded_and_includes_last_pity() {
-        let mut pmf = vec![0.0; 1600];
-        pmf[1599] = 1.0;
-        let curve = sampled_cdf(&Distribution::new(pmf), 1599);
-        assert_eq!(curve.len(), 401);
-        assert_eq!(curve.last(), Some(&(1599, 1.0)));
-    }
-}
-
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
 fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
@@ -1068,3 +1043,28 @@ fn main() -> eframe::Result {
     eframe::run_native("Gacha Lab", options,
         Box::new(|cc| Ok(Box::new(Calculator::new(cc)))))
 }
+#[cfg(test)]
+mod chart_tests {
+    use super::*;
+    #[test]
+    fn sample_curve_has_endpoints_and_monotonic_probabilities() {
+        let dist = Distribution::new(vec![0.0, 0.2, 0.3, 0.5]);
+        let curve = sampled_cdf(&dist, 3);
+        assert_eq!(curve.first().copied(), Some((0, 0.0)));
+        assert_eq!(curve.last().copied(), Some((3, 1.0)));
+        assert!(curve.windows(2).all(|x| x[0].0 < x[1].0 && x[0].1 <= x[1].1));
+        let zero_goal = Distribution::new(vec![1.0]);
+        let immediate = sampled_cdf(&zero_goal, 0);
+        assert_eq!(immediate, vec![(0, 1.0), (1, 1.0)]);
+    }
+
+    #[test]
+    fn long_plot_curve_remains_bounded_and_includes_last_pity() {
+        let mut pmf = vec![0.0; 1600];
+        pmf[1599] = 1.0;
+        let curve = sampled_cdf(&Distribution::new(pmf), 1599);
+        assert_eq!(curve.len(), 401);
+        assert_eq!(curve.last(), Some(&(1599, 1.0)));
+    }
+}
+
