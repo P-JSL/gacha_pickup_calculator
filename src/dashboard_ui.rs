@@ -14,7 +14,7 @@ fn dashboard_card(
 ) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
-        .stroke(egui::Stroke::new(1.0, BORDER))
+        .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(14))
         .inner_margin(13)
         .show(ui, |ui| {
@@ -28,7 +28,7 @@ fn dashboard_card(
 fn overview_metric(ui: &mut egui::Ui, symbol: &str, label: &str, value: String, note: String, color: Color32) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
-        .stroke(egui::Stroke::new(1.0, BORDER))
+        .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(14))
         .inner_margin(14)
         .show(ui, |ui| {
