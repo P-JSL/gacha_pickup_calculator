@@ -138,6 +138,11 @@ impl CatalogUi {
         }
     }
 
+    /// Failed icon requests can be retried without clearing successfully cached images.
+    pub fn retry_failed(&mut self) {
+        self.textures.retain(|_, texture| texture.is_some());
+    }
+
     pub fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
         if entry.has_verified_image()
             && !self.textures.contains_key(&entry.icon_url)
@@ -186,7 +191,10 @@ pub fn picker(
                 ui.label(format!("등록 {}개", count(game, kind)));
                 ui.add(egui::TextEdit::singleline(filter)
                     .hint_text("캐릭터/광추/무기/아크/레코드 검색")
-                    .desired_width(300.0));
+                    .desired_width(245.0));
+                if ui.button("이미지 재시도").clicked() {
+                    art.retry_failed();
+                }
             });
             ui.label(egui::RichText::new(
                 "★5 목표 기준 확률입니다. ★4 목록은 표시되지만 확률 계산 대상은 아닙니다."
