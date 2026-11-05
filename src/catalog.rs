@@ -5,7 +5,7 @@ use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,14 +86,28 @@ impl CatalogUi {
     pub fn new(ctx: &egui::Context) -> Self {
         let (send_url, recv_url) = mpsc::channel::<String>();
         let (send_image, recv_image) = mpsc::channel::<ImageResult>();
-        let repaint = ctx.clone();
-        std::thread::spawn(move || {
-            while let Ok(url) = recv_url.recv() {
-                let pixels = Self::fetch_icon(&url);
-                if send_image.send((url, pixels)).is_err() { break }
-                repaint.request_repaint();
-            }
-        });
+        // Bounded image I/O: one slow icon must not block the rest of the visible catalog.
+        // Each worker locks the queue only while receiving its next URL.
+        let incoming = Arc::new(Mutex::new(recv_url));
+        for _ in 0..4 {
+            let incoming = Arc::clone(&incoming);
+            let send_image = send_image.clone();
+            let repaint = ctx.clone();
+            std::thread::spawn(move || {
+                loop {
+                    let url = match incoming.lock() {
+                        Ok(receiver) => match receiver.recv() {
+                            Ok(url) => url,
+                            Err(_) => break,
+                        },
+                        Err(_) => break,
+                    };
+                    let pixels = Self::fetch_icon(&url);
+                    if send_image.send((url, pixels)).is_err() { break }
+                    repaint.request_repaint();
+                }
+            });
+        }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
             send_url, recv_image,
@@ -212,11 +226,21 @@ mod tests {
     use super::*;
     #[test]
     fn all_games_have_both_named_catalogs() {
+        let mut unique = HashSet::new();
         for game in Game::ALL {
             assert!(count(game, Kind::Character) > 0);
             assert!(count(game, Kind::Weapon) > 0);
             let first = first(game, Kind::Character);
             assert!(by_id(game, Kind::Character, &first).is_some());
         }
+        for item in entries() {
+            assert!(!item.name.trim().is_empty());
+            assert!(item.has_verified_image(),
+                "{} {} must have an existing image source", item.id, item.name);
+            assert!(unique.insert((game_code(item.game), item.kind as u8, item.id.clone())),
+                "duplicate catalog id: {}", item.id);
+        }
+        assert_eq!(count(Game::Neverness, Kind::Weapon), 51);
+        assert!(count(Game::WutheringWaves, Kind::Character) >= 60);
     }
 }
