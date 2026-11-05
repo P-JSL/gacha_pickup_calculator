@@ -190,7 +190,7 @@ impl Calculator {
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
             .show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("GACHA").color(PRIMARY).strong().size(17.0));
@@ -229,12 +229,12 @@ impl Calculator {
     fn sidebar(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(174.0)
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(10))
+            .exact_width(150.0)
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(7))
             .show(ctx, |ui| {
-                ui.add_space(20.0);
+                ui.add_space(8.0);
                 ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
-                ui.add_space(13.0);
+                ui.add_space(8.0);
                 for (view, title) in [
                     (ViewMode::Calculator, "01   확률 대시보드"),
                     (ViewMode::Settings, "02   시뮬레이션 설정"),
@@ -249,14 +249,14 @@ impl Calculator {
                         .fill(if active { SELECTED_NAV } else { SIDEBAR })
                         .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
                         .corner_radius(9);
-                    if ui.add_sized([ui.available_width(), 34.0], button).clicked() {
+                    if ui.add_sized([ui.available_width(), 30.0], button).clicked() {
                         self.view_mode = view;
                     }
-                    ui.add_space(4.0);
+                    ui.add_space(3.0);
                 }
-                ui.add_space(22.0);
-                ui.separator();
                 ui.add_space(12.0);
+                ui.separator();
+                ui.add_space(8.0);
                 ui.label(RichText::new("CURRENT GAME").color(MUTED).size(10.0));
                 ui.add_space(5.0);
                 ui.label(RichText::new(self.setup.game.label()).strong().size(13.0));
@@ -265,13 +265,13 @@ impl Calculator {
                     self.target_eid, self.setup.game.secondary_banner_name(),
                     self.target_refine
                 )).color(MUTED).size(11.0));
-                ui.add_space(12.0);
+                ui.add_space(7.0);
                 ui.label(RichText::new("정확 DP · 조건부 환급 추정")
                     .color(MUTED).size(10.0));
                 ui.add_space(12.0);
                 ui.hyperlink_to("GitHub / Source", "https://github.com/P-JSL/gacha_pickup_calculator");
                 ui.add_space(5.0);
-                ui.label(RichText::new("v0.1.9  ·  DESKTOP").color(MUTED).size(10.0));
+                ui.label(RichText::new("v0.1.10  ·  DESKTOP").color(MUTED).size(10.0));
             });
     }
 
@@ -1070,7 +1070,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>]) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(270.0);
-    let height = if width < 650.0 { 218.0 } else { 254.0 };
+    let height = if width < 650.0 { 205.0 } else { 232.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
     );
@@ -1213,12 +1213,12 @@ impl eframe::App for Calculator {
         self.sidebar(ctx);
         let mut settings_changed = false;
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().fill(BG).inner_margin(12))
+            .frame(egui::Frame::default().fill(BG).inner_margin(8))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.add_space(10.0);
+                        ui.add_space(5.0);
                         match self.view_mode {
                             ViewMode::Calculator => {
                                 self.dashboard(ui);
@@ -1262,7 +1262,7 @@ impl eframe::App for Calculator {
                                 self.observation_validation(ui);
                             }
                         }
-                        ui.add_space(25.0);
+                        ui.add_space(12.0);
                     });
             });
         if settings_changed {
@@ -1315,13 +1315,13 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
     ctx.style_mut(|style| {
-        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-        style.spacing.button_padding = egui::vec2(10.0, 5.0);
-        style.spacing.interact_size.y = 27.0;
+        style.spacing.item_spacing = egui::vec2(7.0, 5.0);
+        style.spacing.button_padding = egui::vec2(9.0, 4.0);
+        style.spacing.interact_size.y = 25.0;
         style.text_styles.insert(egui::TextStyle::Body,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Button,
-            egui::FontId::proportional(14.0));
+            egui::FontId::proportional(13.0));
         style.text_styles.insert(egui::TextStyle::Small,
             egui::FontId::proportional(11.0));
     });
