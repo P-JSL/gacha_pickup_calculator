@@ -50,6 +50,11 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QueryMode { RequiredBudget, AvailableBudget }
 
+/// Keep the primary calculator uncluttered. Advanced evidence inspection is
+/// explicitly opened from the header rather than appended to every result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ViewMode { Calculator, TrackerSources, ObservedDistribution }
+
 struct Calculator {
     setup: GameSetup,
     mode: RateMode,
@@ -62,6 +67,7 @@ struct Calculator {
     stats: Option<Computed>,
     error: Option<String>,
     show_help: bool,
+    view_mode: ViewMode,
     worker: Sender<CalculationRequest>,
     results: Receiver<CalculationResponse>,
     generation: u64,
@@ -75,6 +81,9 @@ struct Calculator {
 
 impl Calculator {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // set_visuals alone changes only the current theme style. The system
+        // preference could otherwise switch the UI back to Light on Windows.
+        cc.egui_ctx.set_theme(egui::Theme::Dark);
         install_korean_font(&cc.egui_ctx);
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
@@ -117,6 +126,7 @@ impl Calculator {
             stats: None,
             error: None,
             show_help: false,
+            view_mode: ViewMode::Calculator,
             worker,
             results,
             generation: 0,
@@ -201,14 +211,17 @@ impl Calculator {
                     dirty |= ui.radio_value(&mut self.mode, RateMode::CommunityEstimate,
                         "소프트 천장 추정 모델").changed();
                 });
-                ui.menu_button("실측 트래커 ▾", |ui| {
-                    ui.label(RichText::new("날짜가 고정된 외부 관측 자료").strong());
-                    for reference in references(self.setup.game) {
-                        ui.hyperlink_to(reference.name, reference.url);
-                        ui.small(format!("자료 확인일: {}", reference.observed_on));
+                ui.menu_button("분석 메뉴 ▾", |ui| {
+                    for (view, title) in [
+                        (ViewMode::Calculator, "확률 계산 · 대시보드"),
+                        (ViewMode::TrackerSources, "07 · 트래커 출처 교차 검증"),
+                        (ViewMode::ObservedDistribution, "08 · CSV 실측 분포 비교"),
+                    ] {
+                        if ui.selectable_label(self.view_mode == view, title).clicked() {
+                            self.view_mode = view;
+                            ui.close_menu();
+                        }
                     }
-                    ui.separator();
-                    ui.small("외부 통계가 내부 소프트 천장 확률을 자동 변경하지 않습니다.");
                 });
                 ui.menu_button("사용법 / 출처 ▾", |ui| {
                     if ui.button("모델과 출처 확인").clicked() {
@@ -576,7 +589,9 @@ impl Calculator {
                 ui.colored_label(GOLD, "소프트 천장 확률은 커뮤니티 추정 모델입니다. 공식 서버 확률식이 아닙니다.");
             }
         });
-        ui.add_space(10.0);
+    }
+
+    fn tracker_sources(&self, ui: &mut egui::Ui) {
         section(ui, "07", "실측 트래커 교차 검증",
                 "관측 평균과 현재 확률 모델을 비교합니다. 표본은 공식 서버 확률이 아니며 자동 보정하지 않습니다.", |ui| {
             let observed = references(self.setup.game);
@@ -608,8 +623,6 @@ impl Calculator {
             ui.colored_label(GOLD,
                 "평균 스택 하나만으로 스택별 확률이나 소프트 천장 함수를 역산할 수 없습니다. 이탈·불완전 이력·표본 편향을 확인해야 합니다.");
         });
-        ui.add_space(10.0);
-        self.observation_validation(ui);
     }
 
     /// The user explicitly provides a local CSV path; data remains on device.
@@ -827,21 +840,41 @@ impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
         let mut dirty = self.header(ctx);
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default()
+            .frame(egui::Frame::default().fill(BG))
+            .show(ctx, |ui| {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.add_space(16.0);
                 ui.heading(RichText::new(self.setup.game.label()).size(25.0).strong());
                 ui.label(RichText::new(self.setup.game.special_notes()).color(MUTED));
                 ui.add_space(14.0);
-                dirty |= self.targets(ui);
-                ui.add_space(8.0);
-                dirty |= self.pity(ui);
-                ui.add_space(8.0);
-                dirty |= self.resources(ui);
-                ui.add_space(8.0);
-                dirty |= self.feedback_controls(ui);
-                if dirty { self.schedule_recalculation(); }
-                self.dashboard(ui);
+                match self.view_mode {
+                    ViewMode::Calculator => {
+                        dirty |= self.targets(ui);
+                        ui.add_space(8.0);
+                        dirty |= self.pity(ui);
+                        ui.add_space(8.0);
+                        dirty |= self.resources(ui);
+                        ui.add_space(8.0);
+                        dirty |= self.feedback_controls(ui);
+                        if dirty { self.schedule_recalculation(); }
+                        self.dashboard(ui);
+                    }
+                    ViewMode::TrackerSources => {
+                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
+                            self.view_mode = ViewMode::Calculator;
+                        }
+                        ui.add_space(10.0);
+                        self.tracker_sources(ui);
+                    }
+                    ViewMode::ObservedDistribution => {
+                        if ui.button("← 확률 대시보드로 돌아가기").clicked() {
+                            self.view_mode = ViewMode::Calculator;
+                        }
+                        ui.add_space(10.0);
+                        self.observation_validation(ui);
+                    }
+                }
                 ui.add_space(25.0);
             });
         });
