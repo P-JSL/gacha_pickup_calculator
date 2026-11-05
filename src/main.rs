@@ -205,7 +205,6 @@ fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketR
     }
 }
 
-#[derive(Clone)]
 struct Computed {
     character: Distribution,
     weapon: Distribution,
@@ -972,7 +971,7 @@ impl Calculator {
     }
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
-        let Some(stats) = self.visible_stats().cloned() else {
+        let Some(stats) = self.stats.as_ref().filter(|_| self.stats_game == Some(self.setup.game)) else {
             if self.calculating {
                 ui.horizontal(|ui| {
                     ui.spinner();
