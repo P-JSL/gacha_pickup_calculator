@@ -166,9 +166,36 @@ jobs:
           path: target/release/gacha_pickup_calculator.exe
           if-no-files-found: error
 
+  images:
+    name: Build and scan offline image library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned image decoder
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir "Pillow==13.0.0"
+      - name: Fetch, validate and re-encode all catalog images
+        run: python3 scripts/build_offline_images.py
+      - name: Scan all normalized images for malware
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam
+          clamscan --recursive --infected dist/Image
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gacha-offline-images
+          path: dist/Image/
+          if-no-files-found: error
+
   release:
     name: Publish versioned release
-    needs: verify
+    needs: [verify, images]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -201,6 +228,11 @@ jobs:
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
+      - uses: actions/download-artifact@v4
+        if: steps.version.outputs.publish == 'true'
+        with:
+          name: gacha-offline-images
+          path: dist/Image
       - name: Check release notes
         if: steps.version.outputs.publish == 'true'
         env:
@@ -224,12 +256,28 @@ jobs:
           if executable.stat().st_size < 100_000:
               raise SystemExit("Windows executable is unexpectedly small.")
           package = Path(f"dist/gacha-pickup-calculator-windows-x64-v{version}.zip")
+          icons = sorted(Path("dist/Image").rglob("*.png"))
+          expected = sum(1 for line in Path("src/catalog_data.tsv").read_text(
+              encoding="utf-8").splitlines() if len(line.split("\t")) == 6)
+          if len(icons) != expected or expected < 680:
+              raise SystemExit(f"Incomplete sanitized assets: {len(icons)}/{expected}")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
-              zipped.writestr("README.txt", "Gacha Pickup Calculator\nRun gacha_pickup_calculator.exe on Windows x64.\nThe ZIP contains the same executable as the standalone release asset.\n")
+              for icon in icons:
+                  zipped.write(icon, icon.relative_to("dist").as_posix())
+              zipped.write("dist/Image/SHA256SUMS.txt", "Image/SHA256SUMS.txt")
+              zipped.writestr("README.txt",
+                  "Gacha Pickup Calculator / Windows x64\n"
+                  "Extract this entire ZIP, preserving the Image directory.\n"
+                  "Run gacha_pickup_calculator.exe alongside the Image folder.\n"
+                  "All image files were decoded, re-encoded and malware-scanned in CI.\n"
+                  "No image network requests are performed while using the app.\n")
           with ZipFile(package) as zipped:
               assert zipped.testzip() is None
               assert executable.name in zipped.namelist()
+              assert len([n for n in zipped.namelist()
+                  if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
+              assert "Image/SHA256SUMS.txt" in zipped.namelist()
           PY
           cd dist
           sha256sum gacha_pickup_calculator.exe \
