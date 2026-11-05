@@ -62,6 +62,8 @@ jobs:
             trap "kill $app 2>/dev/null || true" EXIT
             sleep 9
             kill -0 "$app" || { cat /tmp/gacha-chart.log; exit 1; }
+            # Capture the initial input grid before simulating scroll.
+            scrot -q 90 ci-artifacts/initial.png
             xdotool mousemove 850 700
             xdotool click --repeat 7 --delay 125 5
             sleep 2
@@ -89,6 +91,7 @@ jobs:
         with:
           name: gacha-chart-visual-smoke-linux
           path: |
+            ci-artifacts/initial.png
             ci-artifacts/overview.png
             ci-artifacts/chart.png
           if-no-files-found: error
