@@ -666,6 +666,7 @@ impl Calculator {
         section(ui, "01", "획득 목표", "목표 장수와 기존 보유 장수를 설정합니다.", |ui| {
             ui.columns(2, |cols| {
                 cols[0].label(RichText::new("캐릭터 돌파 목표").color(MUTED));
+                self.catalog_selector(&mut cols[0], catalog::Kind::Character);
                 egui::ComboBox::from_id_salt("eid").width(175.0)
                     .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
                     .show_ui(&mut cols[0], |ui| {
@@ -680,6 +681,7 @@ impl Calculator {
                         .range(0..=7).speed(1).suffix("장")).changed();
                 });
                 cols[1].label(RichText::new(format!("{} 재련 목표", self.setup.game.secondary_banner_name())).color(MUTED));
+                self.catalog_selector(&mut cols[1], catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("refine").width(175.0)
                     .selected_text(if self.target_refine == 0 { "필요 없음".to_owned() }
                         else { format!("S{} · 총 {}장", self.target_refine, self.target_refine) })
