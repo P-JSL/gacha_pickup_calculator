@@ -407,7 +407,7 @@ impl Calculator {
                     ] {
                         let points = PlotPoints::from_iter((0..=end).step_by(step)
                             .map(|x| [x as f64, dist.at(x) * 100.0]));
-                        plot.line(Line::new(points).name(name).color(color).width(2.0));
+                        plot.line(Line::new(points).name(name).color(color).width(2.0_f32));
                     }
                     if let Some(ref feedback) = stats.feedback {
                         // No dedicated tickets: both curves have identical x-axis units.
@@ -415,7 +415,7 @@ impl Calculator {
                             let points = PlotPoints::from_iter((0..=end).step_by(step)
                                 .map(|x| [x as f64, feedback.probability(x).0 * 100.0]));
                             plot.line(Line::new(points).name("환급 포함 · 초기 보유 N")
-                                .color(Color32::from_rgb(203, 158, 255)).width(3.5));
+                                .color(Color32::from_rgb(203, 158, 255)).width(3.5_f32));
                         }
                     }
                 });
@@ -468,7 +468,7 @@ impl Calculator {
 fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
-        .fill(CARD).stroke(egui::Stroke::new(1.0, BORDER))
+        .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(10))
         .inner_margin(13)
         .show(ui, |ui| {
@@ -484,7 +484,7 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
 }
 
 fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
-    egui::Frame::group(ui.style()).fill(CARD).stroke(egui::Stroke::new(1.0, BORDER))
+    egui::Frame::group(ui.style()).fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(10)).inner_margin(12)
         .show(ui, |ui| {
             ui.set_min_width(220.0);
