@@ -4,7 +4,6 @@ use eframe::egui;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -148,7 +147,7 @@ impl CatalogUi {
             return None;
         }
         let bytes = fs::read(path).ok()?;
-        if bytes.len() > 512 * 1024 || !bytes.starts_with(b"\\x89PNG\\r\\n\\x1a\\n") {
+        if bytes.len() > 512 * 1024 || !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
             return None;
         }
         let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()?;
