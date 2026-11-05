@@ -677,3 +677,9 @@ nte	w	arc-51	물망산	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Asse
 
 wuwa	c	RoverAeroMale	Rover: Aero	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/RoverAeroMale.png
 wuwa	c	Roverelectromale	Rover: Electro	5	https://raw.githubusercontent.com/ryanbenson/wuthering-waves-assets/master/images/Roverelectromale.png
+# Announced/update additions without a verified portrait: packaging creates explicit placeholders.
+hsr	c	upcoming_aeon_aha	Aeon ★ Aha (예고 · 4.7)	5	
+nte	c	upcoming_elyms	Elyms (예고 · 1.5)	5	
+nte	c	upcoming_exe	Exe (예고 · 1.5 후반)	5	
+sora	c	firstlight_noya	Firstlight Noya (2.0)	5	
+sora	w	guiding_star_disc	My Guiding Star (2.0)	5	
