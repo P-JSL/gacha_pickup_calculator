@@ -166,6 +166,14 @@ jobs:
           path: ci-artifacts/windows-ui.png
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload Linux executable for real screenshot capture
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gacha-linux-release-executable
+          path: target/release/gacha_pickup_calculator
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -292,15 +300,76 @@ jobs:
             git push origin "HEAD:refs/heads/${{ github.head_ref }}"
           fi
 
-  release:
-    name: Publish versioned release
+  ui_docs:
+    name: Capture latest-character GUI for README
     needs: [verify, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: gacha-linux-release-executable
+          path: target/release/
+      - uses: actions/download-artifact@v4
+        with:
+          name: gacha-offline-images
+          path: target/release/Image/
+      - name: Actual Linux UI with packaged images
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
+          chmod +x target/release/gacha_pickup_calculator
+          bash scripts/capture_readme_screenshots.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gacha-readme-screenshots-v014
+          path: ci-readme-shots/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish_docs:
+    name: Commit real screenshots to README image directory
+    needs: ui_docs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: gacha-readme-screenshots-v014
+          path: ci-readme-shots/
+      - name: Record verified native GUI screenshots in Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+          mkdir -p docs/screenshots/v0.1.14
+          cp ci-readme-shots/*.png docs/screenshots/v0.1.14/
+          git add docs/screenshots/v0.1.14/
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]'                 -c user.email='41898282+github-actions[bot]@users.noreply.github.com'                 commit -m 'docs: publish verified v0.1.14 native GUI captures [skip ci]'
+            git push origin HEAD:main
+          fi
+
+  release:
+    name: Publish versioned release
+    needs: [verify, images, ui_docs, publish_docs]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Check version and existing release
         id: version
         env:
@@ -397,7 +466,7 @@ jobs:
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
             dist/SHA256SUMS.txt \
-            --target "$GITHUB_SHA" \
+            --target "$(git rev-parse HEAD)" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
             --notes-file "RELEASE_NOTES_v$VERSION.md"
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
