@@ -234,7 +234,7 @@ impl Calculator {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
                         format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
-                    probability_card(&mut columns[1], "Weapon Probability",
+                    probability_card(&mut columns[1], &format!("{banner_name} Probability"),
                         format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences);
                     probability_card(&mut columns[2], "Overall Result",
                         format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
@@ -243,7 +243,7 @@ impl Calculator {
                 probability_card(ui, "Character Probability",
                     format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences);
                 ui.add_space(8.0);
-                probability_card(ui, "Weapon Probability",
+                probability_card(ui, &format!("{banner_name} Probability"),
                     format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences);
                 ui.add_space(8.0);
                 probability_card(ui, "Overall Result",
@@ -528,7 +528,7 @@ impl Calculator {
                         for (title, value) in [
                             ("Target Character", results.map(|(_,ch,_)|
                                 format!("E{} · {:.2}%", self.target_eid,ch*100.0))),
-                            ("Target Weapon", results.map(|(_,_,wp)|
+                            (&format!("Target {}", self.setup.game.secondary_banner_name()), results.map(|(_,_,wp)|
                                 format!("S{} · {:.2}%", self.target_refine,wp*100.0))),
                         ] {
                             ui.horizontal(|ui| {
