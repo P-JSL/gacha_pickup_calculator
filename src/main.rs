@@ -220,9 +220,9 @@ impl Calculator {
                         .chain(std::iter::once([end as f64, dist.at(end) * 100.0]))
                         .collect()
                 };
-                plot.line(Line::new("캐릭터 목표", build(&stats.character)).color(Color32::from_rgb(79, 156, 255)).width(2.0));
-                plot.line(Line::new("무기 목표", build(&stats.weapon)).color(Color32::from_rgb(91, 211, 147)).width(2.0));
-                plot.line(Line::new("캐릭터 + 무기 최종 목표", build(&stats.combined)).color(Color32::from_rgb(255, 164, 92)).width(3.0));
+                plot.line(Line::new(build(&stats.character)).name("캐릭터 목표").color(Color32::from_rgb(79, 156, 255)).width(2.0_f32));
+                plot.line(Line::new(build(&stats.weapon)).name("무기 목표").color(Color32::from_rgb(91, 211, 147)).width(2.0_f32));
+                plot.line(Line::new(build(&stats.combined)).name("캐릭터 + 무기 최종 목표").color(Color32::from_rgb(255, 164, 92)).width(3.0_f32));
             });
         ui.separator();
         ui.heading("목표 확률별 누적 뽑기 수");
@@ -269,7 +269,7 @@ impl eframe::App for Calculator {
                         if ui.selectable_label(self.setup.game == game, game.label()).clicked() {
                             self.setup = GameSetup::new(game);
                             dirty = true;
-                            ui.close();
+                            ui.close_menu();
                         }
                     }
                 });
@@ -280,7 +280,7 @@ impl eframe::App for Calculator {
                 ui.menu_button("도움말 / 출처 ▼", |ui| {
                     if ui.button("확률 규칙 / 출처 보기").clicked() {
                         self.show_help = true;
-                        ui.close();
+                        ui.close_menu();
                     }
                     ui.hyperlink_to("원본 저장소", "https://github.com/P-JSL/gacha_pickup_calculator");
                 });
