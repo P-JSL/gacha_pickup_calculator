@@ -146,10 +146,10 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
         .fill(Color32::from_rgb(28, 59, 83))
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(12))
-        .inner_margin(9)
+        .inner_margin(6)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.set_min_height(57.0);
+            ui.set_min_height(48.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(icon).size(16.0).color(Color32::WHITE));
                 ui.label(RichText::new(label).size(10.5).color(Color32::WHITE).strong());
@@ -290,9 +290,9 @@ impl Calculator {
                         }
                     }
                 });
-                ui.add_space(11.0);
+                ui.add_space(3.0);
                 ui.separator();
-                ui.add_space(9.0);
+                ui.add_space(3.0);
                 ui.columns(3, |cols| {
                     setting_tile(&mut cols[0], "♧", "Owned Tickets", |ui| {
                         dirty |= ui.add(egui::DragValue::new(&mut self.setup.flexible)
@@ -309,7 +309,7 @@ impl Calculator {
                                 .range(0..=1_000_000)).changed();
                         });
                 });
-                ui.add_space(10.0);
+                ui.add_space(8.0);
                 ui.columns(4, |cols| {
                     setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
                         egui::ComboBox::from_id_salt("workspace_character")
@@ -377,9 +377,9 @@ impl Calculator {
                         }
                     });
                 });
-                ui.add_space(12.0);
+                ui.add_space(5.0);
                 ui.separator();
-                ui.add_space(9.0);
+                ui.add_space(5.0);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("ⓘ  캐릭터·무기 목표와 환급 재투입을 계산합니다.\n     캐릭터/무기 단독 그래프는 자유권을 각각 전량 배정한 가정입니다.")
                         .color(MUTED).size(10.0));
