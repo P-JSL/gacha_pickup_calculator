@@ -131,7 +131,7 @@ impl Banner {
         let mut cur = vec![0.0; k * stride];
         cur[self.pity * 2 + usize::from(self.guaranteed)] = 1.0;
         let mut pmf = vec![0.0; self.max_additional_pulls() + 1];
-        for step in 1..pmf.len() {
+        for completed_probability in pmf.iter_mut().skip(1) {
             let mut next = vec![0.0; cur.len()];
             for copies in 0..k {
                 for pity in 0..h {
@@ -142,7 +142,7 @@ impl Banner {
                         let success = mass * rate * if g == 1 { 1.0 } else { featured };
                         let miss_feature = mass * rate - success;
                         let miss_rare = mass * (1.0 - rate);
-                        if copies + 1 == k { pmf[step] += success; }
+                        if copies + 1 == k { *completed_probability += success; }
                         else { next[(copies + 1) * stride] += success; }
                         if miss_feature > 0.0 { next[copies * stride + 1] += miss_feature; }
                         if miss_rare > 0.0 {
@@ -172,7 +172,7 @@ impl Banner {
         let mut pmf = vec![0.0; self.max_additional_pulls() + 1];
         let mut cur = vec![0.0; k * hard];
         cur[initial_copies * hard + self.pity] = 1.0;
-        for step in 1..pmf.len() {
+        for (step, completed_probability) in pmf.iter_mut().enumerate().skip(1) {
             let mut next = vec![0.0; cur.len()];
             let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && !claimed_at_start && s.progress + step == s.at);
             let bonus = usize::from(spark_at_step);
@@ -182,10 +182,10 @@ impl Banner {
                     if mass == 0.0 { continue; }
                     let p = if pity + 1 >= hard { 1.0 } else { rate };
                     let win_copies = copies + 1 + bonus;
-                    if win_copies >= k { pmf[step] += mass * p; }
+                    if win_copies >= k { *completed_probability += mass * p; }
                     else { next[win_copies * hard] += mass * p; }
                     let miss_copies = copies + bonus;
-                    if miss_copies >= k { pmf[step] += mass * (1.0 - p); }
+                    if miss_copies >= k { *completed_probability += mass * (1.0 - p); }
                     else if pity + 1 < hard { next[miss_copies * hard + pity + 1] += mass * (1.0 - p); }
                 }
             }
