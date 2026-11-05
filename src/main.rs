@@ -153,6 +153,7 @@ struct Calculator {
     observation_banner: TrackedBanner,
     observation_message: String,
     history: Vec<HistoryEntry>,
+    show_history: bool,
     search_query: String,
 }
 
@@ -206,6 +207,7 @@ impl Calculator {
             observation_banner: TrackedBanner::Character,
             observation_message: String::new(),
             history: Vec::new(),
+            show_history: false,
             search_query: String::new(),
         };
         app.recalculate();
@@ -1546,6 +1548,30 @@ impl eframe::App for Calculator {
         }
         if self.calculating {
             ctx.request_repaint_after(Duration::from_millis(120));
+        }
+        if self.show_history {
+            egui::Window::new("Simulation History")
+                .open(&mut self.show_history)
+                .default_size(egui::vec2(470.0, 330.0))
+                .resizable(true).show(ctx, |ui| {
+                    ui.label(RichText::new(
+                        "현재 실행에서 계산한 최근 결과입니다. 종료 시 초기화됩니다."
+                    ).color(MUTED).size(11.0));
+                    ui.separator();
+                    for result in &self.history {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(result.game.label()).strong());
+                            ui.label(format!("E{} · {} S{}",
+                                result.eid, result.game.secondary_banner_name(),result.refine));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(RichText::new(format!("{:.2}%",
+                                        result.chance * 100.0)).color(MINT).strong());
+                                });
+                        });
+                        ui.separator();
+                    }
+                });
         }
         if self.show_help {
             egui::Window::new("게임별 규칙 · 신뢰도 · 출처")
