@@ -3,10 +3,12 @@
 use eframe::egui;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::fs;
+use std::path::Path;
+
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind { Character, Weapon }
@@ -51,11 +53,19 @@ fn parse() -> Vec<Entry> {
             icon_url: fields[5].to_owned(),
         });
     }
+    // IDs are a fallback only, not authoritative release dates. Explicit
+    // update/beta priorities (snapshot below) always come first.
     out.sort_by(|a, b| {
+        let priority = |e: &Entry| match (e.game, e.kind, e.id.as_str()) {
+            (Game::WutheringWaves, Kind::Character, "1311") => 20261015,
+            (Game::WutheringWaves, Kind::Character, "1312") => 20261015,
+            _ => 0,
+        };
         game_code(a.game).cmp(game_code(b.game))
             .then_with(|| (a.kind == Kind::Weapon).cmp(&(b.kind == Kind::Weapon)))
+            .then_with(|| priority(b).cmp(&priority(a)))
             .then_with(|| b.rarity.cmp(&a.rarity))
-            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| b.id.cmp(&a.id))
     });
     out
 }
@@ -114,15 +124,36 @@ impl CatalogUi {
         }
     }
 
-    fn fetch_icon(url: &str) -> Option<egui::ColorImage> {
-        if !url.starts_with("https://") { return None }
-        let response = ureq::get(url)
-            .timeout(Duration::from_secs(6))
-            .set("User-Agent", "gacha-pickup-calculator/desktop")
-            .call().ok()?;
-        let mut bytes = Vec::new();
-        response.into_reader().take(3_000_000).read_to_end(&mut bytes).ok()?;
-        let image = image::load_from_memory(&bytes).ok()?.thumbnail(112, 112).to_rgba8();
+    /// Offline-only. Never fetch or execute bytes from remote image URLs.
+    /// CI has already decoded and re-encoded each icon into a small PNG.
+    fn fetch_icon(relative: &str) -> Option<egui::ColorImage> {
+        let mut parts = relative.split('/');
+        let game = parts.next()?;
+        let filename = parts.next()?;
+        if parts.next().is_some()
+            || !["HSR", "WutheringWaves", "StellaSora", "Neverness"].contains(&game)
+            || !filename.ends_with(".png")
+            || !filename.trim_end_matches(".png").chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        { return None; }
+        let exe = std::env::current_exe().ok()?;
+        let image_root = exe.parent()?.join("Image");
+        let path = image_root.join(game).join(filename);
+        let metadata = fs::symlink_metadata(&path).ok()?;
+        if !metadata.file_type().is_file() || metadata.len() > 512 * 1024 {
+            return None;
+        }
+        let path = path.canonicalize().ok()?;
+        if !path.starts_with(image_root.canonicalize().ok()?) {
+            return None;
+        }
+        let bytes = fs::read(path).ok()?;
+        if bytes.len() > 512 * 1024 || !bytes.starts_with(b"\\x89PNG\\r\\n\\x1a\\n") {
+            return None;
+        }
+        let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()?;
+        if image.width() > 256 || image.height() > 256 { return None; }
+        let image = image.thumbnail(112, 112).to_rgba8();
         Some(egui::ColorImage::from_rgba_unmultiplied(
             [image.width() as usize, image.height() as usize], image.as_raw(),
         ))
@@ -144,16 +175,24 @@ impl CatalogUi {
     }
 
     pub fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
+        let game = match entry.game {
+            Game::StarRail => "HSR",
+            Game::WutheringWaves => "WutheringWaves",
+            Game::StellaSora => "StellaSora",
+            Game::Neverness => "Neverness",
+        };
+        let kind = if entry.kind == Kind::Character { "c" } else { "w" };
+        let key = format!("{game}/{kind}-{}.png", entry.id);
         if entry.has_verified_image()
-            && !self.textures.contains_key(&entry.icon_url)
-            && !self.queued.contains(&entry.icon_url)
+            && !self.textures.contains_key(&key)
+            && !self.queued.contains(&key)
         {
-            self.queued.insert(entry.icon_url.clone());
-            if self.send_url.send(entry.icon_url.clone()).is_err() {
-                self.queued.remove(&entry.icon_url);
+            self.queued.insert(key.clone());
+            if self.send_url.send(key.clone()).is_err() {
+                self.queued.remove(&key);
             }
         }
-        if let Some(Some(tex)) = self.textures.get(&entry.icon_url) {
+        if let Some(Some(tex)) = self.textures.get(&key) {
             ui.image((tex.id(), egui::vec2(size, size)));
         } else {
             let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
