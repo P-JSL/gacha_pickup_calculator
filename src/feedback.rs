@@ -35,6 +35,10 @@ pub struct FeedbackConfig {
     /// Current 4★ or higher pity on the weapon banner.
     pub weapon_four_star_pity: usize,
     pub samples: usize,
+    /// 0 = all coral buys tickets; 1/2 = reserve enough for that many
+    /// limited-character Wavebands before converting the rest to tickets.
+    pub wuwa_waveband_max: usize,
+    pub wuwa_waveband_cost: usize,
 }
 
 impl FeedbackConfig {
@@ -48,17 +52,17 @@ impl FeedbackConfig {
                 weapon_four_star_rate: 0.066,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
-                samples: 20_000,
+                samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
                 featured_first: 15, featured_duplicate: 15,
-                off_banner_rare: 15, weapon_first: 15, weapon_rare: 15,
+                off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
                 four_star_reward: 3, weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
-                samples: 20_000,
+                samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
             },
             Game::Neverness => Self {
                 // Warp Pieces can buy dice / Tri-Keys. The 24-piece price and
@@ -70,7 +74,7 @@ impl FeedbackConfig {
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0,
-                weapon_four_star_pity: 0, samples: 20_000,
+                weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
             },
             Game::StellaSora => Self {
                 // Expert Permits: duplicate 5★ Trekker / Disc = 200,
@@ -84,7 +88,7 @@ impl FeedbackConfig {
                 character_four_star_rate: 0.08, weapon_four_star_rate: 0.08,
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
-                weapon_four_star_pity: 0, samples: 20_000,
+                weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
             },
         }
     }
@@ -94,6 +98,8 @@ impl FeedbackConfig {
             || self.four_star_hard == 0 || self.four_star_hard > 20
             || self.character_four_star_pity >= self.four_star_hard
             || self.weapon_four_star_pity >= self.four_star_hard
+            || self.wuwa_waveband_max > 2 || self.wuwa_waveband_cost == 0
+            || self.wuwa_waveband_cost > 100_000
             || !valid_probability(self.character_four_star_rate)
             || !valid_probability(self.weapon_four_star_rate)
             || !valid_probability(self.character_other_five_star_rate)
@@ -119,6 +125,8 @@ pub struct RefundScenario {
     pub initial_flexible_required: usize,
     /// All earned points, including the final pull's unspendable reward.
     pub earned_points: usize,
+    pub wavebands_purchased: usize,
+    pub corals_spent_on_wavebands: usize,
 }
 impl RefundScenario {
     fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
@@ -130,6 +138,8 @@ impl RefundScenario {
             points_funded_pulls,
             initial_flexible_required: wallet.initial_flexible_required,
             earned_points: wallet.points - starting_points,
+            wavebands_purchased: wallet.wavebands_bought,
+            corals_spent_on_wavebands: wallet.waveband_points_spent,
         };
         debug_assert_eq!(scenario.raw_pulls,
             scenario.dedicated_used + scenario.points_funded_pulls
@@ -159,6 +169,8 @@ pub struct FeedbackEstimate {
     pub average_raw: f64,
     pub average_initial_flexible: f64,
     pub total_returned_points_average: f64,
+    pub average_wavebands_purchased: f64,
+    pub average_waveband_corals_spent: f64,
 }
 
 impl FeedbackEstimate {
@@ -240,11 +252,14 @@ struct Wallet {
     common_spent: usize,
     initial_flexible_required: usize,
     raw_pulls: usize,
+    waveband_points_spent: usize,
+    wavebands_bought: usize,
 }
 impl Wallet {
     fn new(model: &FeedbackConfig) -> Self {
         Self { points: model.initial_points, price: model.points_per_ticket,
-            common_spent: 0, initial_flexible_required: 0, raw_pulls: 0 }
+            common_spent: 0, initial_flexible_required: 0, raw_pulls: 0,
+            waveband_points_spent: 0, wavebands_bought: 0 }
     }
     /// The ticket for the current pull is payable only with returns obtained *before* that pull.
     fn pay(&mut self, dedicated_remaining: &mut usize) {
@@ -252,12 +267,34 @@ impl Wallet {
         if *dedicated_remaining > 0 { *dedicated_remaining -= 1; }
         else {
             self.common_spent += 1;
-            let recycled_so_far = self.points / self.price;
-            self.initial_flexible_required = self.initial_flexible_required.max(
-                self.common_spent.saturating_sub(recycled_so_far));
+            self.reconcile_funding();
         }
     }
     fn refund(&mut self, reward: usize) { self.points += reward; }
+    fn reconcile_funding(&mut self) {
+        // Corals spent on a Waveband cannot also subsidize a ticket.
+        let recycled = self.points.saturating_sub(self.waveband_points_spent) / self.price;
+        self.initial_flexible_required = self.initial_flexible_required.max(
+            self.common_spent.saturating_sub(recycled));
+    }
+    fn buy_waveband(&mut self, cost: usize) -> bool {
+        if self.points.saturating_sub(self.waveband_points_spent) < cost { return false; }
+        self.waveband_points_spent += cost;
+        self.wavebands_bought += 1;
+        self.reconcile_funding();
+        true
+    }
+}
+
+/// Buy only when the target character already exists and the target is not met.
+fn buy_available_wavebands(wallet: &mut Wallet, model: &FeedbackConfig,
+    owned: usize, won: &mut usize, target: usize, limit: usize, bought: &mut usize) {
+    while *bought < limit && *won < target && owned + *won > 0
+        && wallet.buy_waveband(model.wuwa_waveband_cost)
+    {
+        *bought += 1;
+        *won += 1;
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -290,11 +327,16 @@ fn award_featured(wallet: &mut Wallet, model: &FeedbackConfig, owned: usize,
 
 fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
-                 (owned, dedicated): (usize, &mut usize)) {
+                 (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
     let BannerRule::Standard { rarity, featured_share } = &rule.rule else { return; };
     let mut pity = rule.pity;
     let mut guaranteed = rule.guaranteed;
     let mut won = 0;
+    let mut bought = 0;
+    if waveband_limit > 0 {
+        buy_available_wavebands(wallet, model, owned, &mut won, rule.target_copies,
+            waveband_limit, &mut bought);
+    }
     let mut four_pity = match kind {
         BannerKind::Character => model.character_four_star_pity,
         BannerKind::Weapon => model.weapon_four_star_pity,
@@ -319,6 +361,10 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
                 guaranteed = true;
             }
         } else { pity += 1; }
+        if waveband_limit > 0 {
+            buy_available_wavebands(wallet, model, owned, &mut won, rule.target_copies,
+                waveband_limit, &mut bought);
+        }
     }
 }
 
@@ -430,6 +476,8 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
     let mut total_raw = 0.0;
     let mut total_flexible = 0.0;
     let mut total_returns = 0.0;
+    let mut total_wavebands = 0.0;
+    let mut total_waveband_cost = 0.0;
     for _ in 0..model.samples {
         let mut wallet = Wallet::new(model);
         let mut dedicated_character = setup.character_dedicated;
@@ -440,7 +488,12 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         ] {
             match &banner.rule {
                 BannerRule::Standard { .. } => {
-                    roll_standard(&mut rng, banner, kind, mode, model, &mut wallet, (owned, dedicated));
+                    let max_wavebands = if setup.game == Game::WutheringWaves
+                        && matches!(kind, BannerKind::Character) {
+                        model.wuwa_waveband_max
+                    } else { 0 };
+                    roll_standard(&mut rng, banner, kind, mode, model, &mut wallet,
+                        (owned, dedicated, max_wavebands));
                 }
                 BannerRule::FeaturedCounter { .. } => {
                     roll_featured(&mut rng, banner, kind, model, &mut wallet, owned, dedicated);
@@ -456,6 +509,8 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         total_raw += wallet.raw_pulls as f64;
         total_flexible += wallet.initial_flexible_required as f64;
         total_returns += (wallet.points - model.initial_points) as f64;
+        total_wavebands += wallet.wavebands_bought as f64;
+        total_waveband_cost += wallet.waveband_points_spent as f64;
     }
     scenarios.sort_unstable_by_key(|scenario|
         (scenario.initial_flexible_required, scenario.raw_pulls));
@@ -463,7 +518,9 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
     let n = model.samples as f64;
     Ok(FeedbackEstimate { budgets, raw_pulls, scenarios,
         average_raw: total_raw / n, average_initial_flexible: total_flexible / n,
-        total_returned_points_average: total_returns / n })
+        total_returned_points_average: total_returns / n,
+        average_wavebands_purchased: total_wavebands / n,
+        average_waveband_corals_spent: total_waveband_cost / n })
 }
 
 #[cfg(test)]
@@ -479,7 +536,8 @@ mod tests {
             weapon_first: 1, weapon_rare: 1, four_star_reward: 0,
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
             weapon_four_star_rate: 0.0, character_other_five_star_rate: 0.0,
-            weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10 };
+            weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10,
+            wuwa_waveband_max: 0, wuwa_waveband_cost: 360 };
         let mut w = Wallet::new(&conf);
         let mut d = 0;
         w.pay(&mut d);
@@ -694,8 +752,34 @@ mod tests {
     }
 
     #[test]
-    fn off_banner_wuthering_rare_uses_conservative_default() {
-        assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 15);
+    fn waveband_store_prioritizes_purchases_without_double_spending() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.character = Banner { rule: BannerRule::Standard {
+            rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+            featured_share: 1.0,
+        }, pity: 0, guaranteed: false, target_copies: 4,
+           spark: None, any_rare_pity: 0 };
+        setup.weapon.target_copies = 0;
+        let mut cfg = FeedbackConfig::for_game(Game::WutheringWaves);
+        cfg.samples = 30;
+        cfg.featured_first = 2;
+        cfg.featured_duplicate = 2;
+        cfg.wuwa_waveband_cost = 2;
+        cfg.points_per_ticket = 2;
+        cfg.four_star_reward = 0;
+        cfg.character_four_star_rate = 0.0;
+        let tickets = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(tickets.quantile(1.0), 1);
+        cfg.wuwa_waveband_max = 2;
+        let wavebands = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(wavebands.average_wavebands_purchased, 2.0);
+        assert_eq!(wavebands.average_waveband_corals_spent, 4.0);
+        assert_eq!(wavebands.scenarios[0].raw_pulls, 2);
+        assert_eq!(wavebands.scenarios[0].initial_flexible_required, 2);
+    }
+    #[test]
+    fn off_banner_wuthering_rare_includes_30_extra_corals() {
+        assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 45);
     }
 
 }

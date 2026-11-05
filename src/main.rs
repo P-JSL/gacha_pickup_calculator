@@ -8,6 +8,7 @@ use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, Rate
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
 use std::collections::HashMap;
+use std::io::Read;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
@@ -206,11 +207,48 @@ fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, role: TicketR
     }
 }
 
+/// Match simulation assumptions across all three WuWa coral strategies.
+fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[FeedbackEstimate],
+    setup: &GameSetup, confidence: usize) {
+    let owned = setup.available_flexible();
+    let threshold = confidence as f64 / 100.0;
+    section(ui, "WU", "명조 · 산호 투자 전략 3종 비교",
+        "환급 재투입까지 계산한 몬테카를로 비교입니다. 돌파 재료는 산호를 확보한 이후 구매합니다.", |ui| {
+            egui::ScrollArea::horizontal().show(ui, |ui| {
+                egui::Grid::new("wuwa_comparison_table").striped(true)
+                    .min_col_width(95.0).spacing([14.0, 9.0]).show(ui, |ui| {
+                        for title in ["산호 사용", &format!("{}% 필요 자유뽑", confidence),
+                            "추가 별의 소리", "현재 재화 성공률", "평균 총 뽑", "평균 돌파 구매"] {
+                            ui.label(RichText::new(title).strong());
+                        }
+                        ui.end_row();
+                        for (count, result) in strategies.iter().enumerate() {
+                            let needed = result.quantile(threshold);
+                            let extra = setup.additional_currency_for(needed);
+                            let chance = result.probability(owned).0;
+                            ui.label(match count {
+                                0 => "뽑기권 전환", 1 => "돌파 최대 1개",
+                                _ => "돌파 최대 2개",
+                            });
+                            ui.label(format!("{needed}뽑"));
+                            ui.label(format!("{extra}개"));
+                            ui.label(format!("{:.2}%", chance * 100.0));
+                            ui.label(format!("{:.1}뽑", result.average_raw));
+                            ui.label(format!("{:.2}개", result.average_wavebands_purchased));
+                            ui.end_row();
+                        }
+                    });
+            });
+            ui.small("필요 자유뽑은 별도 전용권을 제외한 최초 뽑기 예산입니다. 확률은 표본 기반 추정치입니다.");
+        });
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
+    wuwa_strategies: Option<Vec<FeedbackEstimate>>,
 }
 
 struct CalculationRequest {
@@ -229,10 +267,23 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     let character = request.setup.character.distribution(request.mode)?;
     let weapon = request.setup.weapon.distribution(request.mode)?;
     let combined = character.combine(&weapon);
-    let feedback = if request.feedback_config.enabled {
-        Some(estimate(&request.setup, request.mode, &request.feedback_config)?)
-    } else { None };
-    Ok(Computed { character, weapon, combined, feedback })
+    let (feedback, wuwa_strategies) = if request.feedback_config.enabled
+        && request.setup.game == Game::WutheringWaves
+    {
+        let mut strategies = Vec::with_capacity(3);
+        for max_wavebands in 0..=2 {
+            let mut variant = request.feedback_config.clone();
+            variant.wuwa_waveband_max = max_wavebands;
+            strategies.push(estimate(&request.setup, request.mode, &variant)?);
+        }
+        let selected = strategies[request.feedback_config.wuwa_waveband_max.min(2)].clone();
+        (Some(selected), Some(strategies))
+    } else if request.feedback_config.enabled {
+        (Some(estimate(&request.setup, request.mode, &request.feedback_config)?), None)
+    } else {
+        (None, None)
+    };
+    Ok(Computed { character, weapon, combined, feedback, wuwa_strategies })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -256,7 +307,7 @@ struct UiPreferences {
 impl Default for UiPreferences {
     fn default() -> Self {
         Self {
-            auto_recalculate: true,
+            auto_recalculate: false,
             debounce_ms: 350,
             show_result_panel: true,
             show_chart_fill: true,
@@ -779,6 +830,73 @@ impl Calculator {
         dirty
     }
 
+    /// Independent banner pages share their input state with the dashboard.
+    fn single_banner_page(&mut self, ui: &mut egui::Ui, weapon: bool) -> bool {
+        let mut dirty = false;
+        let title = if weapon { self.setup.game.secondary_banner_name() } else { "캐릭터" };
+        section(ui, "01", &format!("{title} 목표와 보유"), "선택한 배너만 수정합니다.", |ui| {
+            if weapon {
+                self.catalog_selector(ui, catalog::Kind::Weapon);
+                egui::ComboBox::from_id_salt("weapon_only_goal")
+                    .selected_text(if self.target_refine == 0 { "필요 없음".into() }
+                        else { format!("S{} · {}장", self.target_refine, self.target_refine) })
+                    .show_ui(ui, |ui| {
+                        for count in 0..=5 {
+                            dirty |= ui.selectable_value(&mut self.target_refine, count,
+                                if count == 0 { "필요 없음".into() }
+                                else { format!("S{count} / {count}장") }).changed();
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    ui.label("기보유");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
+                        .range(0..=5).suffix("장")).changed();
+                });
+            } else {
+                self.catalog_selector(ui, catalog::Kind::Character);
+                egui::ComboBox::from_id_salt("character_only_goal")
+                    .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
+                    .show_ui(ui, |ui| {
+                        for level in 0..=6 {
+                            dirty |= ui.selectable_value(&mut self.target_eid, level,
+                                format!("E{level} / {}장", level + 1)).changed();
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    ui.label("기보유");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
+                        .range(0..=7).suffix("장")).changed();
+                });
+            }
+        });
+        ui.add_space(10.0);
+        section(ui, "02", &format!("{title} 천장"), "", |ui| {
+            if weapon {
+                dirty |= Self::banner_controls(ui, title, &mut self.setup.weapon.rule,
+                    &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                    &mut self.setup.weapon.any_rare_pity);
+            } else {
+                dirty |= Self::banner_controls(ui, title, &mut self.setup.character.rule,
+                    &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                    &mut self.setup.character.any_rare_pity);
+                if let Some(spark) = self.setup.character.spark.as_mut() {
+                    ui.separator();
+                    let mut available = !spark.used;
+                    if ui.checkbox(&mut available, "120회 보너스 미사용").changed() {
+                        spark.used = !available;
+                        dirty = true;
+                    }
+                    ui.horizontal(|ui| {
+                        ui.label("배너 진행도");
+                        dirty |= ui.add(egui::DragValue::new(&mut spark.progress)
+                            .range(0..=120)).changed();
+                    });
+                }
+            }
+        });
+        dirty
+    }
+
     fn banner_controls(ui: &mut egui::Ui, name: &str,
                        rule: &mut BannerRule, pity: &mut usize,
                        guaranteed: &mut bool, any_rare: &mut usize) -> bool {
@@ -923,6 +1041,27 @@ impl Calculator {
                 "{} · 게임별 환급 기본값",
                 self.setup.game.exchange_points_name()
             )).color(PRIMARY));
+            if self.setup.game == Game::WutheringWaves {
+                ui.colored_label(PRIMARY,
+                    "명조: 산호를 뽑기권으로 사용하거나 픽업 캐릭터 돌파 재료를 최대 2개 우선 구매합니다.");
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("산호 사용 전략");
+                    egui::ComboBox::from_id_salt("wuwa_wavebands")
+                        .selected_text(format!("돌파 최대 {}개", self.feedback_cfg.wuwa_waveband_max))
+                        .show_ui(ui, |ui| {
+                            for count in 0..=2 {
+                                dirty |= ui.selectable_value(
+                                    &mut self.feedback_cfg.wuwa_waveband_max, count,
+                                    if count == 0 { "뽑기권만 교환".to_owned() }
+                                    else { format!("돌파 {count}개 우선") }).changed();
+                            }
+                        });
+                    ui.label("돌파 1개 가격");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.wuwa_waveband_cost)
+                        .range(1..=100_000).suffix("산호")).changed();
+                });
+                ui.small("산호 8개=뽑기권 1개, 돌파 재료 360개 기본값(사용자 수정 가능). 획득 중 발생한 산호까지 반영하며 남는 산호는 뽑기에 사용합니다.");
+            }
             if self.setup.game == Game::Neverness {
                 ui.colored_label(GOLD,
                     "이환: Warp Pieces 교환 단가·보드 보상·Tri-Key 전환 조건은 추가 검증이 필요한 추정값입니다.");
@@ -1216,6 +1355,10 @@ impl Calculator {
             }
         });
         ui.add_space(12.0);
+        if let Some(strategies) = &stats.wuwa_strategies {
+            wuwa_strategy_table(ui, strategies, &self.setup, self.confidence);
+            ui.add_space(10.0);
+        }
         if let Some(ref feedback) = stats.feedback {
             let target_budget = if self.query_mode == QueryMode::RequiredBudget {
                 feedback.quantile(q)
@@ -1396,12 +1539,29 @@ impl Calculator {
                     if let Some(ref schedule) = candidate {
                         let load = (|| -> Result<ObservationDataset, String> {
                             let path = std::path::Path::new(&self.observation_path);
-                            let size = std::fs::metadata(path)
-                                .map_err(|e| format!("파일 확인 실패: {e}"))?.len();
-                            if size > 8 * 1024 * 1024 {
+                            let metadata = std::fs::symlink_metadata(path)
+                                .map_err(|e| format!("파일 확인 실패: {e}"))?;
+                            if !metadata.file_type().is_file() {
+                                return Err("심볼릭 링크·장치가 아닌 일반 CSV 파일만 허용합니다.".into());
+                            }
+                            const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
+                            if metadata.len() > MAX_CSV_BYTES {
                                 return Err("CSV 크기는 8 MiB 이하로 제한됩니다.".into());
                             }
-                            let contents = std::fs::read_to_string(path)
+                            let file = std::fs::File::open(path)
+                                .map_err(|e| format!("CSV 열기 실패: {e}"))?;
+                            if !file.metadata().is_ok_and(|m| m.is_file()) {
+                                return Err("CSV로 일반 파일만 허용합니다.".into());
+                            }
+                            // Bound the actual read; metadata can race with a
+                            // file replacement or change after the initial check.
+                            let mut bytes = Vec::new();
+                            file.take(MAX_CSV_BYTES + 1).read_to_end(&mut bytes)
+                                .map_err(|e| format!("CSV 읽기 실패: {e}"))?;
+                            if bytes.len() as u64 > MAX_CSV_BYTES {
+                                return Err("읽는 중 크기가 8 MiB를 초과했습니다.".into());
+                            }
+                            let contents = String::from_utf8(bytes)
                                 .map_err(|e| format!("UTF-8 CSV 읽기 실패: {e}"))?;
                             parse_observation_csv(&contents, schedule.hard)
                         })();
@@ -1579,7 +1739,7 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
 /// and Linux. No OS-native chart controls or persistence are involved.
 fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
     let end = chart_domain_end(series);
-    let width = ui.available_width().max(190.0);
+    let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
     let (response, painter) = ui.allocate_painter(
         egui::vec2(width, height), egui::Sense::hover(),
@@ -1685,6 +1845,17 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
             series.iter().map(|line| format!("{} {:.1}%", line.label,
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
+        // Keep the exact point probability visible inside the graph as well
+        // as in the native mouse tooltip, even on platforms where hover UI
+        // can be delayed or positioned outside a small desktop viewport.
+        let badge = egui::Rect::from_min_size(
+            egui::pos2(graph.left() + 5.0, graph.top() + 5.0),
+            egui::vec2((graph.width() - 10.0).max(12.0), 22.0));
+        painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
+        let overlay = painter.with_clip_rect(badge.shrink(3.0));
+        overlay.text(badge.left_center() + egui::vec2(5.0, 0.0),
+            egui::Align2::LEFT_CENTER, &tooltip,
+            egui::FontId::proportional(10.5), Color32::WHITE);
         response.clone().on_hover_text(tooltip);
         }
     }
@@ -1755,9 +1926,21 @@ impl eframe::App for Calculator {
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
         if self.header(ctx) {
-            self.schedule_recalculation();
+            self.input_needs_calculation = true;
+            if self.ui_preferences.auto_recalculate {
+                self.schedule_recalculation();
+            } else {
+                // Game switching and navigation never start a new expensive
+                // simulation while automatic updates are disabled.
+                self.pending_since = None;
+                self.calculating = false;
+                self.generation = self.generation.wrapping_add(1);
+            }
         }
-        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel {
+        // Reserve a usable central editing width. The optional right sidebar
+        // collapses on smaller windows rather than overlapping input controls.
+        if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel
+            && ctx.available_rect().width() >= 1_270.0 {
             self.workspace_results_panel(ctx);
         }
         let mut settings_changed = false;
@@ -1795,10 +1978,9 @@ impl eframe::App for Calculator {
                                     } else {
                                         "무기 · 광추 · 레코드 · Arc 목표 관리"
                                     },
-                                    "캐릭터와 보조 배너의 목표 및 천장 상태는 서로 독립적입니다.");
-                                settings_changed |= self.targets(ui);
-                                ui.add_space(10.0);
-                                settings_changed |= self.pity(ui);
+                                    "선택한 배너만 편집하며, 입력값은 대시보드·시뮬레이터와 공유합니다.");
+                                let weapon = self.view_mode == ViewMode::Weapons;
+                                settings_changed |= self.single_banner_page(ui, weapon);
                             }
                             ViewMode::Preferences => {
                                 self.desktop_settings(ui);
@@ -1867,10 +2049,18 @@ impl eframe::App for Calculator {
             });
         if settings_changed {
             self.input_needs_calculation = true;
+            if !self.ui_preferences.auto_recalculate {
+                // An edit invalidates any in-flight response, without starting
+                // heavy computations or changing focus on each keystroke.
+                self.generation = self.generation.wrapping_add(1);
+                self.pending_since = None;
+                self.calculating = false;
+            }
         }
         if self.manual_calculation_requested {
             self.manual_calculation_requested = false;
-            self.schedule_recalculation();
+            self.pending_since = None;
+            self.recalculate();
         } else if settings_changed && self.ui_preferences.auto_recalculate {
             self.schedule_recalculation();
         }
@@ -1993,6 +2183,13 @@ fn main() -> eframe::Result {
 #[cfg(test)]
 mod chart_tests {
     use super::*;
+    #[test]
+    fn automatic_recalculation_is_disabled_by_default() {
+        let prefs = UiPreferences::default();
+        assert!(!prefs.auto_recalculate);
+        assert!(prefs.show_hover_guides);
+    }
+
     #[test]
     fn sample_curve_has_endpoints_and_monotonic_probabilities() {
         let dist = Distribution::new(vec![0.0, 0.2, 0.3, 0.5]);

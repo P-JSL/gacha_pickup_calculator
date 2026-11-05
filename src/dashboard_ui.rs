@@ -94,15 +94,17 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
                else if kind == 2 { Color32::from_rgb(35, 57, 94) }
                else { Color32::from_rgb(28, 63, 96) };
     wash(ui, r, base, Color32::from_rgb(17, 43, 67));
-    metric_icon(ui.painter(), egui::pos2(r.left()+34.0,r.top()+47.0), kind, color);
+    // Clip large text at the edge of its metric card, never paint over peers.
+    let paint = ui.painter().with_clip_rect(r.shrink(4.0));
+    metric_icon(&paint, egui::pos2(r.left()+34.0,r.top()+47.0), kind, color);
     let left = r.left()+66.0;
-    ui.painter().text(egui::pos2(left,r.top()+18.0),
+    paint.text(egui::pos2(left,r.top()+18.0),
         egui::Align2::LEFT_TOP, label, egui::FontId::proportional(12.0),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+43.0),
+    paint.text(egui::pos2(left,r.top()+43.0),
         egui::Align2::LEFT_TOP, value, egui::FontId::proportional(27.0),
         Color32::WHITE);
-    ui.painter().text(egui::pos2(left,r.top()+94.0),
+    paint.text(egui::pos2(left,r.top()+94.0),
         egui::Align2::LEFT_TOP, note, egui::FontId::proportional(10.0),
         MUTED);
 }
@@ -150,7 +152,7 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.set_min_height(48.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(icon).size(16.0).color(Color32::WHITE));
                 ui.label(RichText::new(label).size(10.5).color(Color32::WHITE).strong());
             });
@@ -185,8 +187,11 @@ impl Calculator {
             let expected = stats.feedback.as_ref().map(|f| f.average_raw)
                 .unwrap_or(stats.combined.mean);
             let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
-            if self.input_needs_calculation || self.calculating {
-                ui.label(RichText::new("입력 반영 중 · 이전 계산 결과를 유지합니다.")
+            if self.input_needs_calculation && !self.calculating {
+                ui.label(RichText::new("입력 수정됨 · Run Simulation을 누르면 결과가 갱신됩니다.")
+                    .color(YELLOW).size(10.0));
+            } else if self.calculating {
+                ui.label(RichText::new("백그라운드 계산 중 · 이전 결과를 유지합니다.")
                     .color(YELLOW).size(10.0));
             }
             ui.columns(4, |columns| {
@@ -230,7 +235,7 @@ impl Calculator {
             let chart_total = [ChartSeries {
                 label: "전체 · 환급 전", source: ChartSource::Exact(&stats.combined), color: PINK,
             }];
-            if ui.available_width() >= 720.0 {
+            if ui.available_width() >= 900.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
                         format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
@@ -262,6 +267,12 @@ impl Calculator {
 
         ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
+        if let Some(stats) = self.visible_stats() {
+            if let Some(strategies) = &stats.wuwa_strategies {
+                ui.add_space(10.0);
+                wuwa_strategy_table(ui, strategies, &self.setup, self.confidence);
+            }
+        }
         dirty
     }
 
@@ -275,7 +286,7 @@ impl Calculator {
             .inner_margin(13)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("☷").color(CYAN).size(19.0));
                     ui.label(RichText::new("Simulation Settings").size(16.0).strong());
                     ui.add_space(19.0);
