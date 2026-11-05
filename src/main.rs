@@ -23,6 +23,69 @@ const SIDEBAR: Color32 = Color32::from_rgb(3, 20, 30);
 const SELECTED_NAV: Color32 = Color32::from_rgb(30, 77, 112);
 const SURFACE: Color32 = Color32::from_rgb(12, 35, 54);
 
+/// Paint navigation icons with egui primitives rather than OS/font-specific glyphs.
+fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, color: Color32) {
+    let p = |x: f32, y: f32| egui::pos2(center.x + x, center.y + y);
+    let stroke = egui::Stroke::new(1.8_f32, color);
+    match view {
+        ViewMode::Calculator => {
+            painter.line_segment([p(-8.0, -1.0), p(0.0, -8.0)], stroke);
+            painter.line_segment([p(0.0, -8.0), p(8.0, -1.0)], stroke);
+            painter.line_segment([p(-6.0, -1.0), p(-6.0, 7.0)], stroke);
+            painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
+            painter.line_segment([p(6.0, 7.0), p(6.0, -1.0)], stroke);
+        }
+        ViewMode::Settings => {
+            for (y, x) in [(-6.0, -3.0), (0.0, 5.0), (6.0, -1.0)] {
+                painter.line_segment([p(-8.0, y), p(8.0, y)], stroke);
+                painter.circle_filled(p(x, y), 2.6, color);
+            }
+        }
+        ViewMode::Currency => {
+            painter.circle_stroke(p(-2.0, -2.0), 6.5, stroke);
+            painter.circle_stroke(p(3.0, 3.5), 5.5, stroke);
+        }
+        ViewMode::Characters => {
+            painter.circle_stroke(p(-3.5, -4.0), 3.6, stroke);
+            painter.circle_stroke(p(5.5, -3.0), 2.7, stroke);
+            painter.line_segment([p(-9.0, 7.0), p(-8.0, 2.0)], stroke);
+            painter.line_segment([p(-8.0, 2.0), p(2.0, 2.0)], stroke);
+            painter.line_segment([p(2.0, 2.0), p(4.0, 7.0)], stroke);
+            painter.line_segment([p(5.0, 2.0), p(9.0, 2.0)], stroke);
+            painter.line_segment([p(9.0, 2.0), p(10.0, 7.0)], stroke);
+        }
+        ViewMode::Weapons => {
+            painter.line_segment([p(-7.0, -7.0), p(7.0, 7.0)], stroke);
+            painter.line_segment([p(-7.0, 7.0), p(7.0, -7.0)], stroke);
+            painter.line_segment([p(-7.0, -7.0), p(-3.0, -7.0)], stroke);
+            painter.line_segment([p(7.0, -7.0), p(3.0, -7.0)], stroke);
+        }
+        ViewMode::Analytics => {
+            for (x, h) in [(-7.0, 7.0), (-1.0, 12.0), (5.0, 16.0)] {
+                painter.rect_filled(
+                    egui::Rect::from_min_size(p(x, 8.0 - h), egui::vec2(3.5, h)),
+                    1.0, color,
+                );
+            }
+        }
+        ViewMode::TrackerSources => {
+            painter.line_segment([p(-7.0, -6.0), p(7.0, -6.0)], stroke);
+            painter.line_segment([p(-7.0, 0.0), p(7.0, 0.0)], stroke);
+            painter.line_segment([p(-7.0, 6.0), p(5.0, 6.0)], stroke);
+        }
+        ViewMode::ObservedDistribution => {
+            for x in [-6.0, 0.0, 6.0] {
+                for y in [-6.0, 0.0, 6.0] {
+                    painter.rect_filled(
+                        egui::Rect::from_center_size(p(x, y), egui::vec2(3.5, 3.5)),
+                        0.5, color,
+                    );
+                }
+            }
+        }
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
@@ -310,29 +373,52 @@ impl Calculator {
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
             .show(ctx, |ui| {
                 ui.add_space(14.0);
-                ui.vertical_centered(|ui| {
-                    ui.label(RichText::new("✧").color(PRIMARY).size(45.0).strong());
-                    ui.label(RichText::new("GACHA LAB").color(MUTED).size(11.0).strong());
-                });
-                ui.add_space(25.0);
+                let (logo, painter) = ui.allocate_painter(
+                    egui::vec2(ui.available_width(), 82.0), egui::Sense::hover(),
+                );
+                let c = egui::pos2(logo.rect.center().x, logo.rect.top() + 35.0);
+                painter.circle_stroke(c, 24.0,
+                    egui::Stroke::new(1.2_f32, PRIMARY.gamma_multiply(0.65)));
+                painter.line_segment([
+                    egui::pos2(c.x - 17.0, c.y), egui::pos2(c.x + 17.0, c.y)
+                ], egui::Stroke::new(2.3_f32, PRIMARY));
+                painter.line_segment([
+                    egui::pos2(c.x, c.y - 17.0), egui::pos2(c.x, c.y + 17.0)
+                ], egui::Stroke::new(2.3_f32, PRIMARY));
+                painter.circle_filled(c, 5.0, Color32::WHITE);
+                painter.text(
+                    egui::pos2(logo.rect.center().x, logo.rect.bottom() - 5.0),
+                    egui::Align2::CENTER_BOTTOM, "GACHA LAB",
+                    egui::FontId::proportional(11.0), MUTED,
+                );
+                ui.add_space(17.0);
                 for (view, title) in [
-                    (ViewMode::Calculator, "⌂   Dashboard"),
-                    (ViewMode::Settings, "◇   Simulator"),
-                    (ViewMode::Currency, "◈   Currency"),
-                    (ViewMode::Characters, "♧   Characters"),
-                    (ViewMode::Weapons, "⚔   Weapons"),
-                    (ViewMode::Analytics, "▥   Analytics"),
-                    (ViewMode::TrackerSources, "☷   Sources"),
-                    (ViewMode::ObservedDistribution, "▧   CSV Analysis"),
+                    (ViewMode::Calculator, "Dashboard"),
+                    (ViewMode::Settings, "Simulator"),
+                    (ViewMode::Currency, "Currency"),
+                    (ViewMode::Characters, "Characters"),
+                    (ViewMode::Weapons, "Weapons"),
+                    (ViewMode::Analytics, "Analytics"),
+                    (ViewMode::TrackerSources, "Sources"),
+                    (ViewMode::ObservedDistribution, "CSV Analysis"),
                 ] {
                     let active = self.view_mode == view;
-                    let button = egui::Button::new(
-                        RichText::new(title).size(14.0)
-                            .color(if active { Color32::WHITE } else { MUTED }).strong()
-                    ).fill(if active { SELECTED_NAV } else { SIDEBAR })
-                        .stroke(egui::Stroke::new(if active { 1.0_f32 } else { 0.0_f32 }, BORDER))
-                        .corner_radius(11);
-                    if ui.add_sized([ui.available_width(), 39.0], button).clicked() {
+                    let (rect, response) = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), 39.0), egui::Sense::click(),
+                    );
+                    let background = if active { SELECTED_NAV }
+                        else if response.hovered() { CARD }
+                        else { SIDEBAR };
+                    ui.painter().rect_filled(rect, 10.0, background);
+                    let color = if active { Color32::WHITE } else { MUTED };
+                    draw_nav_icon(ui.painter(),
+                        egui::pos2(rect.left() + 21.0, rect.center().y), view, color);
+                    ui.painter().text(
+                        egui::pos2(rect.left() + 43.0, rect.center().y),
+                        egui::Align2::LEFT_CENTER, title,
+                        egui::FontId::proportional(14.0), color,
+                    );
+                    if response.clicked() {
                         self.view_mode = view;
                     }
                     ui.add_space(5.0);
