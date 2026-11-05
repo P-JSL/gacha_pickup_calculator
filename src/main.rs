@@ -236,10 +236,10 @@ impl Calculator {
                 ui.label(RichText::new("WORKSPACE").color(MUTED).size(10.0).strong());
                 ui.add_space(13.0);
                 for (view, title) in [
-                    (ViewMode::Calculator, "◫  확률 대시보드"),
-                    (ViewMode::Settings, "⚙  시뮬레이션 설정"),
-                    (ViewMode::TrackerSources, "▤  트래커 교차 검증"),
-                    (ViewMode::ObservedDistribution, "◷  실측 CSV 분석"),
+                    (ViewMode::Calculator, "01   확률 대시보드"),
+                    (ViewMode::Settings, "02   시뮬레이션 설정"),
+                    (ViewMode::TrackerSources, "03   트래커 교차 검증"),
+                    (ViewMode::ObservedDistribution, "04   실측 CSV 분석"),
                 ] {
                     let active = self.view_mode == view;
                     let label = RichText::new(title).size(13.0)
@@ -627,7 +627,7 @@ impl Calculator {
         // On a wide display the two independent banners are displayed next
         // to each other. On narrow/HiDPI Windows viewports they stack, so no
         // graph extends beyond the available logical width.
-        if ui.available_width() >= 1080.0 {
+        if ui.available_width() >= 880.0 {
             ui.columns(2, |cols| {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
