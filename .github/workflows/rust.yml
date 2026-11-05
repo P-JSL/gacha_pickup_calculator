@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -41,28 +41,94 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish v0.1.0 release
+    name: Publish versioned release
     needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Check version and existing release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice title=Existing release::$TAG is already published; change Cargo.toml version before releasing again."
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+          else
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+              echo "::error::Tag $TAG exists without a release. Refusing an ambiguous overwrite."
+              exit 1
+            fi
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
+        if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
-      - name: Prepare source archive
+      - name: Prepare and verify release assets
+        if: steps.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
-          git archive --format=zip -o dist/gacha-pickup-calculator-source-v0.1.0.zip HEAD
-          sha256sum dist/* > dist/SHA256SUMS.txt
-      - name: Publish release only after successful builds
+          set -euo pipefail
+          test -s dist/gacha_pickup_calculator.exe
+          git archive --format=zip -o "dist/gacha-pickup-calculator-source-v$VERSION.zip" HEAD
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          version = os.environ["VERSION"]
+          executable = Path("dist/gacha_pickup_calculator.exe")
+          if executable.stat().st_size < 100_000:
+              raise SystemExit("Windows executable is unexpectedly small.")
+          package = Path(f"dist/gacha-pickup-calculator-windows-x64-v{version}.zip")
+          with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
+              zipped.write(executable, executable.name)
+              zipped.writestr("README.txt", "Gacha Pickup Calculator\nRun gacha_pickup_calculator.exe on Windows x64.\nThe ZIP contains the same executable as the standalone release asset.\n")
+          with ZipFile(package) as zipped:
+              assert zipped.testzip() is None
+              assert executable.name in zipped.namelist()
+          PY
+          cd dist
+          sha256sum gacha_pickup_calculator.exe \
+            "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
+            "gacha-pickup-calculator-source-v$VERSION.zip" > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+      - name: Publish release and validate asset list
+        if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
-          if gh release view v0.1.0 >/dev/null 2>&1; then
-            echo 'v0.1.0 already exists; not overwriting.'
-            exit 0
-          fi
-          gh release create v0.1.0 dist/gacha_pickup_calculator.exe dist/gacha-pickup-calculator-source-v0.1.0.zip dist/SHA256SUMS.txt \
-            --target "$GITHUB_SHA" --title 'v0.1.0 — Rust Markov DP Calculator' \
-            --notes 'Initial four-game desktop release: Honkai Star Rail, Wuthering Waves, Neverness to Everness, Stella Sora. Estimates and limitations are documented in README.'
+          set -euo pipefail
+          gh release create "$TAG" \
+            dist/gacha_pickup_calculator.exe \
+            "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
+            "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
+            dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "$TAG — Rust Gacha Pickup Calculator" \
+            --notes "Windows x64 executable and portable ZIP; Rust source archive and SHA-256 checksums. Windows GUI interactive startup has not been tested in CI."
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
+          for asset in gacha_pickup_calculator.exe \
+            "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
+            "gacha-pickup-calculator-source-v$VERSION.zip" SHA256SUMS.txt; do
+            grep -Fx -- "$asset" actual-assets.txt >/dev/null || {
+              echo "::error::Missing release asset: $asset"
+              exit 1
+            }
+          done
+          echo "::notice title=Release published::$TAG has all four expected assets."
