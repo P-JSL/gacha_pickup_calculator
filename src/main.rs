@@ -181,6 +181,7 @@ struct Calculator {
     show_history: bool,
     search_query: String,
     sidebar_decor: Option<egui::TextureHandle>,
+    header_avatar: Option<egui::TextureHandle>,
 }
 
 impl Calculator {
@@ -198,6 +199,18 @@ impl Calculator {
                 [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
             );
             cc.egui_ctx.load_texture("sidebar_decor", pixels, egui::TextureOptions::LINEAR)
+        });
+        let header_avatar = image::load_from_memory(
+            include_bytes!("assets/header_avatar.jpg")
+        ).ok().map(|art| {
+            let rgba = art.to_rgba8();
+            cc.egui_ctx.load_texture(
+                "header_avatar",
+                egui::ColorImage::from_rgba_unmultiplied(
+                    [rgba.width() as usize, rgba.height() as usize], rgba.as_raw(),
+                ),
+                egui::TextureOptions::LINEAR,
+            )
         });
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
@@ -246,6 +259,7 @@ impl Calculator {
             show_history: false,
             search_query: String::new(),
             sidebar_decor,
+            header_avatar,
         };
         app.recalculate();
         app
@@ -362,50 +376,76 @@ impl Calculator {
         game_changed
     }
 
-    /// Compact Windows desktop header matching the dashboard reference.
+    /// Compact reference-style header with functional search and utilities.
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(14))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(15))
             .show(ctx, |ui| {
-                ui.add_space(31.0);
+                ui.add_space(30.0);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("Gacha Pickup Calculator").strong().size(22.0));
+                        ui.label(RichText::new("Gacha Pickup Calculator")
+                            .strong().size(23.0));
                         ui.label(RichText::new("Probability & Refund Simulator")
-                            .color(MUTED).size(11.0));
+                            .color(MUTED).size(12.0));
                     });
-                    ui.add_space(24.0);
-                    let search = ui.add(egui::TextEdit::singleline(&mut self.search_query)
-                        .desired_width(340.0)
-                        .hint_text("⌕  Search games or sections..."));
-                    if search.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-                        dirty |= self.activate_search();
-                    }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("ⓘ  Help").clicked() {
-                            self.show_help = true;
-                        }
-                        ui.menu_button("◈  확률 모델", |ui| {
-                            dirty |= ui.radio_value(&mut self.mode,
-                                RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
-                            dirty |= ui.radio_value(&mut self.mode,
-                                RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
-                        });
-                        egui::ComboBox::from_id_salt("top_game").width(130.0)
-                            .selected_text(self.setup.game.label())
-                            .show_ui(ui, |ui| {
+                    ui.with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if let Some(ref avatar) = self.header_avatar {
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(45.0, 45.0), egui::Sense::click(),
+                                );
+                                ui.painter().circle_filled(
+                                    rect.center(), 22.5, Color32::from_rgb(42, 68, 96),
+                                );
+                                ui.painter().image(avatar.id(),rect.shrink(3.0),
+                                    egui::Rect::from_min_max(
+                                        egui::pos2(0.0,0.0),egui::pos2(1.0,1.0)),
+                                    Color32::WHITE);
+                                if response.clicked() { self.show_help = true; }
+                            }
+                            if ui.add(egui::Button::new("?")
+                                .fill(CARD).corner_radius(10)
+                                .min_size(egui::vec2(39.0, 39.0))).clicked() {
+                                self.show_help = true;
+                            }
+                            ui.menu_button("♧", |ui| {
+                                ui.label("최근 시뮬레이션");
+                                ui.label(format!("현재 세션 기록 {}건", self.history.len()));
+                                if ui.button("전체 기록 보기").clicked() {
+                                    self.show_history = true;
+                                    ui.close_menu();
+                                }
+                            });
+                            ui.menu_button("☆", |ui| {
+                                ui.label("게임 바로 선택");
                                 for game in Game::ALL {
-                                    if ui.selectable_label(
-                                        self.setup.game == game, game.label()
-                                    ).clicked() && self.setup.game != game {
-                                        self.change_game(game);
-                                        dirty = true;
+                                    if ui.button(game.label()).clicked() {
+                                        if self.setup.game != game {
+                                            self.change_game(game);
+                                            dirty = true;
+                                        }
+                                        self.view_mode = ViewMode::Calculator;
+                                        ui.close_menu();
                                     }
                                 }
                             });
-                    });
+                            ui.add_space(8.0);
+                            let search = ui.add(
+                                egui::TextEdit::singleline(&mut self.search_query)
+                                    .desired_width(385.0)
+                                    .hint_text("⌕  Search games or sections...")
+                                    .margin(egui::Margin::symmetric(10, 8))
+                            );
+                            if search.lost_focus()
+                                && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                                dirty |= self.activate_search();
+                            }
+                        },
+                    );
                 });
+                ui.add_space(12.0);
             });
         dirty
     }
@@ -1500,6 +1540,12 @@ impl eframe::App for Calculator {
                                     );
                                 });
                                 ui.add_space(7.0);
+                                ui.menu_button("확률 모델 ▾", |ui| {
+                                    settings_changed |= ui.radio_value(&mut self.mode,
+                                        RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
+                                    settings_changed |= ui.radio_value(&mut self.mode,
+                                        RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                                });
                                 // Two compact input rows on desktop; no settings
                                 // are removed, and narrow viewports stack safely.
                                 if ui.available_width() >= 910.0 {
