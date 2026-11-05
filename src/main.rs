@@ -380,7 +380,7 @@ impl Calculator {
     fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(15))
+            .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(egui::Margin { left: 15, right: 15, top: 15, bottom: 0 }))
             .show(ctx, |ui| {
                 ui.add_space(30.0);
                 ui.horizontal(|ui| {
@@ -454,7 +454,6 @@ impl Calculator {
                         },
                     );
                 });
-                ui.add_space(12.0);
             });
         dirty
     }
