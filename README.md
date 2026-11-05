@@ -169,3 +169,15 @@ NTE Warp Exchange의 Solid Dice 및 Tri-Key는 각각 Warp Pieces 24개로 구�
 
 참고한 디자인 방향: [Behance – Modern Dark Analytics Dashboard](https://www.behance.net/gallery/241158287/Modern-Dark-Analytics-Dashboard-UI-Design-Admin-UXUI), [Behance – FlowTrack](https://www.behance.net/gallery/238810585/FlowTrack-FinTech-Dashboard-UIUX-Design). 최종 UI의 코드·컬러·컴포넌트는 프로젝트용으로 독립 구현했습니다.
 
+
+## v0.1.10: 컴팩트 설정 워크스페이스
+
+v0.1.9의 Behance형 사이드바와 대시보드 카드를 보존하고 입력 화면의 높이와 불필요한 여백을 정리했습니다.
+
+- **설정 화면은 넓은 창에서 2열 × 2행 카드**로 표시합니다. (획득 목표 / 천장 상태, 보유 티켓 / 환급 모델) 좁은 창에서는 자동으로 세로 배치됩니다.
+- 두 배너 천장 스택을 가로로 배치하고, 환급 교환 가격·보유 포인트·활성화 여부는 바로 수정할 수 있습니다.
+- 중복 장수 보상, 4성 획득률, 개별 4성 천장 및 시뮬레이션 횟수는 **고급 설정**에서 펼쳐서 조정합니다. 모든 값은 기존과 동일하며 숨겨진 기능이 삭제되지는 않았습니다.
+- 사이드바 폭 150pt, 탐색 버튼 높이 30pt, 카드 패딩, 설명 크기와 차트 높이를 조정해 데이터와 그래프를 더 적은 공간에 배치했습니다.
+- 정밀한 회귀를 위해 GUI 초기 화면/설정 화면/스크롤 그래프 화면을 Linux 가상 디스플레이에서 캡처합니다. Windows와 Linux는 같은 egui 내부 레이아웃을 사용합니다.
+- DP·몬테카를로·게임 규칙·표본수는 변경하지 않았습니다.
+
