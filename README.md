@@ -2,8 +2,8 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 스텔라 소라 · 이환**의 한정 픽업 목표 달성 확률과 필요 재화를 분석하는 Rust 데스크톱 프로그램입니다. 캐릭터 돌파와 광추·무기·레코드·Arc를 구분하고, 환급 재화의 재사용까지 계산합니다.
 
-**문서 버전: v0.1.14 · 2026-11-06**  
-[Windows 다운로드 및 Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases) · [릴리즈 상세](RELEASE_NOTES_v0.1.14.md) · [변경 이력](docs/CHANGELOG.md)
+**문서 버전: v0.1.15 · 2026-11-06**  
+[Windows 다운로드 및 Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases) · [릴리즈 상세](RELEASE_NOTES_v0.1.15.md) · [변경 이력](docs/CHANGELOG.md)
 
 > **정확도:** DP는 입력된 게임별 확률 규칙 내에서 정확한 분포를 계산합니다. 실제 게임이 비공개로 운영하는 소프트 천장 등과의 동등성을 보장하지 않습니다. 환급과 상점 교환을 포함한 결과는 보유 상태·4성 중복 가정에 따른 Monte Carlo **추정치**입니다.
 
@@ -13,7 +13,7 @@
 
 ### 메인 Dashboard — 신규 캐릭터 Aeon ★ Aha
 
-![v0.1.14 대시보드 실제 캡처: Aeon Aha 선택](docs/screenshots/v0.1.14/dashboard-hsr-aha.png)
+![v0.1.15 대시보드 실제 캡처: Aeon Aha 선택](docs/screenshots/v0.1.15/dashboard-hsr-aha.png)
 
 스타레일 신규 발표 캐릭터를 우선 선택한 첫 화면입니다. 상단 KPI, **캐릭터/보조 배너/전체의 별도 확률 그래프**, 빠른 시뮬레이션 설정, 환급 및 최근 결과가 표시됩니다. 처음 보유 재화가 0인 경우 0%로 표시되며, 화면에 임의의 데모 확률을 삽입하지 않습니다.
 
@@ -21,9 +21,9 @@
 
 | 명조 — 최신 공명자 | 스텔라 소라 — 최신 여행가 |
 |:---:|:---:|
-| ![명조 최신 캐릭터 실제 화면](docs/screenshots/v0.1.14/dashboard-wuwa-latest.png) | ![스텔라 소라 최신 캐릭터 실제 화면](docs/screenshots/v0.1.14/dashboard-stellasora-latest.png) |
+| ![명조 최신 캐릭터 실제 화면](docs/screenshots/v0.1.15/dashboard-wuwa-latest.png) | ![스텔라 소라 최신 캐릭터 실제 화면](docs/screenshots/v0.1.15/dashboard-stellasora-latest.png) |
 
-![이환 최신 캐릭터 실제 실행 화면](docs/screenshots/v0.1.14/dashboard-nte-latest.png)
+![이환 최신 캐릭터 실제 실행 화면](docs/screenshots/v0.1.15/dashboard-nte-latest.png)
 
 최신 정렬은 **확인된 발표·업데이트 날짜 기반 정적 스냅샷**입니다. 실시간 베타 서버 동기화가 아니며, 신규 캐릭터의 검증된 공식 이미지가 없으면 `NEW` 대체 이미지로 표시합니다.
 
@@ -31,13 +31,13 @@
 
 | Simulator — 목표·천장·재화 | Currency — 보유권·환급 |
 |:---:|:---:|
-| ![Simulator 화면](docs/screenshots/v0.1.14/simulator-hsr-aha.png) | ![Currency 화면](docs/screenshots/v0.1.14/currency.png) |
+| ![Simulator 화면](docs/screenshots/v0.1.15/simulator-hsr-aha.png) | ![Currency 화면](docs/screenshots/v0.1.15/currency.png) |
 
 | Characters — 캐릭터 전용 | Weapons — 무기/광추/Arc/레코드 전용 |
 |:---:|:---:|
-| ![Characters 화면](docs/screenshots/v0.1.14/characters.png) | ![Weapons 화면](docs/screenshots/v0.1.14/weapons.png) |
+| ![Characters 화면](docs/screenshots/v0.1.15/characters.png) | ![Weapons 화면](docs/screenshots/v0.1.15/weapons.png) |
 
-![Settings: 프로그램 표시와 계산 갱신 설정](docs/screenshots/v0.1.14/preferences.png)
+![Settings: 프로그램 표시와 계산 갱신 설정](docs/screenshots/v0.1.15/preferences.png)
 
 위 스크린샷들은 GitHub Actions의 실제 GUI 검증으로 생성합니다. 소스/화면을 바꾸면 스크린샷도 해당 버전으로 다시 캡처해야 합니다.
 
@@ -67,12 +67,12 @@
 
 ## Windows x64 설치
 
-1. [Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 `gacha-pickup-calculator-windows-x64-v0.1.14.zip` 이상의 **Windows ZIP**을 받습니다.
+1. [Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 `gacha-pickup-calculator-windows-x64-v0.1.15.zip` 이상의 **Windows ZIP**을 받습니다.
 2. ZIP을 **모두 압축 해제**합니다. 이미지 파일은 폴더 구조를 유지해야 합니다.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 이 앱은 실행 중 **캐릭터 이미지를 네트워크에서 다운로드하지 않습니다**.
 
 ```text
-gacha-pickup-calculator-windows-x64-v0.1.14/
+gacha-pickup-calculator-windows-x64-v0.1.15/
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/                # c-ID.png / w-ID.png
