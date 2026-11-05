@@ -29,7 +29,7 @@ jobs:
         with:
           path: ${{ github.workspace }}
 
-      - name: Launch native Windows EXE and capture display
+      - name: Capture Windows app screens at highest available display resolution
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -37,33 +37,81 @@ jobs:
           $env:RUST_BACKTRACE = "1"
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
-          Write-Host "User: $env:USERNAME / Session: $([System.Diagnostics.Process]::GetCurrentProcess().SessionId)"
+          Add-Type @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class AppWindow {
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,uint data,UIntPtr info);
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd,int cmd);
+          }
+          '@
+          Write-Host "Windows user $env:USERNAME, session $([Diagnostics.Process]::GetCurrentProcess().SessionId)"
+          $before = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host "Before resolution: $before"
+          if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
+            foreach ($size in @(@(1600,900), @(1920,1080), @(1536,864))) {
+              try {
+                Set-DisplayResolution -Width $size[0] -Height $size[1] -Force -ErrorAction Stop | Out-Host
+                Start-Sleep -Seconds 2
+                $changed = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+                Write-Host "After resolution request: $changed"
+                if ($changed.Width -ge 1536 -and $changed.Height -ge 864) { break }
+              } catch {
+                Write-Warning "Resolution $($size[0])x$($size[1]): $($_.Exception.Message)"
+              }
+            }
+          } else {
+            Write-Warning "Set-DisplayResolution is unavailable"
+          }
           $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          Write-Host "Screen: $bounds"
+          Write-Host "Screen for capturing: $bounds"
           $exe = Join-Path $pwd "gacha_pickup_calculator.exe"
           $stdout = Join-Path $pwd "screenshots\stdout.txt"
           $stderr = Join-Path $pwd "screenshots\stderr.txt"
           $app = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          function Save-Screen([string]$name) {
+            $rectangle = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap($rectangle.Width,$rectangle.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            try {
+              $graphics.CopyFromScreen($rectangle.Location,[System.Drawing.Point]::Empty,$rectangle.Size)
+              $output = Join-Path $pwd "screenshots\$name.png"
+              $bitmap.Save($output,[System.Drawing.Imaging.ImageFormat]::Png)
+              Write-Host "Saved actual Windows screenshot: $output ($($rectangle.Width)x$($rectangle.Height))"
+            } finally {
+              $graphics.Dispose()
+              $bitmap.Dispose()
+            }
+          }
+          function Click-Nav([int]$y) {
+            [AppWindow]::SetCursorPos(90,$y) | Out-Null
+            [AppWindow]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+            [AppWindow]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+            Start-Sleep -Seconds 3
+            [AppWindow]::SetCursorPos(950,30) | Out-Null
+          }
           try {
             Start-Sleep -Seconds 9
             $app.Refresh()
-            Write-Host "App pid $($app.Id), session $($app.SessionId), window $($app.MainWindowHandle), alive $(!$app.HasExited)"
+            Write-Host "Process PID $($app.Id), window $($app.MainWindowHandle), alive $(!$app.HasExited)"
             if ($app.HasExited) {
               Write-Host "Exit code: $($app.ExitCode)"
-              if (Test-Path $stderr) { Get-Content $stderr -Tail 70 }
+              if (Test-Path $stderr) { Get-Content $stderr -Tail 60 }
               throw "Windows UI process terminated before screenshot"
             }
-            $image = New-Object System.Drawing.Bitmap($bounds.Width,$bounds.Height)
-            $graphics = [System.Drawing.Graphics]::FromImage($image)
-            try {
-              $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
-              $output = Join-Path $pwd "screenshots\windows-main.png"
-              $image.Save($output,[System.Drawing.Imaging.ImageFormat]::Png)
-              Write-Host "Saved actual Windows display to $output"
-            } finally {
-              $graphics.Dispose()
-              $image.Dispose()
-            }
+            [AppWindow]::ShowWindow($app.MainWindowHandle,3) | Out-Null
+            [AppWindow]::SetForegroundWindow($app.MainWindowHandle) | Out-Null
+            Start-Sleep -Seconds 3
+            [AppWindow]::SetCursorPos(950,30) | Out-Null
+            Save-Screen "windows-dashboard"
+            Click-Nav 260
+            Save-Screen "windows-simulator"
+            Click-Nav 320
+            Save-Screen "windows-currency"
+            Click-Nav 500
+            Save-Screen "windows-analytics"
           } finally {
             Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
           }
