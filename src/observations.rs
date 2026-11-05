@@ -196,8 +196,8 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         .ok_or("누적 이벤트 수가 정수 범위를 초과했습니다.")?;
     let total_censored = censored.iter().try_fold(0_u64, |n, &v| n.checked_add(v))
         .ok_or("누적 검열 수가 정수 범위를 초과했습니다.")?;
-    if observations == 0 || total_events == 0 {
-        return Err("최소 한 번의 최고 등급 획득과 관측 대상이 필요합니다.".into());
+    if observations == 0 {
+        return Err("적어도 하나의 관측 구간이 필요합니다.".into());
     }
     let observed = if quality == ObservationQuality::CompletedOnly {
         total_events
@@ -389,6 +389,15 @@ mod tests {
     fn extreme_counts_are_rejected_without_integer_overflow() {
         let csv = "pity,at_risk,events,censored\n1,18446744073709551615,18446744073709551615,18446744073709551615\n";
         assert!(parse_observation_csv(csv, 90).is_err());
+    }
+
+    #[test]
+    fn all_censored_cohort_is_valid_but_has_no_greenwood_band() {
+        let data = parse_observation_csv("duration,event\n5,0\n5,0\n5,0\n", 90).unwrap();
+        assert_eq!(data.observations, 3);
+        assert_eq!(data.events, 0);
+        assert_eq!(data.censored, 3);
+        assert!(data.rows.iter().all(|r| r.survival == 1.0 && r.cdf_ci_95.is_none()));
     }
 
     #[test]
