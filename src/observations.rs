@@ -37,8 +37,8 @@ pub struct ObservationRow {
     pub censored: u64,
     pub hazard: f64,
     pub survival: f64,
-    pub cdf_low_95: f64,
-    pub cdf_high_95: f64,
+    /// Pointwise log-log Greenwood interval, absent at degenerate endpoints.
+    pub cdf_ci_95: Option<(f64, f64)>,
 }
 
 #[derive(Clone, Debug)]
@@ -228,10 +228,10 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         if d > 0 && n > d {
             greenwood_sum += d as f64 / ((n as f64) * ((n - d) as f64));
         }
-        let (low, high) = survival_cdf_interval(survival, greenwood_sum);
+        let ci = survival_cdf_interval(survival, greenwood_sum);
         rows.push(ObservationRow {
             pity, at_risk: n, events: d, censored: c, hazard, survival,
-            cdf_low_95: low, cdf_high_95: high,
+            cdf_ci_95: ci,
         });
         remaining = n - d - c;
     }
@@ -244,16 +244,17 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
 /// Log-log transformed Greenwood 95% confidence interval.
 /// In the boundary cases, the interval is descriptive only; the tail is
 /// explicitly not declared "precise" when few players remain at risk.
-fn survival_cdf_interval(survival: f64, sum: f64) -> (f64, f64) {
-    if survival <= 0.0 { return (1.0, 1.0); }
-    if survival >= 1.0 { return (0.0, 0.0); }
+fn survival_cdf_interval(survival: f64, sum: f64) -> Option<(f64, f64)> {
+    // Greenwood is undefined when survival is exactly zero and has zero-width,
+    // misleading confidence bands before the first observed event.
+    if !(0.0..1.0).contains(&survival) { return None; }
     let log_h = (-survival.ln()).ln();
     let err = 1.96 * sum.sqrt() / survival.ln().abs();
     let lower_s = -((log_h + err).exp());
     let upper_s = -((log_h - err).exp());
     let low = 1.0 - upper_s.exp();
     let high = 1.0 - lower_s.exp();
-    (low.clamp(0.0, 1.0), high.clamp(0.0, 1.0))
+    Some((low.clamp(0.0, 1.0), high.clamp(0.0, 1.0)))
 }
 
 impl ObservationDataset {
@@ -378,8 +379,10 @@ mod tests {
         assert_eq!(c.reliable_risk_bins, 3);
         assert!(c.max_cdf_delta < 1e-12);
         assert!(c.mean_abs_hazard_delta < 1e-12);
-        assert!(data.rows[1].cdf_low_95 <= 0.75);
-        assert!(data.rows[1].cdf_high_95 >= 0.75);
+        let (lower, upper) = data.rows[1].cdf_ci_95.expect("interior KM confidence");
+        assert!(lower <= 0.75);
+        assert!(upper >= 0.75);
+        assert!(data.rows[2].cdf_ci_95.is_none());
     }
 
     #[test]
