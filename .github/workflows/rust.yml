@@ -44,14 +44,6 @@ jobs:
           cargo audit
       - name: Build release
         run: cargo build --release
-      - name: Upload Linux executable for UI documentation screenshots
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: gacha-linux-app
-          path: target/release/gacha_pickup_calculator
-          if-no-files-found: error
-          retention-days: 7
       - name: Linux GUI startup smoke (virtual display)
         if: runner.os == 'Linux'
         shell: bash
@@ -215,8 +207,8 @@ jobs:
           if-no-files-found: error
 
   docs_ui:
-    name: Publish real screenshots to README asset directory
-    needs: [images, verify]
+    name: Commit verified native README screenshots to PR branch
+    needs: ui_docs
     if: github.event_name == 'pull_request' && github.head_ref == 'feature/offline-image-package-v014-20261106' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
@@ -225,83 +217,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-          persist-credentials: true
       - uses: actions/download-artifact@v4
         with:
-          name: gacha-linux-app
-          path: app
-      - uses: actions/download-artifact@v4
-        with:
-          name: gacha-offline-images
-          path: app/Image
-      - name: Capture actual simulator and settings UI
+          name: gacha-readme-screenshots-v014
+          path: docs/screenshots/v0.1.14/
+      - name: Verify screenshots and publish to source branch
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgl1-mesa-dri libxkbcommon-x11-0 scrot xdotool python3-pil fonts-noto-cjk
-          chmod +x app/gacha_pickup_calculator
-          mkdir -p ci-ui docs/images
-          xvfb-run -a -s '-screen 0 1536x864x24' bash -c '
-            set -eu
-            LIBGL_ALWAYS_SOFTWARE=1 ./app/gacha_pickup_calculator >/tmp/docs-ui.log 2>&1 &
-            app=$!
-            trap "kill $app 2>/dev/null || true" EXIT
-            sleep 12
-            kill -0 "$app" || { cat /tmp/docs-ui.log; exit 1; }
-            xdotool mousemove 1480 25
-            scrot -q 90 ci-ui/dashboard.png
-            xdotool mousemove 95 228 click 1
-            sleep 2
-            scrot -q 90 ci-ui/simulator.png
-            xdotool mousemove 95 286 click 1
-            sleep 2
-            scrot -q 90 ci-ui/currency.png
-            xdotool mousemove 95 344 click 1
-            sleep 3
-            scrot -q 90 ci-ui/characters.png
-            xdotool mousemove 95 399 click 1
-            sleep 3
-            scrot -q 90 ci-ui/weapons.png
-            xdotool mousemove 95 458 click 1
-            sleep 2
-            scrot -q 90 ci-ui/analytics.png
-            xdotool mousemove 95 549 click 1
-            sleep 2
-            scrot -q 90 ci-ui/settings.png
-            xdotool mousemove 95 167 click 1
-            sleep 2
-            xdotool mousemove 722 389
-            scrot -q 90 ci-ui/chart-hover.png
-          '
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image
-          expected = ("dashboard", "simulator", "currency", "characters",
-                      "weapons", "analytics", "settings", "chart-hover")
-          for name in expected:
-              source = Path("ci-ui") / f"{name}.png"
-              with Image.open(source) as img:
-                  if img.size != (1536, 864):
-                      raise SystemExit(f"Unexpected live screenshot dimensions: {name} {img.size}")
-                  image = img.convert("RGB")
-                  out = Path("docs/images") / f"ui-{name}.webp"
-                  image.save(out, "WEBP", quality=81, method=6)
-                  if out.stat().st_size < 10_000:
-                      raise SystemExit(f"UI image unexpectedly small: {out}")
-                  print(f"Verified screenshot {out}: {out.stat().st_size} bytes")
-          PY
-      - name: Commit verified UI photos to the same PR branch
-        shell: bash
-        run: |
-          set -euo pipefail
+          test "$(find docs/screenshots/v0.1.14 -maxdepth 1 -name '*.png' | wc -l)" -eq 9
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/images/ui-*.webp
-          if git diff --cached --quiet; then
-            echo "UI photos are already up to date."
-          else
-            git commit -m "docs(ui): update screenshots from actual v0.1.14 Linux GUI run"
+          git add docs/screenshots/v0.1.14/
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(ui): publish nine verified real GUI screenshots [skip ci]"
             git push origin "HEAD:refs/heads/${{ github.head_ref }}"
           fi
 
@@ -336,37 +265,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish_docs:
-    name: Commit real screenshots to README image directory
-    needs: ui_docs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-      - uses: actions/download-artifact@v4
-        with:
-          name: gacha-readme-screenshots-v014
-          path: ci-readme-shots/
-      - name: Record verified native GUI screenshots in Git
-        shell: bash
-        run: |
-          set -euo pipefail
-          git pull --ff-only origin main
-          mkdir -p docs/screenshots/v0.1.14
-          cp ci-readme-shots/*.png docs/screenshots/v0.1.14/
-          git add docs/screenshots/v0.1.14/
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]'                 -c user.email='41898282+github-actions[bot]@users.noreply.github.com'                 commit -m 'docs: publish verified v0.1.14 native GUI captures [skip ci]'
-            git push origin HEAD:main
-          fi
-
   release:
     name: Publish versioned release
-    needs: [verify, images, ui_docs, publish_docs]
+    needs: [verify, images, ui_docs]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
