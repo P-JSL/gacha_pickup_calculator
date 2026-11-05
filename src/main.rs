@@ -301,13 +301,33 @@ impl Calculator {
     fn pity(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
         section(ui, "02", "천장 및 확정 상태", "캐릭터와 무기 천장은 독립적으로 관리됩니다.", |ui| {
-            dirty |= Self::banner_controls(ui, "캐릭터", &mut self.setup.character.rule,
-                &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
-                &mut self.setup.character.any_rare_pity);
-            ui.separator();
-            dirty |= Self::banner_controls(ui, self.setup.game.secondary_banner_name(), &mut self.setup.weapon.rule,
-                &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
-                &mut self.setup.weapon.any_rare_pity);
+            let secondary = self.setup.game.secondary_banner_name();
+            if ui.available_width() >= 510.0 {
+                ui.columns(2, |cols| {
+                    dirty |= Self::banner_controls(
+                        &mut cols[0], "캐릭터", &mut self.setup.character.rule,
+                        &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                        &mut self.setup.character.any_rare_pity,
+                    );
+                    dirty |= Self::banner_controls(
+                        &mut cols[1], secondary, &mut self.setup.weapon.rule,
+                        &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                        &mut self.setup.weapon.any_rare_pity,
+                    );
+                });
+            } else {
+                dirty |= Self::banner_controls(
+                    ui, "캐릭터", &mut self.setup.character.rule,
+                    &mut self.setup.character.pity, &mut self.setup.character.guaranteed,
+                    &mut self.setup.character.any_rare_pity,
+                );
+                ui.separator();
+                dirty |= Self::banner_controls(
+                    ui, secondary, &mut self.setup.weapon.rule,
+                    &mut self.setup.weapon.pity, &mut self.setup.weapon.guaranteed,
+                    &mut self.setup.weapon.any_rare_pity,
+                );
+            }
             if let Some(spark) = self.setup.character.spark.as_mut() {
                 ui.separator();
                 ui.label(RichText::new("배너별 120회 별도 교환 보너스").color(PRIMARY));
@@ -371,9 +391,9 @@ impl Calculator {
             dirty |= ui.checkbox(&mut self.feedback_cfg.enabled,
                 "피드백 뽑기 재화 반영 (재현 가능한 몬테카를로)").changed();
             ui.label(RichText::new(format!(
-                "{} · 게임별 초기 설정 (필요 시 수동 수정 가능)",
+                "{} · 게임별 환급 기본값",
                 self.setup.game.exchange_points_name()
-            )).color(PRIMARY));
+            )).color(PRIMARY).size(11.0));
             if self.setup.game == Game::Neverness {
                 ui.colored_label(GOLD,
                     "이환: Warp Pieces 교환 단가·보드 보상·Tri-Key 전환 조건은 추가 검증이 필요한 추정값입니다.");
@@ -398,13 +418,16 @@ impl Calculator {
                     ui.label(format!("현재 보유 {name}"));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                         .range(0..=1_000_000)).changed();
-                    ui.label(format!(
-                        "현재 재화로 {}뽑 즉시 교환 가능",
+                    ui.label(RichText::new(format!(
+                        "교환 가능 {}뽑",
                         self.feedback_cfg.initial_points / self.feedback_cfg.points_per_ticket.max(1)
-                    ));
+                    )).color(MINT));
                 });
-                ui.horizontal_wrapped(|ui| {
-                    ui.label("픽업 캐릭터 첫 장");
+                egui::CollapsingHeader::new("고급 설정 · 장수별 보상 / 4성 확률 / 시뮬레이션")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("픽업 캐릭터 첫 장");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.featured_first)
                         .range(0..=100_000)).changed();
                     ui.label("중복 장당");
@@ -484,7 +507,8 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_pity)
                         .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
                 });
-                ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
+                        ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
+                    });
             }
         });
         dirty
@@ -510,9 +534,9 @@ impl Calculator {
             self.setup.character_dedicated, self.setup.weapon_dedicated, owned_flexible);
         let current_probability = stats.feedback.as_ref().map(|f| f.probability(owned_flexible).0)
             .unwrap_or(current_raw.success_probability);
-        ui.add_space(12.0);
+        ui.add_space(7.0);
         ui.horizontal(|ui| {
-            ui.heading("확률 분석 대시보드");
+            ui.heading(RichText::new("확률 분석 대시보드").size(17.0));
             ui.label(RichText::new("입력 상태 변경 시 자동 계산").color(MUTED).size(11.0));
         });
         ui.horizontal_wrapped(|ui| {
@@ -621,11 +645,11 @@ impl Calculator {
                 }
             });
         }
-        ui.add_space(8.0);
+        ui.add_space(5.0);
         let secondary_name = self.setup.game.secondary_banner_name();
         let secondary_heading = format!("{secondary_name} 목표 확률");
         let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
-        ui.add_space(10.0);
+        ui.add_space(5.0);
         // On a wide display the two independent banners are displayed next
         // to each other. On narrow/HiDPI Windows viewports they stack, so no
         // graph extends beyond the available logical width.
@@ -648,14 +672,14 @@ impl Calculator {
                     label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
                 }]);
             });
-            ui.add_space(8.0);
+            ui.add_space(5.0);
             section(ui, "05-B", &secondary_heading, single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
                 }]);
             });
         }
-        ui.add_space(10.0);
+        ui.add_space(6.0);
         section(ui, "05-C", "전체 목표 합산 및 환급 확률",
             "합산: 전체 두 목표를 달성할 누적 확률 · 환급: 최초 필요한 자유 배분권 기준 (서로 다른 비용 축).", |ui| {
             let mut curves = vec![ChartSeries {
@@ -1124,20 +1148,36 @@ impl eframe::App for Calculator {
             .frame(egui::Frame::default().fill(BG))
             .show(ctx, |ui| {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                ui.add_space(16.0);
-                ui.heading(RichText::new(self.setup.game.label()).size(25.0).strong());
-                ui.label(RichText::new(self.setup.game.special_notes()).color(MUTED));
-                ui.add_space(14.0);
+                ui.add_space(7.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.heading(RichText::new(self.setup.game.label()).size(18.0).strong());
+                    ui.label(RichText::new(self.setup.game.special_notes())
+                        .color(MUTED).size(11.0));
+                });
+                ui.add_space(6.0);
                 match self.view_mode {
                     ViewMode::Calculator => {
-                        dirty |= self.targets(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.pity(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.resources(ui);
-                        ui.add_space(8.0);
-                        dirty |= self.feedback_controls(ui);
-                        // Keep the currently visible result synchronized before drawing it.
+                        // The input area fits into two concise rows on desktop.
+                        // On narrow Windows layouts it gracefully stacks.
+                        if ui.available_width() >= 1050.0 {
+                            ui.columns(2, |cols| {
+                                dirty |= self.targets(&mut cols[0]);
+                                dirty |= self.pity(&mut cols[1]);
+                            });
+                            ui.add_space(6.0);
+                            ui.columns(2, |cols| {
+                                dirty |= self.resources(&mut cols[0]);
+                                dirty |= self.feedback_controls(&mut cols[1]);
+                            });
+                        } else {
+                            dirty |= self.targets(ui);
+                            ui.add_space(6.0);
+                            dirty |= self.pity(ui);
+                            ui.add_space(6.0);
+                            dirty |= self.resources(ui);
+                            ui.add_space(6.0);
+                            dirty |= self.feedback_controls(ui);
+                        }
                         if dirty { self.schedule_recalculation(); }
                         self.dashboard(ui);
                     }
@@ -1156,7 +1196,7 @@ impl eframe::App for Calculator {
                         self.observation_validation(ui);
                     }
                 }
-                ui.add_space(25.0);
+                ui.add_space(10.0);
             });
         });
         // Header game/model changes can happen while viewing tracker pages.
