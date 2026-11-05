@@ -6,6 +6,8 @@ use gacha_pickup_calculator::feedback::{estimate, FeedbackConfig, FeedbackEstima
 use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::time::{Duration, Instant};
 
 const BG: Color32 = Color32::from_rgb(13, 19, 33);
 const CARD: Color32 = Color32::from_rgb(24, 34, 51);
@@ -20,6 +22,28 @@ struct Computed {
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
+}
+
+struct CalculationRequest {
+    generation: u64,
+    setup: GameSetup,
+    mode: RateMode,
+    feedback_config: FeedbackConfig,
+}
+
+struct CalculationResponse {
+    generation: u64,
+    result: Result<Computed, String>,
+}
+
+fn compute(request: &CalculationRequest) -> Result<Computed, String> {
+    let character = request.setup.character.distribution(request.mode)?;
+    let weapon = request.setup.weapon.distribution(request.mode)?;
+    let combined = character.combine(&weapon);
+    let feedback = if request.feedback_config.enabled {
+        Some(estimate(&request.setup, request.mode, &request.feedback_config)?)
+    } else { None };
+    Ok(Computed { character, weapon, combined, feedback })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -37,11 +61,37 @@ struct Calculator {
     stats: Option<Computed>,
     error: Option<String>,
     show_help: bool,
+    worker: Sender<CalculationRequest>,
+    results: Receiver<CalculationResponse>,
+    generation: u64,
+    pending_since: Option<Instant>,
+    calculating: bool,
 }
 
 impl Calculator {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         install_korean_font(&cc.egui_ctx);
+        // All potentially costly Markov-DP and refund simulations run off the GUI thread.
+        // The worker drops queued stale requests before each calculation; the UI also
+        // rejects out-of-generation responses to avoid showing outdated probabilities.
+        let (worker, work_rx) = mpsc::channel::<CalculationRequest>();
+        let (result_tx, results) = mpsc::channel::<CalculationResponse>();
+        let repaint = cc.egui_ctx.clone();
+        std::thread::spawn(move || {
+            while let Ok(mut request) = work_rx.recv() {
+                while let Ok(newer) = work_rx.try_recv() {
+                    request = newer;
+                }
+                let result = compute(&request);
+                if result_tx.send(CalculationResponse {
+                    generation: request.generation,
+                    result,
+                }).is_err() {
+                    break;
+                }
+                repaint.request_repaint();
+            }
+        });
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = BG;
         visuals.window_fill = CARD;
@@ -62,6 +112,11 @@ impl Calculator {
             stats: None,
             error: None,
             show_help: false,
+            worker,
+            results,
+            generation: 0,
+            pending_since: None,
+            calculating: false,
         };
         app.recalculate();
         app
@@ -76,19 +131,41 @@ impl Calculator {
 
     fn recalculate(&mut self) {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
-        let result = (|| {
-            let character = self.setup.character.distribution(self.mode)?;
-            let weapon = self.setup.weapon.distribution(self.mode)?;
-            let combined = character.combine(&weapon);
-            let feedback = if self.feedback_cfg.enabled {
-                Some(estimate(&self.setup, self.mode, &self.feedback_cfg)?)
-            } else { None };
-            Ok::<_, String>(Computed { character, weapon, combined, feedback })
-        })();
-        match result {
-            Ok(stats) => { self.stats = Some(stats); self.error = None; }
-            Err(message) => { self.stats = None; self.error = Some(message); }
+        self.generation = self.generation.wrapping_add(1);
+        self.calculating = true;
+        self.stats = None;
+        self.error = None;
+        let request = CalculationRequest {
+            generation: self.generation,
+            setup: self.setup.clone(),
+            mode: self.mode,
+            feedback_config: self.feedback_cfg.clone(),
+        };
+        if self.worker.send(request).is_err() {
+            self.calculating = false;
+            self.error = Some("백그라운드 계산 작업을 시작할 수 없습니다.".to_owned());
         }
+    }
+
+    fn poll_results(&mut self) {
+        while let Ok(response) = self.results.try_recv() {
+            // Ignore results from settings the user has since changed.
+            if response.generation != self.generation || self.pending_since.is_some() {
+                continue;
+            }
+            self.calculating = false;
+            match response.result {
+                Ok(stats) => { self.stats = Some(stats); self.error = None; }
+                Err(message) => { self.stats = None; self.error = Some(message); }
+            }
+        }
+    }
+
+    fn schedule_recalculation(&mut self) {
+        self.pending_since = Some(Instant::now());
+        self.stats = None;
+        self.error = None;
+        self.calculating = true;
     }
 
     fn header(&mut self, ctx: &egui::Context) -> bool {
@@ -339,8 +416,15 @@ impl Calculator {
 
     fn dashboard(&mut self, ui: &mut egui::Ui) {
         let Some(stats) = &self.stats else {
-            ui.colored_label(Color32::LIGHT_RED,
-                self.error.as_deref().unwrap_or("계산되지 않았습니다."));
+            if self.calculating {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("설정에 따른 확률을 다시 계산하고 있습니다.");
+                });
+            } else {
+                ui.colored_label(Color32::LIGHT_RED,
+                    self.error.as_deref().unwrap_or("계산되지 않았습니다."));
+            }
             return;
         };
         let q = self.confidence as f64 / 100.0;
@@ -549,6 +633,7 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.poll_results();
         let mut dirty = self.header(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -563,11 +648,22 @@ impl eframe::App for Calculator {
                 dirty |= self.resources(ui);
                 ui.add_space(8.0);
                 dirty |= self.feedback_controls(ui);
-                if dirty { self.recalculate(); }
+                if dirty { self.schedule_recalculation(); }
                 self.dashboard(ui);
                 ui.add_space(25.0);
             });
         });
+        if let Some(edited_at) = self.pending_since {
+            if edited_at.elapsed() >= Duration::from_millis(300) {
+                self.pending_since = None;
+                self.recalculate();
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(80));
+            }
+        }
+        if self.calculating {
+            ctx.request_repaint_after(Duration::from_millis(120));
+        }
         if self.show_help {
             egui::Window::new("게임별 규칙 · 신뢰도 · 출처")
                 .open(&mut self.show_help).resizable(true).show(ctx, |ui| {
