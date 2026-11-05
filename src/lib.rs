@@ -103,7 +103,15 @@ impl Banner {
                 let later = if *featured_share >= 1.0 { rarity.hard } else { 2 * rarity.hard };
                 first + (self.target_copies - 1) * later
             }
-            BannerRule::FeaturedCounter { hard_featured, .. } => self.target_copies * hard_featured - self.pity,
+            BannerRule::FeaturedCounter { hard_featured, .. } => {
+                let normal = self.target_copies * hard_featured - self.pity;
+                if let Some(spark) = self.spark.as_ref().filter(|s| !s.used) {
+                    let remaining = spark.at.saturating_sub(spark.progress);
+                    let k_minus_one = (self.target_copies - 1)
+                        .saturating_mul(*hard_featured).saturating_sub(self.pity);
+                    normal.min(remaining.max(k_minus_one))
+                } else { normal }
+            },
             BannerRule::NteArcBatch => self.target_copies * 80 - self.pity * 10,
         }
     }
@@ -526,6 +534,22 @@ mod tests {
             assert_eq!(rarity.chance(71, RateMode::PublishedOnly), 0.1959);
             assert_eq!(rarity.chance(90, RateMode::PublishedOnly), 1.0);
         } else { panic!("expected NTE character board rule"); }
+    }
+
+    #[test]
+    fn one_time_stella_spark_shortens_true_hard_guarantee() {
+        for (copies, maximum) in [(1, 120), (2, 160), (3, 320)] {
+            let banner = Banner {
+                rule: BannerRule::FeaturedCounter { featured_rate: 0.0, hard_featured: 160 },
+                pity: 0, guaranteed: false, target_copies: copies,
+                spark: Some(Spark { at: 120, progress: 0, used: false }),
+                any_rare_pity: 0,
+            };
+            assert_eq!(banner.max_additional_pulls(), maximum);
+            let dist = banner.distribution(RateMode::PublishedOnly).unwrap();
+            assert_eq!(dist.quantile(1.0), maximum);
+            assert_eq!(dist.at(maximum), 1.0);
+        }
     }
 
     #[test]
