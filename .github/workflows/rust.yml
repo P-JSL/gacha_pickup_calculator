@@ -132,16 +132,18 @@ jobs:
       - name: Public API documentation build
         if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.doc_api == 'true'
         run: cargo doc --locked --no-deps --lib
+  build_linux:
+    name: Build Linux GUI executable
+    needs: classify
+    if: needs.classify.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+      - name: Linux windowing prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev
       - name: Build release
-        if: needs.classify.outputs.build == 'true'
         run: cargo build --locked --release
-      - name: Optional trusted Authenticode signing (requires protected certificate secrets)
-        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.release == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        env:
-          WIN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
-          WIN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
-        run: ./scripts/sign_windows_release.ps1
       - name: Linux GUI startup smoke (virtual display)
         if: runner.os == 'Linux' && needs.classify.outputs.build == 'true'
         shell: bash
@@ -158,10 +160,34 @@ jobs:
             exit 1
           fi
           echo "GUI stayed alive under virtual X11 display without crashing."
-      # Native Linux GUI startup was checked above. A dedicated ui_docs runner
-      # captures all nine GUI screenshots after the OS builds, without
-      # waiting for parallel RustSec, performance or ClamAV security checks.
-      # Avoid running a second Xvfb/scrot session in this verification job.
+      # Captured UI screenshots only need the Linux executable, not the
+      # completion of Windows tests/build or of independent security jobs.
+      - name: Upload Linux executable for real screenshot capture
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: gacha-linux-release-executable
+          path: target/release/gacha_pickup_calculator
+          if-no-files-found: error
+          retention-days: 7
+
+  build_windows:
+    name: Build Windows release executable
+    needs: classify
+    if: needs.classify.outputs.build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+      - name: Build release
+        run: cargo build --locked --release
+      - name: Optional trusted Authenticode signing (requires protected certificate secrets)
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.release == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          WIN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WIN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: ./scripts/sign_windows_release.ps1
       - name: Windows native dark UI screenshot smoke
         if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         continue-on-error: true
@@ -211,14 +237,6 @@ jobs:
           # GUI capture is diagnostic, whereas build/tests remain mandatory.
           if-no-files-found: ignore
           retention-days: 7
-      - name: Upload Linux executable for real screenshot capture
-        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: gacha-linux-release-executable
-          path: target/release/gacha_pickup_calculator
-          if-no-files-found: error
-          retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows' && needs.classify.outputs.release == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -227,7 +245,7 @@ jobs:
           path: target/release/gacha_pickup_calculator.exe
           if-no-files-found: error
 
-  # Independent functional gates run in parallel with Linux/Windows tests.
+  # Independent functional gates run in parallel with tests and release builds.
   # Separate runners also prevent cargo-audit installation and the antivirus
   # mirror download from delaying the GUI and Windows release builds.
   rustsec:
@@ -304,7 +322,7 @@ jobs:
 
   ui_docs:
     name: Capture latest-character GUI for README
-    needs: [classify, verify]
+    needs: [classify, build_linux]
     if: needs.classify.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     # Screenshot capture is never allowed to hang and block release forever.
@@ -350,7 +368,7 @@ jobs:
     name: Publish versioned release
     # New releases cannot publish until ALL parallel security, numeric, image
     # and GUI gates succeed. Docs-only / existing-version pushes skip safely.
-    needs: [classify, docs, verify, rustsec, performance, image_integrity, images, ui_docs]
+    needs: [classify, docs, verify, build_linux, build_windows, rustsec, performance, image_integrity, images, ui_docs]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.classify.outputs.release == 'true'
     runs-on: ubuntu-24.04
     permissions:
