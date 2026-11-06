@@ -1374,25 +1374,25 @@ impl Calculator {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                    }], self.ui_preferences);
+                    }], self.ui_preferences, self.language());
                 });
                 section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                    }], self.ui_preferences);
+                    }], self.ui_preferences, self.language());
                 });
             });
         } else {
             section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                }], self.ui_preferences);
+                }], self.ui_preferences, self.language());
             });
             ui.add_space(8.0);
             section(ui, "05-B", &secondary_heading, single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                }], self.ui_preferences);
+                }], self.ui_preferences, self.language());
             });
         }
         ui.add_space(10.0);
@@ -1413,7 +1413,7 @@ impl Calculator {
                     });
                 }
             }
-            draw_probability_chart(ui, &curves, self.ui_preferences);
+            draw_probability_chart(ui, &curves, self.ui_preferences, self.language());
             if stats.feedback.is_some() && !comparable {
                 ui.colored_label(GOLD,
                     "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
@@ -1799,10 +1799,21 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
     series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1)
 }
 
+/// Keep the hover label inside the plot for every pointer position.
+fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_width: f32, height: f32) -> egui::Rect {
+    let inner = graph.shrink(4.0);
+    let width = desired_width.min(inner.width()).max(0.0);
+    let height = height.min(inner.height()).max(0.0);
+    let x = (cursor.x + 12.0).clamp(inner.left(), (inner.right() - width).max(inner.left()));
+    let y = (cursor.y - height - 11.0)
+        .clamp(inner.top(), (inner.bottom() - height).max(inner.top()));
+    egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height))
+}
+
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
-fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
+fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences, language: Language) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -1905,23 +1916,26 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
                 project(x, line.source.probability(x)), 3.5, line.color,
             );
         }
+        let pull_unit = match language {
+            Language::Korean => "뽑 이내", Language::English => "pulls or fewer",
+            Language::Japanese => "連以内", Language::ChineseSimplified => "抽以内",
+            Language::ChineseTraditional => "抽以內",
+        };
         let tooltip = format!(
-            "{x}뽑 이내 · {}",
+            "{x} {pull_unit} · {}",
             series.iter().map(|line| format!("{} {:.1}%", line.label,
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
-        // Keep the exact point probability visible inside the graph as well
-        // as in the native mouse tooltip, even on platforms where hover UI
-        // can be delayed or positioned outside a small desktop viewport.
-        let badge = egui::Rect::from_min_size(
-            egui::pos2(graph.left() + 5.0, graph.top() + 5.0),
-            egui::vec2((graph.width() - 10.0).max(12.0), 22.0));
+        // Native egui hover popups can escape the chart; never use on_hover_text here.
+        let tooltip_font = egui::FontId::proportional(10.5);
+        let text_width = ui.fonts(|fonts| fonts.layout_no_wrap(
+            tooltip.clone(), tooltip_font.clone(), Color32::WHITE).size().x);
+        let badge = chart_tooltip_rect(graph, pointer, text_width + 16.0, 22.0);
         painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
-        let overlay = painter.with_clip_rect(badge.shrink(3.0));
-        overlay.text(badge.left_center() + egui::vec2(5.0, 0.0),
+        let overlay = painter.with_clip_rect(badge.intersect(graph).shrink(3.0));
+        overlay.text(badge.left_center() + egui::vec2(7.0, 0.0),
             egui::Align2::LEFT_CENTER, &tooltip,
-            egui::FontId::proportional(10.5), Color32::WHITE);
-        response.clone().on_hover_text(tooltip);
+            tooltip_font, Color32::WHITE);
         }
     }
     // The compact dashboard uses one line per card. Keep legends only where
@@ -2253,6 +2267,19 @@ mod chart_tests {
         let prefs = UiPreferences::default();
         assert!(!prefs.auto_recalculate);
         assert!(prefs.show_hover_guides);
+    }
+
+    #[test]
+    fn chart_tooltip_stays_within_plot_at_all_edges() {
+        let graph = egui::Rect::from_min_size(egui::pos2(40.0, 20.0), egui::vec2(170.0, 90.0));
+        for pos in [graph.left_top(), graph.right_top(), graph.left_bottom(),
+                    graph.right_bottom(), graph.center()] {
+            let rect = chart_tooltip_rect(graph, pos, 340.0, 22.0);
+            assert!(graph.contains(rect.left_top()));
+            assert!(graph.contains(rect.right_bottom()));
+            assert!(rect.width() <= graph.width());
+            assert!(rect.height() <= graph.height());
+        }
     }
 
     #[test]
