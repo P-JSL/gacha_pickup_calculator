@@ -556,6 +556,11 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
 pub fn estimate(setup: &GameSetup, mode: RateMode,
                 model: &FeedbackConfig) -> Result<FeedbackEstimate, String> {
     model.validate()?;
+    // This estimator is public and may be called without the UI's preceding
+    // exact DP calculation. Reject invalid or impossible banner transitions
+    // before entering potentially unbounded sampling loops.
+    setup.character.distribution(mode)?;
+    setup.weapon.distribution(mode)?;
     for (banner, extra) in [
         (&setup.character, model.character_other_five_star_rate),
         (&setup.weapon, model.weapon_other_five_star_rate),
@@ -697,6 +702,21 @@ mod tests {
         assert_eq!(estimate.quantile(-0.5), 0);
         assert_eq!(estimate.quantile(0.5), 3);
         assert_eq!(estimate.quantile(1.0), 5);
+    }
+
+    #[test]
+    fn direct_simulation_rejects_impossible_banner_instead_of_looping() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 0);
+        setup.character.rule = BannerRule::Standard {
+            rarity: RateSchedule {
+                base: 0.0, hard: 90, soft: SoftPity::None,
+            },
+            featured_share: 0.0,
+        };
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.samples = 1;
+        assert!(estimate(&setup, RateMode::PublishedOnly, &cfg).is_err());
     }
 
     #[test]
