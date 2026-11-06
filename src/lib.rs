@@ -131,15 +131,18 @@ impl Banner {
         if self.target_copies == 0 { return 0; }
         match &self.rule {
             BannerRule::Standard { rarity, featured_share } => {
-                let first_rare = rarity.hard - self.pity;
+                let first_rare = rarity.hard.saturating_sub(self.pity);
                 let first = if self.guaranteed || *featured_share >= 1.0 {
                     first_rare
-                } else { first_rare + rarity.hard };
-                let later = if *featured_share >= 1.0 { rarity.hard } else { 2 * rarity.hard };
-                first + (self.target_copies - 1) * later
+                } else { first_rare.saturating_add(rarity.hard) };
+                let later = if *featured_share >= 1.0 {
+                    rarity.hard
+                } else { rarity.hard.saturating_mul(2) };
+                first.saturating_add(self.target_copies.saturating_sub(1).saturating_mul(later))
             }
             BannerRule::FeaturedCounter { hard_featured, .. } => {
-                let normal = self.target_copies * hard_featured - self.pity;
+                let normal = self.target_copies.saturating_mul(*hard_featured)
+                    .saturating_sub(self.pity);
                 if let Some(spark) = self.spark.as_ref().filter(|s| !s.used) {
                     let remaining = spark.at.saturating_sub(spark.progress);
                     let k_minus_one = (self.target_copies - 1)
@@ -147,7 +150,8 @@ impl Banner {
                     normal.min(remaining.max(k_minus_one))
                 } else { normal }
             },
-            BannerRule::NteArcBatch => self.target_copies * 80 - self.pity * 10,
+            BannerRule::NteArcBatch => self.target_copies.saturating_mul(80)
+                .saturating_sub(self.pity.saturating_mul(10)),
         }
     }
 
@@ -164,7 +168,8 @@ impl Banner {
     }
 
     fn standard(&self, rarity: &RateSchedule, featured: f64, mode: RateMode) -> Result<Distribution, String> {
-        if rarity.hard == 0 || self.pity >= rarity.hard || !valid_probability(rarity.base)
+        if rarity.hard == 0 || rarity.hard > 500 || self.pity >= rarity.hard
+            || !valid_probability(rarity.base)
             || !valid_probability(featured) || featured == 0.0 {
             return Err("캐릭터/무기 천장 또는 확률 입력값이 유효하지 않습니다.".into());
         }
@@ -204,7 +209,7 @@ impl Banner {
     }
 
     fn featured(&self, rate: f64, hard: usize) -> Result<Distribution, String> {
-        if hard == 0 || self.pity >= hard || !valid_probability(rate) {
+        if hard == 0 || hard > 500 || self.pity >= hard || !valid_probability(rate) {
             return Err("픽업 직접 확정 천장 또는 확률 입력값이 유효하지 않습니다.".into());
         }
         if let Some(spark) = &self.spark {
@@ -222,7 +227,7 @@ impl Banner {
         let mut next = vec![0.0; cur.len()];
         for (step, completed_probability) in pmf.iter_mut().enumerate().skip(1) {
             next.fill(0.0);
-            let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && !claimed_at_start && s.progress + step == s.at);
+            let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && !claimed_at_start && s.at.saturating_sub(s.progress) == step);
             let bonus = usize::from(spark_at_step);
             for copies in 0..k {
                 for pity in 0..hard {
@@ -254,10 +259,14 @@ impl Banner {
         let stride = 8 * 6;
         let mut cur = vec![0.0; k * stride];
         cur[self.pity * 6 + self.any_rare_pity] = 1.0;
-        let mut pmf = vec![0.0; (k * 8 + 1) * 10];
+        // The first guarantee already has 'self.pity' completed batches.
+        // Stop exactly at the guaranteed maximum; do not expose trailing
+        // unreachable entries to 100%-confidence quantiles or graphs.
+        let max_batches = k * 8 - self.pity;
+        let mut pmf = vec![0.0; max_batches * 10 + 1];
         let outcomes = arc_batch_outcomes();
         let mut next = vec![0.0; cur.len()];
-        for batch in 1..=k * 8 {
+        for batch in 1..=max_batches {
             next.fill(0.0);
             for copies in 0..k {
                 for pickup_pity in 0..8 {
@@ -361,6 +370,9 @@ impl Distribution {
 
     /// Exact convolution of independent *first-passage* (stopping-time) distributions.
     pub fn combine(&self, other: &Self) -> Self {
+        if self.pmf.is_empty() || other.pmf.is_empty() {
+            return Self::new(Vec::new());
+        }
         let mut combined = vec![0.0; self.pmf.len() + other.pmf.len() - 1];
         for (i, &a) in self.pmf.iter().enumerate() {
             if a == 0.0 { continue; }
@@ -517,6 +529,58 @@ mod tests {
         assert_eq!(result.at(9), 0.0);
         assert!(result.at(10) > 0.0);
         assert_eq!(result.at(79), result.at(70));
+    }
+
+    #[test]
+    fn nte_arc_distribution_stops_at_actual_guarantee_not_trailing_zeros() {
+        for initial_pity in 0..8 {
+            for copies in [1, 2, 3] {
+                let banner = Banner {
+                    rule: BannerRule::NteArcBatch, pity: initial_pity,
+                    guaranteed: false, target_copies: copies,
+                    spark: None, any_rare_pity: 0,
+                };
+                let dist = banner.distribution(RateMode::PublishedOnly).unwrap();
+                let guaranteed_pulls = (copies * 8 - initial_pity) * 10;
+                assert_eq!(banner.max_additional_pulls(), guaranteed_pulls);
+                assert_eq!(dist.pmf.len(), guaranteed_pulls + 1);
+                assert_eq!(dist.quantile(1.0), guaranteed_pulls);
+                assert!(dist.at(guaranteed_pulls) > 1.0 - 1e-10);
+                assert!(dist.at(guaranteed_pulls - 10) < 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_or_extreme_banner_inputs_return_errors_instead_of_panics() {
+        let zero = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 0.5, hard: 0, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 5, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        assert!(zero.distribution(RateMode::PublishedOnly).is_err());
+        assert_eq!(zero.max_additional_pulls(), 0);
+        let huge = Banner {
+            rule: BannerRule::FeaturedCounter {
+                featured_rate: 0.01, hard_featured: usize::MAX,
+            },
+            pity: 0, guaranteed: false, target_copies: 15,
+            spark: None, any_rare_pity: 0,
+        };
+        assert_eq!(huge.max_additional_pulls(), usize::MAX);
+        assert!(huge.distribution(RateMode::PublishedOnly).is_err());
+    }
+
+    #[test]
+    fn empty_distribution_combination_does_not_underflow() {
+        let empty = Distribution::new(vec![]);
+        let populated = Distribution::new(vec![0.0, 1.0]);
+        let combined = empty.combine(&populated);
+        assert!(combined.pmf.is_empty());
+        assert_eq!(combined.at(3), 0.0);
     }
 
     #[test]
