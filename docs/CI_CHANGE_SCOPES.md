@@ -22,8 +22,8 @@
 
 - 워크플로 최상단의 `paths` / `paths-ignore` 조건으로 CI 자체를 생략하지 않습니다. 이렇게 하면 **Required status checks가 Pending**으로 남을 수 있습니다.
 - `Verify (windows-latest)`, `Verify (ubuntu-24.04)` 및 `CodeQL (rust/python/actions)`의 **매트릭스 Job 이름을 항상 생성**합니다. 문서 전용 변경에서는 Job 내부의 비용이 큰 단계만 건너뜁니다.
-- 이미지 정합성(`Verify bundled image integrity`), ClamAV(`Audit and scan checked-in offline images`), RustSec(`RustSec dependency audit`), 성능(`Measure probability performance`) 및 GUI 캡처처럼 매트릭스가 아닌 Job은 관련 없는 변경에서 Skipped일 수 있습니다. 새 버전 배포 시에는 **모두 성공해야** 릴리즈 작업이 실행됩니다.
-- Ruleset을 활성화할 경우 `Classify CI scope`, `Validate documentation and release contracts`, `Classify CodeQL inputs`과 필요한 매트릭스별 검사 이름을 함께 등록하는 것이 안전합니다. 별도 RustSec·성능·PNG 정합성 체크의 이름도 확인해야 합니다. 판별 단계가 실패할 때 뒤따르는 검사만 Skipped 되는 것을 성공으로 오해하지 않도록 합니다.
+- 이미지 정합성(`Verify bundled image integrity`), ClamAV(`Audit and scan checked-in offline images`), RustSec(`RustSec dependency audit`), 성능(`Measure probability performance`), Linux/Windows Release 빌드 및 GUI 캡처처럼 매트릭스가 아닌 Job은 관련 없는 변경에서 Skipped일 수 있습니다. 새 버전 배포 시에는 **모두 성공해야** 릴리즈 작업이 실행됩니다.
+- Ruleset을 활성화할 경우 `Classify CI scope`, `Validate documentation and release contracts`, `Classify CodeQL inputs`, 두 Verify 매트릭스, **두 Release Build Job** 및 필요한 RustSec·성능·PNG 정합성 검사의 이름을 확인해야 합니다. 이 목록은 관리자 설정이 자동 적용되는 것이 아닙니다. 판별 단계가 실패할 때 뒤따르는 검사만 Skipped 되는 것을 성공으로 오해하지 않도록 합니다.
 - 기존 `scripts/configure_repository_security.py --apply`는 여러 검사와 정책을 **즉시 Active**로 설정하므로, 각 체크 이름과 PR 병합 경로를 검증하기 전 실행하지 않는 편이 안전합니다.
 
 ## 장시간 단계의 병렬 분리
@@ -39,8 +39,10 @@
 | 실제 GUI 캡처 | 약 1분 33초 | 기존 `Capture latest-character GUI for README` 계속 독립 실행 |
 
 - 4개 무거운 작업은 `Classify CI scope`가 해당 작업을 필요로 판단하면 **동시에 시작할 수 있습니다.** OS 빌드의 결과를 기다렸다가 RustSec·성능·ClamAV를 실행하지 않습니다.
-- 화면 캡처는 완성된 **Linux 실행 파일**이 필요하므로 기존 Windows/Linux 빌드 검증 이후에 실행합니다. 단, RustSec·성능·ClamAV의 종료는 기다리지 않습니다.
-- 새 버전 릴리즈는 `Verify`, RustSec, 성능, PNG 정합성, ClamAV, GUI 및 문서 계약 **전부 성공**이 확인되어야만 준비·Sigstore 서명·게재를 시작합니다.
+- `Verify (ubuntu-24.04)` 및 `Verify (windows-latest)`는 기존대로 단위 테스트·Clippy와 문서 API 확인을 수행합니다. 실제 Release 실행 파일 빌드는 각각 독립된 `Build Linux GUI executable`과 `Build Windows release executable`에서 **테스트와 동시에** 시작합니다.
+- 유효성 검사와 Release 빌드가 분리되더라도 **최종 게시 전에는 Verify 두 Job과 Build 두 Job 모두 성공**해야 합니다. Windows Authenticode는 이전처럼 신규 버전 `main` 릴리즈 빌드에서만 실행합니다.
+- 화면 캡처는 완성된 **Linux 실행 파일**만 필요하므로, 이제 `Build Linux GUI executable`이 완료되자마자 시작합니다. **Windows 테스트·Windows 빌드·RustSec·성능·ClamAV의 종료를 기다리지 않습니다.**
+- 새 버전 릴리즈는 `Verify` 2개, **Release Build 2개**, RustSec, 성능, PNG 정합성, ClamAV, GUI 및 문서 계약 **전부 성공**이 확인되어야만 준비·Sigstore 서명·게재를 시작합니다.
 - ClamAV는 **Ubuntu 공식 패키지 저장소를 통한 동일한 서명 검증**을 사용하며, GitHub 호스티드 러너의 지연이 긴 Azure 미러 대신 공식 `archive.ubuntu.com`을 우선 사용합니다.
 - 이 변경은 **Job 간 병렬화**이며 GitHub 호스티드 러너 가용성과 네트워크 대역폭에 따라 전체 실행 시간 개선 폭이 달라집니다. 별도 러너가 늘면 무료 Actions 사용량도 상황에 따라 증가할 수 있습니다.
 
@@ -59,3 +61,19 @@
 4. 현행 보안 운영 상태는 [보안 배포 안내](SECURE_RELEASE_v1_0_3.md), 프로그램 안내는 [README](../README.md)를 참조하십시오.
 
 [GitHub Actions 필수 체크·Skipped Job 규칙](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks) · [GitHub Job 조건](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)
+
+## 추가 최적화: 테스트와 Release 빌드 병렬화 (2026-11-07)
+
+[기존 `main` 실행 #42312700762](https://github.com/P-JSL/gacha_pickup_calculator/actions/runs/42312700762)은 Windows 단위 테스트 약 88초→Clippy 24초→Release 빌드 140초를 **동일 Job에서 순차 실행**했습니다. Linux도 단위 테스트 약 47초→Clippy 20초→Release 빌드 89초가 순차였습니다.
+
+이번 변경은 다음과 같이 책임을 분리합니다.
+
+| Job | 수행 | 완료 후 연결 |
+|---|---|---|
+| `Verify (windows-latest)` | Windows 테스트·Clippy | 릴리즈에 필수 |
+| `Verify (ubuntu-24.04)` | Linux 테스트·Clippy·라이브러리 문서 검사 | 릴리즈에 필수 |
+| `Build Windows release executable` | Release 컴파일, 선택적 서명, 해당 시 Windows UI 진단, 릴리즈 실행 파일 업로드 | 릴리즈에 필수 |
+| `Build Linux GUI executable` | Release 컴파일, Linux GUI 실제 시작 검사, 스크린샷용 실행 파일 업로드 | GUI 캡처 시작 및 릴리즈에 필수 |
+| `Capture latest-character GUI for README` | **Linux 빌드 직후** 실제 GUI 캡처 | 릴리즈에 필수 |
+
+모든 Job의 코드·의존성·테스트 명령은 기존 값 그대로 보존합니다. **새 의존성·액션 캐시를 사용하지 않습니다.** 특히 GitHub Actions 빌드 캐시는 변조된 캐시가 바이너리에 영향을 줄 수 있으므로, 신뢰 경계를 별도 설계하지 않은 상태에서는 출처 증명 릴리즈에 적용하지 않습니다. Job 수가 늘어 총 러너 실행 분량은 증가할 수 있지만, 서로 기다리는 구간을 줄여 **사용자가 보는 완료시간(벽시계 시간)**을 줄이도록 설계했습니다. 실제 개선 폭은 변경 전후 GitHub Actions 실행 기록으로 확인해야 합니다.

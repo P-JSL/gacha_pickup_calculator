@@ -2,6 +2,12 @@
 
 현재 릴리즈는 **v1.0.3**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
 
+## 테스트·빌드 경로 병렬화 (2026-11-07, 버전 v1.0.3 유지)
+- Windows·Linux의 `Verify` 작업에서 Release 빌드를 분리하여, 기존 단위 테스트·Clippy와 OS별 Release 빌드가 **동시에** 실행되도록 변경.
+- `Capture latest-character GUI for README`의 선행 조건을 Linux 실행 파일 준비만으로 축소. Windows 테스트·빌드 완료와 무관하게 실제 GUI 캡처 시작.
+- 새 릴리즈는 기존 Verify 2종에 Linux/Windows Build 2종, RustSec, 성능, 이미지 검사 및 GUI 캡처의 성공을 요구. Windows Authenticode 및 기존 Sigstore 검증 경로 유지.
+- 원본 Rust 소스·게임 데이터·릴리즈 파일 변경 없고, 신뢰되지 않은 공용 빌드 캐시 도입 없음.
+
 ## 장시간 보안·성능 작업 병렬화 (2026-11-07, 버전 v1.0.3 유지)
 - Linux `Verify`에 순차적으로 묶였던 RustSec(약 2분 56초)와 Release 성능 테스트(약 1분 39초)를 독립적인 병렬 Job으로 분리.
 - 이미지 매니페스트 정합성/배포 자산 준비를 ClamAV 패키지 설치·바이러스 검사(약 7분 10초)와 분리. GitHub Ubuntu 공식 미러 우선 사용.
