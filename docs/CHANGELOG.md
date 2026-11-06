@@ -1,6 +1,14 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-현재 릴리즈는 **v1.0.1**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+현재 릴리즈는 **v1.0.2**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v1.0.2 (2026-11-07)
+- 바이너리 전용 `app/`, `data/`, `ui/`의 무제한 `pub`를 `pub(crate)`로 제한하고 외부 라이브러리 공개 API는 유지. CI에서 visibility 규칙을 검증.
+- GitHub raw 업데이트는 정확한 40자리 커밋 SHA와 승인된 TSV/매니페스트/PNG 경로만 허용. `curl --disable`로 사용자 .curlrc 설정 우회.
+- 언어 설정 파일을 비공개 권한 임시 파일에 완전히 기록 후 교체하고 기존 심볼릭 링크 및 비정상 파일을 거부.
+- CSV 헤더 처리 O(h²) → O(h) 해시 중복 검사, 최대 64개 열 제한. 카탈로그 전용 연결 멤버십 O(p×n) → O(n+p) 기대 조회.
+- 추적되는 민감 파일 패턴을 소스 ZIP 생성 전 CI에서 차단하고 [공개 경계와 위험 문서](SECURITY_BOUNDARY_V1_0_2.md) 추가.
+- 확률 DP·Monte Carlo·UI 이벤트·게임 데이터는 변경하지 않음.
 
 ## v1.0.1 (2026-11-07)
 - `src/lib.rs` 및 `src/main.rs`의 crate-root `include!`를 명시적인 Rust 모듈과 crate-private 인터페이스로 전환하고 기존 공개 1.x 라이브러리 API는 재수출로 유지.
