@@ -154,6 +154,8 @@ pub fn t(language: Language, text: &'static str) -> &'static str {
         "Additional featured ticket equivalents" => ["추가 필요 전용 뽑기권(환산)", "Additional featured ticket equivalents", "追加の限定募集券換算", "还需限定抽卡券（折算）", "還需限定抽卡券（折算）"],
         "Featured ticket equivalents" => ["전용권 상당", "featured-ticket equivalents", "限定券相当", "限定券等价", "限定券等價"],
         "Copies unit" => ["장", "copies", "枚", "份", "份"],
+        "Standalone ticket shortfall" => ["단독 추가 필요 전용권", "Solo banner ticket deficit", "単独募集の追加専用券", "单卡池还需专用票", "單卡池還需專用券"],
+        "Solo ticket estimate excludes refunds" => ["각 단독 부족분은 보유 재화 전부를 해당 배너에 사용한 참고치이며, 미래 환급은 제외합니다. 두 수치를 합산하지 마세요.", "Each solo estimate uses all convertible currency, excludes future rebates, and must not be added to the other.", "各単独計算は所持通貨を全額使用、将来還元を除外。合算しないでください。", "单卡池估算分别使用全部可兑换货币，不含未来返还，不可相加。", "單卡池估算各自使用全部可兌換貨幣，不含未來回饋，不可相加。"],
         "Currency units" => ["개", "units", "個", "个", "個"],
         "Target confidence" => ["목표 성공률", "Target success rate", "目標達成率", "目标成功率", "目標成功率"],
         "Refund-simulation estimate" => ["환급 재투입 포함 · 표본 추정", "Including recycled refunds · simulated", "還元再投入込み・推定", "包含返还循环 · 抽样估算", "包含回饋循環 · 抽樣估算"],

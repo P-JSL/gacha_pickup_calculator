@@ -160,6 +160,21 @@ impl GoalFunding {
     }
 }
 
+/// One banner's *standalone* additional featured-ticket units. This is an
+/// independent reference which assumes the entire convertible currency can
+/// be used on this banner; it must never be added to the other banner's result.
+/// Stella Sora's record Gold Discs are displayed in units, not 1-pull tickets.
+fn standalone_ticket_shortage(setup: &GameSetup, needed_after_dedicated: usize, weapon: bool) -> usize {
+    let missing_pulls = needed_after_dedicated.saturating_sub(setup.available_flexible());
+    let units_per_pull = if weapon { setup.game.weapon_ticket_units_per_pull() } else { 1 };
+    let missing_units = missing_pulls.saturating_mul(units_per_pull);
+    if weapon && setup.game == Game::StellaSora {
+        missing_units.saturating_sub(setup.weapon_ticket_remainder)
+    } else {
+        missing_units
+    }
+}
+
 /// Shared, compact funding summary displayed on Dashboard and Analytics.
 fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
                        language: Language) {
@@ -175,9 +190,16 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     });
     ui.add_space(5.0);
 
-    let individual = |ui: &mut egui::Ui, label: &str,
+    let individual = |ui: &mut egui::Ui, label: &str, weapon: bool,
                       counts: (usize, usize, usize, usize, usize, usize)| {
         let (target, owned, missing, raw, dedicated, shared) = counts;
+        let ticket = i18n::ticket_name(language, setup.game, weapon);
+        let shortage = standalone_ticket_shortage(setup, shared, weapon);
+        let unit = if weapon && setup.game == Game::StellaSora {
+            t(language, "Currency units")
+        } else {
+            t(language, "Passes")
+        };
         ui.label(RichText::new(label).color(PRIMARY).strong());
         ui.label(format!(
             "{} {}  ·  {} {}  ·  {} {}",
@@ -196,6 +218,10 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
                 t(language, "Owned dedicated passes"), dedicated, t(language, "Passes"),
             ));
         }
+        ui.label(RichText::new(format!(
+            "{} · {}: +{} {}",
+            t(language, "Standalone ticket shortfall"), ticket, shortage, unit,
+        )).color(if shortage == 0 { MINT } else { GOLD }).strong());
     };
     let shortage = |ui: &mut egui::Ui| {
         ui.label(RichText::new(t(language, "Additional featured ticket equivalents"))
@@ -215,23 +241,23 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     };
     if ui.available_width() >= 780.0 {
         ui.columns(3, |cols| {
-            individual(&mut cols[0], t(language, "Characters"), (
+            individual(&mut cols[0], t(language, "Characters"), false, (
                 gap.character_target, gap.character_owned, gap.character_missing,
                 gap.character_single_raw, gap.dedicated_character,
                 gap.character_single_shared));
-            individual(&mut cols[1], secondary, (
+            individual(&mut cols[1], secondary, true, (
                 gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
                 gap.weapon_single_raw, gap.dedicated_weapon,
                 gap.weapon_single_shared));
             shortage(&mut cols[2]);
         });
     } else {
-        individual(ui, t(language, "Characters"), (
+        individual(ui, t(language, "Characters"), false, (
             gap.character_target, gap.character_owned, gap.character_missing,
             gap.character_single_raw, gap.dedicated_character,
             gap.character_single_shared));
         ui.add_space(6.0);
-        individual(ui, secondary, (
+        individual(ui, secondary, true, (
             gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
             gap.weapon_single_raw, gap.dedicated_weapon,
             gap.weapon_single_shared));
@@ -264,6 +290,8 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
             setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
         )).color(MUTED).size(11.0));
     }
+    ui.label(RichText::new(t(language, "Solo ticket estimate excludes refunds"))
+        .color(MUTED).size(11.0));
     ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
         .color(MUTED).size(11.0));
     if setup.game == Game::StellaSora {
@@ -275,3 +303,34 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     }
 }
 
+
+/// Unit tests of independent banner-only shortage calculation.
+/// The combined goal uses the separate joint DP/Monte Carlo funding path.
+#[cfg(test)]
+mod standalone_ticket_tests {
+    use super::*;
+
+    #[test]
+    fn standalone_shortage_never_double_counts_convertible_currency() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            setup.flexible = 2;
+            setup.premium_currency = game.cost_per_pull() - 1;
+            assert_eq!(standalone_ticket_shortage(&setup, 3, false), 1);
+            setup.premium_currency += 1;
+            assert_eq!(standalone_ticket_shortage(&setup, 3, false), 0);
+            assert_eq!(standalone_ticket_shortage(&setup, 0, true), 0);
+        }
+    }
+
+    #[test]
+    fn stella_record_disc_remainder_is_subtracted_only_from_record_cost() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.set_weapon_ticket_inventory(299);
+        setup.premium_currency = 0;
+        assert_eq!(standalone_ticket_shortage(&setup, 2, true), 301);
+        assert_eq!(standalone_ticket_shortage(&setup, 2, false), 2);
+        setup.set_weapon_ticket_inventory(300);
+        assert_eq!(standalone_ticket_shortage(&setup, 1, true), 300);
+    }
+}
