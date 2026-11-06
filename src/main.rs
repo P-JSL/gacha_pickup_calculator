@@ -434,6 +434,12 @@ impl Calculator {
                 repaint.request_repaint();
             }
         });
+        // Screenshot automation must re-calculate after each game switch.
+        // Production default remains OFF; the CI flag is never set by the app.
+        let mut ui_preferences = UiPreferences::default();
+        if std::env::var("GACHA_CI_AUTO_REFRESH").as_deref() == Ok("1") {
+            ui_preferences.auto_recalculate = true;
+        }
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
@@ -447,7 +453,7 @@ impl Calculator {
             stats_game: None,
             input_needs_calculation: false,
             manual_calculation_requested: false,
-            ui_preferences: UiPreferences::default(),
+            ui_preferences,
             language_preference: i18n::load_preference(),
             system_language: i18n::system_language(),
             language_save_error: None,
