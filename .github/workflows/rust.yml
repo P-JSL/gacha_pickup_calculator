@@ -180,7 +180,8 @@ jobs:
           set -euo pipefail
           echo "::notice title=GUI capture::Installing screenshot prerequisites with bounded timeouts."
           timeout --signal=TERM --kill-after=10s 180s sudo apt-get update
-          timeout --signal=TERM --kill-after=10s 180s sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
+          timeout --signal=TERM --kill-after=10s 180s sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=45 install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
+          test -s /usr/share/fonts/truetype/nanum/NanumGothic.ttf
           chmod +x target/release/gacha_pickup_calculator
           echo "::notice title=GUI capture::Starting actual GUI screenshots with a 3-minute limit."
           timeout --signal=TERM --kill-after=10s 180s bash scripts/capture_readme_screenshots.sh

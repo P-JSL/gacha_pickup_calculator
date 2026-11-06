@@ -7,6 +7,7 @@
 - 도달 불가능한 영(0) 확률 상태의 곱셈을 건너뛰어 희소 PMF 합성을 개선(확률 의미/연산 순서 불변).
 - `scripts/verify_release_contract.py`를 CI에 추가하여 `Cargo.toml`/`Cargo.lock`, 1.0.0 릴리즈 노트, 분리된 모듈의 `include!`/외부 파일 경로, 로컬 문서 링크를 점검.
 - Linux/Windows 기존 CI 테스트·Clippy·RustSec·이미지 검증·실제 GUI 캡처·SHA-256 패키징을 유지하고 Rust API 문서 빌드 강화.
+- v1.0.0 RC GUI 검증에서 Ubuntu의 61MB Noto CJK 폰트 패키지 다운로드가 180초 제한에 걸린 문제를 수정: 10MB Nanum Korean 폰트와 최소 APT 의존성으로 대체하고 런타임 폰트 검색 경로를 함께 보완.
 - 전체 요구 사항의 분해/검증 목록은 [1.0.0 출시 준비 전수조사](docs/V1_RELEASE_READINESS.md)와 [모듈별 설계](docs/ARCHITECTURE.md) 참고.
 
 ## 명시적 한계

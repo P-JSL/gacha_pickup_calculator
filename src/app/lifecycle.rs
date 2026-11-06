@@ -235,6 +235,7 @@ fn install_korean_font(ctx: &egui::Context) {
         r"C:\Windows\Fonts\malgunbd.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
         "/System/Library/Fonts/AppleSDGothicNeo.ttc",
     ];
     for location in locations {
