@@ -2072,7 +2072,7 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
-        if self.updates.poll(ctx) { self.catalog_ui.retry_failed(); }
+        if self.updates.poll(ctx) { self.catalog_ui.invalidate_after_update(); }
         self.catalog_ui.pump(ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
