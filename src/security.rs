@@ -20,7 +20,7 @@ const IMAGE_MANIFEST: &str = include_str!("../Image/SHA256SUMS.txt");
 fn parse_sha256(value: &str) -> Option<[u8; 32]> {
     if value.len() != 64 || !value.is_ascii() { return None; }
     let mut digest = [0_u8; 32];
-    for (byte, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+    for (byte, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let high = (pair[0] as char).to_digit(16)?;
         let low = (pair[1] as char).to_digit(16)?;
         digest[byte] = ((high << 4) | low) as u8;
