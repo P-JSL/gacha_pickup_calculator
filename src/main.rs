@@ -378,9 +378,9 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     });
     ui.add_space(5.0);
 
-    let individual = |ui: &mut egui::Ui, label: &str, target: usize,
-                      owned: usize, missing: usize, raw: usize,
-                      dedicated: usize, shared: usize| {
+    let individual = |ui: &mut egui::Ui, label: &str,
+                      counts: (usize, usize, usize, usize, usize, usize)| {
+        let (target, owned, missing, raw, dedicated, shared) = counts;
         ui.label(RichText::new(label).color(PRIMARY).strong());
         ui.label(format!(
             "{} {}  ·  {} {}  ·  {} {}",
@@ -417,25 +417,26 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     };
     if ui.available_width() >= 780.0 {
         ui.columns(3, |cols| {
-            individual(&mut cols[0], t(language, "Characters"),
+            individual(&mut cols[0], t(language, "Characters"), (
                 gap.character_target, gap.character_owned, gap.character_missing,
                 gap.character_single_raw, gap.dedicated_character,
-                gap.character_single_shared);
-            individual(&mut cols[1], secondary,
+                gap.character_single_shared));
+            individual(&mut cols[1], secondary, (
                 gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
                 gap.weapon_single_raw, gap.dedicated_weapon,
-                gap.weapon_single_shared);
+                gap.weapon_single_shared));
             shortage(&mut cols[2]);
         });
     } else {
-        individual(ui, t(language, "Characters"),
+        individual(ui, t(language, "Characters"), (
             gap.character_target, gap.character_owned, gap.character_missing,
             gap.character_single_raw, gap.dedicated_character,
-            gap.character_single_shared);
+            gap.character_single_shared));
         ui.add_space(6.0);
-        individual(ui, secondary, gap.weapon_target, gap.weapon_owned,
-            gap.weapon_missing, gap.weapon_single_raw, gap.dedicated_weapon,
-            gap.weapon_single_shared);
+        individual(ui, secondary, (
+            gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
+            gap.weapon_single_raw, gap.dedicated_weapon,
+            gap.weapon_single_shared));
         ui.separator();
         shortage(ui);
     }
