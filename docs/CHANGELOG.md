@@ -1,6 +1,13 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-현재 릴리즈는 **v0.2.2**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+현재 릴리즈는 **v0.2.3**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v0.2.3 (2026-11-06)
+- 프로그램 시작 시 GitHub 커밋 고정 카탈로그·매핑·이미지 매니페스트 갱신. 업데이트 불일치 시 기존 데이터 유지.
+- 캐릭터 이미지의 버전별 generation 검증을 추가해 이전 로딩 결과가 새 PNG를 덮어쓰지 않도록 처리.
+- RwLock poison fail-closed 처리, SHA-256·파일 크기·디코더 검증 유지.
+- 확률 DP의 버퍼 재사용/사전 계산으로 반복 할당을 감소시킴. 수학적 계산 규칙은 불변.
+- 최신 프로그램 릴리즈 확인 및 Settings 표시. 바이너리 무인 설치와 공식 발표 자동 수집은 미지원.
 
 ## v0.2.2 (2026-11-06)
 - 캐릭터 5★ 전수 매핑 검증: 141건 전용 장비 연결 및 30건 예외 사유를 명시해 새 캐릭터 자동 추가 시 잘못된 임의 매핑을 방지.
