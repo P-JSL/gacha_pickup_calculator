@@ -172,6 +172,7 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
 impl Calculator {
     /// Reference-style overview. All visible values come from the active model, never from demo data.
     pub(super) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
+        let language = self.language();
         let mut dirty = false;
         if let Some(stats) = self.visible_stats() {
             let free_pulls = self.setup.available_flexible();
@@ -186,82 +187,85 @@ impl Calculator {
                 .unwrap_or(raw.success_probability);
             let expected = stats.feedback.as_ref().map(|f| f.average_raw)
                 .unwrap_or(stats.combined.mean);
-            let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
+            let meta = if stats.feedback.is_some() { t(language, "Including recycled refunds") } else { t(language, "Accurate probability DP") };
             if self.input_needs_calculation && !self.calculating {
-                ui.label(RichText::new("입력 수정됨 · Run Simulation을 누르면 결과가 갱신됩니다.")
+                ui.label(RichText::new(t(language, "Changes pending. Select Run Simulation to update."))
                     .color(YELLOW).size(10.0));
             } else if self.calculating {
-                ui.label(RichText::new("백그라운드 계산 중 · 이전 결과를 유지합니다.")
+                ui.label(RichText::new(t(language, "Calculating in background. Previous results remain visible."))
                     .color(YELLOW).size(10.0));
             }
             ui.columns(4, |columns| {
                 let (label, value, detail) = if self.setup.game.shares_featured_ticket() {
-                    ("별의 궤도 전용 티켓", format!("{}", self.setup.flexible),
-                        format!("캐릭터·광추 공용 / 성옥 전환 {}뽑",
-                            self.setup.premium_currency / self.setup.game.cost_per_pull()))
+                    (i18n::ticket_name(language, self.setup.game, false), format!("{}", self.setup.flexible),
+                        format!("{}: {} ({})", t(language, "Shared character/weapon ticket"),
+                            self.setup.premium_currency / self.setup.game.cost_per_pull(),
+                            i18n::currency_name(language, self.setup.game)))
                 } else {
-                    ("Character / Weapon Tickets",
+                    (t(language, "Character / Weapon Tickets"),
                         format!("{} / {}", self.setup.character_dedicated,
                             self.setup.weapon_dedicated),
                         if self.setup.game == Game::StellaSora {
-                            format!("하늘 티켓 / 골든 디스크 {}개",
+                            format!("{} / {}: {}",
+                                i18n::ticket_name(language, self.setup.game, false),
+                                i18n::ticket_name(language, self.setup.game, true),
                                 self.setup.weapon_ticket_inventory())
                         } else {
-                            format!("전용권 2종 · 공용 전환 {}뽑", free_pulls)
+                            format!("{}: {}", t(language, "Shared Currency"), free_pulls)
                         })
                 };
                 overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
-                overview_metric(&mut columns[1], 1, "Target Success Rate",
+                overview_metric(&mut columns[1], 1, t(language, "Target Success Rate"),
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
-                overview_metric(&mut columns[2], 2, "Expected Pulls",
-                    format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK);
-                overview_metric(&mut columns[3], 3, "Remaining Currency",
+                overview_metric(&mut columns[2], 2, t(language, "Expected Pulls"),
+                    format!("{expected:.1}"), t(language, "Average pulls to all targets").to_owned(), PINK);
+                overview_metric(&mut columns[3], 3, t(language, "Remaining Currency"),
                     self.setup.premium_currency.to_string(),
-                    format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                        self.setup.game.currency_name()), CYAN);
+                    format!("{} × {} {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
+                        self.setup.game.cost_per_pull(), i18n::currency_name(language, self.setup.game)), CYAN);
             });
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
             let char_rate = stats.character.at(character_budget) * 100.0;
             let weapon_rate = stats.weapon.at(weapon_budget) * 100.0;
-            let banner_name = self.setup.game.secondary_banner_name();
+            let banner_name = i18n::banner_name(language, self.setup.game);
             let chart_char = [ChartSeries {
-                label: "캐릭터", source: ChartSource::Exact(&stats.character), color: CYAN,
+                label: t(language, "Characters"), source: ChartSource::Exact(&stats.character), color: CYAN,
             }];
             let chart_weapon = [ChartSeries {
                 label: banner_name, source: ChartSource::Exact(&stats.weapon), color: YELLOW,
             }];
             let chart_total = [ChartSeries {
-                label: "전체 · 환급 전", source: ChartSource::Exact(&stats.combined), color: PINK,
+                label: t(language, "Overall"), source: ChartSource::Exact(&stats.combined), color: PINK,
             }];
             if ui.available_width() >= 900.0 {
                 ui.columns(3, |columns| {
-                    probability_card(&mut columns[0], "Character Probability",
-                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
-                    probability_card(&mut columns[1], &format!("{banner_name} Probability"),
-                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
-                    probability_card(&mut columns[2], "Overall Result",
-                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
+                    probability_card(&mut columns[0], t(language, "Character Probability"),
+                        format!("E{} {}: {:.2}%", self.target_eid, t(language, "Success"), char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
+                    probability_card(&mut columns[1], &format!("{banner_name} {}", t(language, "Probability")),
+                        format!("S{} {}: {:.2}%", self.target_refine, t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
+                    probability_card(&mut columns[2], t(language, "Overall Result"),
+                        format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
             } else {
-                probability_card(ui, "Character Probability",
-                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences, self.language());
+                probability_card(ui, t(language, "Character Probability"),
+                    format!("{}: {char_rate:.2}%", t(language, "Success")), &chart_char, CYAN, self.ui_preferences, self.language());
                 ui.add_space(8.0);
-                probability_card(ui, &format!("{banner_name} Probability"),
-                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences, self.language());
+                probability_card(ui, &format!("{banner_name} {}", t(language, "Probability")),
+                    format!("{}: {weapon_rate:.2}%", t(language, "Success")), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                 ui.add_space(8.0);
-                probability_card(ui, "Overall Result",
-                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
+                probability_card(ui, t(language, "Overall Result"),
+                    format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
         } else if self.calculating {
-            dashboard_card(ui, "Probability Overview", |ui| {
-                ui.horizontal(|ui| { ui.spinner(); ui.label("게임별 확률과 환급을 계산하고 있습니다."); });
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
             });
         } else {
-            dashboard_card(ui, "Probability Overview", |ui| {
-                ui.colored_label(Color32::LIGHT_RED, self.error.as_deref().unwrap_or("계산 결과가 없습니다."));
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.colored_label(Color32::LIGHT_RED, self.error.as_deref().unwrap_or(t(language, "No calculation available")));
             });
         }
 
