@@ -170,7 +170,14 @@ fn fetch_https(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
     }
     // No shell, no redirects, strict HTTPS, bounded response and timeout.
     // curl ships with modern Windows and common Linux installations.
-    let mut child = Command::new("curl")
+    let mut command = Command::new("curl");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Do not flash a console window when the egui app starts on Windows.
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let mut child = command
         .args(["--fail", "--silent", "--show-error",
             "--proto", "=https", "--max-redirs", "0",
             "--connect-timeout", "6", "--max-time", "22",
@@ -397,9 +404,14 @@ pub fn parse_bundle(
             return Err("전용 장비 연결 출처 또는 TSV 형식 오류".to_owned());
         }
         let game = parse_game(f[0]).ok_or("연결 게임 ID 오류")?;
-        if lookup.get(&(game, catalog::Kind::Character, f[1].to_owned())) != Some(&5)
+        let featured_character = entries.iter().any(|entry|
+            entry.game == game && entry.kind == catalog::Kind::Character
+                && entry.id == f[1] && entry.is_featured_target()
+        );
+        if !featured_character
+            || lookup.get(&(game, catalog::Kind::Character, f[1].to_owned())) != Some(&5)
             || lookup.get(&(game, catalog::Kind::Weapon, f[2].to_owned())) != Some(&5) {
-            return Err(format!("존재하지 않는 5★ 전용 장비 연결: {line}"));
+            return Err(format!("비픽업 캐릭터 또는 존재하지 않는 5★ 전용 장비 연결: {line}"));
         }
         if pairs.insert((game, f[1].to_owned()), f[2].to_owned()).is_some() {
             return Err(format!("캐릭터 ID 중복 연결: {line}"));

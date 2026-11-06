@@ -210,11 +210,15 @@ struct ActiveCatalog {
 }
 static LIVE: OnceLock<RwLock<Option<Arc<ActiveCatalog>>>> = OnceLock::new();
 
-fn active() -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
-    let lock = LIVE.get_or_init(|| RwLock::new(None));
+fn snapshot_from_lock(
+    lock: &RwLock<Option<Arc<ActiveCatalog>>>,
+) -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
     // Never call PoisonError::into_inner: a panicking writer might have left
     // the active catalog in an inconsistent state.
     Ok(lock.read().map_err(|_| "카탈로그 공유 상태가 poisoned 되었습니다.")?.clone())
+}
+fn active() -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
+    snapshot_from_lock(LIVE.get_or_init(|| RwLock::new(None)))
 }
 
 pub fn publish_verified(bundle: VerifiedBundle) -> Result<(), &'static str> {
@@ -493,6 +497,17 @@ pub fn picker(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn poisoned_catalog_lock_refuses_to_read_unvalidated_state() {
+        let isolated = Arc::new(RwLock::new(None));
+        let writer = Arc::clone(&isolated);
+        assert!(std::thread::spawn(move || {
+            let _guard = writer.write().expect("fresh lock");
+            panic!("intentional write-lock poisoning");
+        }).join().is_err());
+        assert!(snapshot_from_lock(&isolated).is_err());
+    }
     #[test]
     fn upcoming_and_released_characters_are_prioritized() {
         assert_eq!(first(Game::StarRail, Kind::Character), "1511");
