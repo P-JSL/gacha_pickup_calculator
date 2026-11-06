@@ -1,11 +1,11 @@
 //! Offline desktop localization. No IP geolocation, web requests or external dependencies.
 use gacha_pickup_calculator::games::Game;
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, io::{self, Write}, path::{Path, PathBuf}};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Language { Korean, English, Japanese, ChineseSimplified, ChineseTraditional }
+pub(crate) enum Language { Korean, English, Japanese, ChineseSimplified, ChineseTraditional }
 impl Language {
-    pub fn code(self) -> &'static str {
+    pub(crate) fn code(self) -> &'static str {
         match self {
             Self::Korean => "KO", Self::English => "EN", Self::Japanese => "JA",
             Self::ChineseSimplified => "ZH-CN", Self::ChineseTraditional => "ZH-TW",
@@ -18,9 +18,9 @@ impl Language {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum LanguagePreference { Automatic, Korean, English, Japanese, ChineseSimplified, ChineseTraditional }
+pub(crate) enum LanguagePreference { Automatic, Korean, English, Japanese, ChineseSimplified, ChineseTraditional }
 impl LanguagePreference {
-    pub const ALL: [Self; 6] = [Self::Automatic, Self::Korean, Self::English,
+    pub(crate) const ALL: [Self; 6] = [Self::Automatic, Self::Korean, Self::English,
         Self::Japanese, Self::ChineseSimplified, Self::ChineseTraditional];
     fn key(self) -> &'static str {
         match self { Self::Automatic => "auto", Self::Korean => "ko", Self::English => "en",
@@ -33,13 +33,13 @@ impl LanguagePreference {
             "zh-cn" => Some(Self::ChineseSimplified), "zh-tw" => Some(Self::ChineseTraditional),
             _ => None }
     }
-    pub fn effective(self, system: Language) -> Language {
+    pub(crate) fn effective(self, system: Language) -> Language {
         match self { Self::Automatic => system, Self::Korean => Language::Korean,
             Self::English => Language::English, Self::Japanese => Language::Japanese,
             Self::ChineseSimplified => Language::ChineseSimplified,
             Self::ChineseTraditional => Language::ChineseTraditional }
     }
-    pub fn display(self, system: Language, ui: Language) -> String {
+    pub(crate) fn display(self, system: Language, ui: Language) -> String {
         match self {
             Self::Automatic => format!("{} ({})", t(ui, "Automatic"), system.code()),
             Self::Korean => "한국어".into(), Self::English => "English".into(),
@@ -50,7 +50,7 @@ impl LanguagePreference {
 }
 
 /// Locale is taken from the OS user locale/region, never inferred from IP addresses.
-pub fn parse_system_locale(raw: &str) -> Language {
+pub(crate) fn parse_system_locale(raw: &str) -> Language {
     let locale = raw.trim().split([':', '.', '@']).next().unwrap_or("")
         .replace('_', "-").to_ascii_lowercase();
     if locale == "ko" || locale.starts_with("ko-") { Language::Korean }
@@ -71,7 +71,7 @@ fn windows_user_locale() -> Option<String> {
     if length <= 1 || length as usize > buffer.len() { return None; }
     String::from_utf16(&buffer[..length as usize - 1]).ok()
 }
-pub fn system_language() -> Language {
+pub(crate) fn system_language() -> Language {
     #[cfg(windows)]
     if let Some(locale) = windows_user_locale() { return parse_system_locale(&locale); }
     for key in ["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"] {
@@ -94,21 +94,63 @@ fn settings_path() -> Option<PathBuf> {
             .map(|p| p.join("gacha-pickup-calculator").join("language.txt"))
     }
 }
-pub fn load_preference() -> LanguagePreference {
+pub(crate) fn load_preference() -> LanguagePreference {
     settings_path().and_then(|p| fs::read_to_string(p).ok())
         .and_then(|s| LanguagePreference::from_key(&s))
         .unwrap_or(LanguagePreference::Automatic)
 }
-pub fn save_preference(pref: LanguagePreference) -> std::io::Result<()> {
-    let path = settings_path().ok_or_else(|| std::io::Error::new(
-        std::io::ErrorKind::NotFound, "No system settings directory"))?;
+pub(crate) fn save_preference(pref: LanguagePreference) -> io::Result<()> {
+    let path = settings_path().ok_or_else(|| io::Error::new(
+        io::ErrorKind::NotFound, "No system settings directory"))?;
+    save_preference_to(&path, pref)
+}
+
+/// Settings must not overwrite a pre-planted symlink or partially truncate an
+/// existing preference on write failure. Use a private, unique temporary file.
+fn save_preference_to(path: &Path, pref: LanguagePreference) -> io::Result<()> {
     if let Some(dir) = path.parent() { fs::create_dir_all(dir)?; }
-    fs::write(path, pref.key())
+    match fs::symlink_metadata(path) {
+        Ok(meta) if !meta.file_type().is_file() => {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput,
+                "Refusing to overwrite a non-regular language settings file"));
+        }
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        _ => {}
+    }
+    let mut candidate = None;
+    for attempt in 0..32 {
+        let temp = path.with_extension(format!("tmp-{}-{attempt}", std::process::id()));
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        match options.open(&temp) {
+            Ok(file) => { candidate = Some((temp, file)); break; }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    let (temp, mut file) = candidate.ok_or_else(|| io::Error::new(
+        io::ErrorKind::AlreadyExists, "No unique settings temporary file available"))?;
+    let result = (|| {
+        file.write_all(pref.key().as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        // Windows rename cannot replace an existing regular file; the only
+        // non-atomic interval is after a fully synced temp is already staged.
+        #[cfg(windows)]
+        if fs::symlink_metadata(path).is_ok() { fs::remove_file(path)?; }
+        fs::rename(&temp, path)
+    })();
+    if result.is_err() { let _ = fs::remove_file(&temp); }
+    result
 }
 
 /// User-visible strings: Korean, English, Japanese, Simplified Chinese, Traditional Chinese.
 /// Unknown locale defaults to English; game names and item identities are not modified.
-pub fn t(language: Language, text: &'static str) -> &'static str {
+pub(crate) fn t(language: Language, text: &'static str) -> &'static str {
     let values = match text {
         "Automatic" => ["자동 (시스템 언어)", "Automatic", "自動（システム言語）", "自动（系统语言）", "自動（系統語言）"],
         "Language" => ["언어", "Language", "言語", "语言", "語言"],
@@ -229,7 +271,7 @@ pub fn t(language: Language, text: &'static str) -> &'static str {
     };
     values[language.index()]
 }
-pub fn game_name(language: Language, game: Game) -> &'static str {
+pub(crate) fn game_name(language: Language, game: Game) -> &'static str {
     match (language,game) {
         (Language::Korean,_) => game.label(),
         (_, Game::StarRail) => "Honkai: Star Rail",
@@ -238,7 +280,7 @@ pub fn game_name(language: Language, game: Game) -> &'static str {
         (_, Game::Neverness) => "Neverness to Everness",
     }
 }
-pub fn banner_name(language: Language, game: Game) -> &'static str {
+pub(crate) fn banner_name(language: Language, game: Game) -> &'static str {
     match (language,game) {
         (Language::Korean,_) => game.secondary_banner_name(),
         (Language::Japanese, Game::StarRail) => "光円錐",
@@ -250,7 +292,7 @@ pub fn banner_name(language: Language, game: Game) -> &'static str {
         (_, Game::Neverness) => "Arc",
     }
 }
-pub fn currency_name(language: Language, game: Game) -> &'static str {
+pub(crate) fn currency_name(language: Language, game: Game) -> &'static str {
     match (language,game) {
         (Language::Korean,_) => game.currency_name(),
         (Language::Japanese, Game::StarRail) => "星玉",
@@ -268,7 +310,7 @@ pub fn currency_name(language: Language, game: Game) -> &'static str {
         (_,Game::Neverness) => "Annulith",
     }
 }
-pub fn ticket_name(language: Language, game: Game, weapon: bool) -> &'static str {
+pub(crate) fn ticket_name(language: Language, game: Game, weapon: bool) -> &'static str {
     if language == Language::Korean {
         return if weapon { game.weapon_ticket_name() } else { game.character_ticket_name() };
     }
@@ -282,7 +324,7 @@ pub fn ticket_name(language: Language, game: Game, weapon: bool) -> &'static str
         (Game::Neverness,true) => "Tri-Key",
     }
 }
-pub fn refund_name(language: Language, game: Game) -> &'static str {
+pub(crate) fn refund_name(language: Language, game: Game) -> &'static str {
     if language == Language::Korean { return game.exchange_points_name(); }
     match game { Game::StarRail => "Undying Starlight",
         Game::WutheringWaves => "Afterglow Coral",
@@ -292,6 +334,31 @@ pub fn refund_name(language: Language, game: Game) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preference_write_replaces_previous_value_without_truncating_unsafe_target() {
+        let base = std::env::temp_dir().join(format!(
+            "gacha-lang-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .expect("valid system clock").as_nanos()));
+        fs::create_dir_all(&base).unwrap();
+        let path = base.join("language.txt");
+        save_preference_to(&path, LanguagePreference::Korean).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "ko");
+        save_preference_to(&path, LanguagePreference::Japanese).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "ja");
+        #[cfg(unix)] {
+            use std::os::unix::fs::symlink;
+            let victim = base.join("do-not-overwrite");
+            fs::write(&victim, "protected").unwrap();
+            fs::remove_file(&path).unwrap();
+            symlink(&victim, &path).unwrap();
+            assert!(save_preference_to(&path, LanguagePreference::English).is_err());
+            assert_eq!(fs::read_to_string(victim).unwrap(), "protected");
+        }
+        let _ = fs::remove_dir_all(base);
+    }
+
     #[test]
     fn locale_region_and_variants() {
         assert_eq!(parse_system_locale("ko_KR.UTF-8"), Language::Korean);
