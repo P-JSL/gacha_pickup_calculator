@@ -104,7 +104,7 @@ jobs:
           }
       - name: Upload Windows UI screenshot
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-windows-native-ui-smoke
           path: ci-artifacts/windows-ui.png
@@ -112,7 +112,7 @@ jobs:
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-linux-release-executable
           path: target/release/gacha_pickup_calculator
@@ -120,7 +120,7 @@ jobs:
           retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-pickup-calculator-windows-x64
           path: target/release/gacha_pickup_calculator.exe
@@ -147,7 +147,7 @@ jobs:
           sudo systemctl stop clamav-freshclam 2>/dev/null || true
           sudo freshclam
           clamscan --recursive --infected dist/Image
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gacha-offline-images
           path: dist/Image/
@@ -177,7 +177,7 @@ jobs:
           sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
           bash scripts/capture_readme_screenshots.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gacha-readme-screenshots-v015
           path: ci-readme-shots/
