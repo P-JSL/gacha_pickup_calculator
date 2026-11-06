@@ -2,8 +2,8 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표에 필요한 뽑기 횟수, 보유 재화, 환급 재투자를 분석하는 **Rust/egui 데스크톱 프로그램**입니다.
 
-**최신 문서: v0.2.5 (2026-11-06)**  
-[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.5) · [v0.2.5 변경사항](RELEASE_NOTES_v0.2.5.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
+**최신 문서: v0.2.6 (2026-11-06)**  
+[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.6) · [v0.2.6 변경사항](RELEASE_NOTES_v0.2.6.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
 
 > **정확도 범위:** 희귀도 및 픽업 확률은 선택된 배너 규칙에 대한 유한 상태 DP로 계산합니다. 소프트 천장·게임 내 숨겨진 처리 등 미공개 조건이 있으면 실제 서비스 확률과 다를 수 있습니다. 4성 중복, 상점 환급, 재화 재투자는 개별 계정의 소장 상태를 모두 알 수 없어 **Monte Carlo 추정치**입니다. 서로 다른 결과를 혼동하지 마십시오.
 
@@ -15,9 +15,11 @@
 
 > **v0.2.5 목표 추가 비용:** 목표 캐릭터·장비의 기보유 수량을 먼저 차감하고, 캐릭터/광추·무기·Arc·레코드별 전용권과 공용 티켓·게임 재화를 반영해 목표 성공률(기본 90%)을 달성하기 위해 **현재보다 더 필요한 공용 뽑기 횟수와 정확한 추가 게임 재화 수량**을 Dashboard/Analytics에 표시합니다. 환급 모델 사용 시 이미 보유한 교환 포인트와 이후 발생하는 환급의 재투입을 계산합니다. 캐릭터·장비 단독 필요량은 같은 공용 재화를 각각 가정하므로 단순 합산하지 않습니다.
 
+> **v0.2.6 전용 뽑기권 표기:** Dashboard·Analytics의 목표 부족분 카드에서 '공용권' 단어 대신 게임별 실제 한정 픽업 티켓 명칭을 사용합니다. 붕괴: 스타레일은 캐릭터와 광추가 같은 한정 티켓을 공유하고, 명조/이환/스텔라 소라는 캐릭터와 무기·Arc·레코드 전용권을 구분합니다. 스텔라 소라 골든 디스크는 1회=300개 단위로 표시합니다. **각 배너의 단독 부족분은 같은 보유 프리미엄 재화를 각각 전량 적용한 참고값으로, 합산하면 안 됩니다.** 전체 필요량은 환급/확률 모델의 공동 목표 예산을 기준으로 별도 산출합니다.
+
 ## 화면
 
-현재 버전 **v0.2.5의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.5/gacha-pickup-calculator-screenshots-v0.2.5.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
+현재 버전 **v0.2.6의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.6/gacha-pickup-calculator-screenshots-v0.2.6.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
 
 ## 주요 기능
 
@@ -35,12 +37,12 @@
 
 | 메뉴 | 기능 |
 |---|---|
-| Dashboard | 추가 필요 재화 KPI 및 보유량 대비 부족분 상세, 게임 선택, 분리된 확률 그래프, 빠른 목표·재화 입력 |
+| Dashboard | 게임별 전용 뽑기권 회분 기준 KPI 및 캐릭터/장비 단독 부족분 상세, 게임 선택, 분리된 확률 그래프, 빠른 목표·재화 입력 |
 | Simulator | 목표, 천장, 확정 상태, 교환·중복 보상, 세부 확률 설정 |
 | Currency | 게임별 전용 티켓/재화/환급 포인트 교환비 설정 |
 | Characters | 캐릭터 선택과 돌파·기보유·캐릭터 천장 설정 |
 | Weapons | 광추·무기·Arc·레코드 선택 및 재련·기보유·장비 천장 |
-| Analytics | 목표 성공률별 추가 필요 재화와 기보유 장수·전용권 반영 내역, 정확한 분포, 추정 환급, 성공률 비교 |
+| Analytics | 목표 성공률별 한정 전용권 명칭·부족분 및 기보유 장수·재화 반영 내역, 정확한 분포, 추정 환급, 성공률 비교 |
 | Tracker / CSV | 검열 데이터를 고려한 관측 통계 분석 |
 | Settings | 언어, 레이아웃, 차트, 자동 재계산, 게임 데이터·프로그램 업데이트 확인 |
 
@@ -72,12 +74,12 @@
 
 ## 설치 (Windows x64)
 
-1. [v0.2.5 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.5)에서 `gacha-pickup-calculator-windows-x64-v0.2.5.zip`을 받습니다.
+1. [v0.2.6 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.6)에서 `gacha-pickup-calculator-windows-x64-v0.2.6.zip`을 받습니다.
 2. ZIP 전체를 압축 해제합니다. **실행 파일과 `Image/` 폴더 구조를 그대로 유지**하십시오.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 별도 관리자 권한이나 외부 API 키는 필요하지 않습니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v0.2.5.zip
+gacha-pickup-calculator-windows-x64-v0.2.6.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/
