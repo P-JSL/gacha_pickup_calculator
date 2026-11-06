@@ -11,6 +11,8 @@ pub mod feedback;
 pub mod tracker;
 pub mod observations;
 
+use std::sync::OnceLock;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RateMode {
     /// Use only officially published base and hard guarantee numbers.
@@ -141,14 +143,18 @@ impl Banner {
         let mut cur = vec![0.0; k * stride];
         cur[self.pity * 2 + usize::from(self.guaranteed)] = 1.0;
         let mut pmf = vec![0.0; self.max_additional_pulls() + 1];
+        // State dimensions and rarity schedule never change during this DP run.
+        // Reuse a cleared buffer instead of allocating once per simulated pull.
+        let mut next = vec![0.0; cur.len()];
+        let chances: Vec<f64> = (1..=h).map(|draw| rarity.chance(draw, mode)).collect();
         for completed_probability in pmf.iter_mut().skip(1) {
-            let mut next = vec![0.0; cur.len()];
+            next.fill(0.0);
             for copies in 0..k {
                 for pity in 0..h {
                     for g in 0..2 {
                         let mass = cur[copies * stride + pity * 2 + g];
                         if mass == 0.0 { continue; }
-                        let rate = rarity.chance(pity + 1, mode);
+                        let rate = chances[pity];
                         let success = mass * rate * if g == 1 { 1.0 } else { featured };
                         let miss_feature = mass * rate - success;
                         let miss_rare = mass * (1.0 - rate);
@@ -161,7 +167,7 @@ impl Banner {
                     }
                 }
             }
-            cur = next;
+            std::mem::swap(&mut cur, &mut next);
         }
         Ok(Distribution::new(pmf))
     }
@@ -182,8 +188,9 @@ impl Banner {
         let mut pmf = vec![0.0; self.max_additional_pulls() + 1];
         let mut cur = vec![0.0; k * hard];
         cur[initial_copies * hard + self.pity] = 1.0;
+        let mut next = vec![0.0; cur.len()];
         for (step, completed_probability) in pmf.iter_mut().enumerate().skip(1) {
-            let mut next = vec![0.0; cur.len()];
+            next.fill(0.0);
             let spark_at_step = self.spark.as_ref().is_some_and(|s| !s.used && !claimed_at_start && s.progress + step == s.at);
             let bonus = usize::from(spark_at_step);
             for copies in 0..k {
@@ -199,7 +206,7 @@ impl Banner {
                     else if pity + 1 < hard { next[miss_copies * hard + pity + 1] += mass * (1.0 - p); }
                 }
             }
-            cur = next;
+            std::mem::swap(&mut cur, &mut next);
         }
         Ok(Distribution::new(pmf))
     }
@@ -218,14 +225,15 @@ impl Banner {
         cur[self.pity * 6 + self.any_rare_pity] = 1.0;
         let mut pmf = vec![0.0; (k * 8 + 1) * 10];
         let outcomes = arc_batch_outcomes();
+        let mut next = vec![0.0; cur.len()];
         for batch in 1..=k * 8 {
-            let mut next = vec![0.0; cur.len()];
+            next.fill(0.0);
             for copies in 0..k {
                 for pickup_pity in 0..8 {
                     for any_pity in 0..6 {
                         let mass = cur[copies * stride + pickup_pity * 6 + any_pity];
                         if mass == 0.0 { continue; }
-                        for &(natural_featured, natural_off, probability) in &outcomes {
+                        for &(natural_featured, natural_off, probability) in outcomes {
                             let rare = natural_featured + natural_off;
                             let (featured, off) = if pickup_pity == 7 && natural_featured == 0 {
                                 // The eighth multi guarantees one featured S Arc.
@@ -256,7 +264,7 @@ impl Banner {
                     }
                 }
             }
-            cur = next;
+            std::mem::swap(&mut cur, &mut next);
         }
         Ok(Distribution::new(pmf))
     }
@@ -264,7 +272,9 @@ impl Banner {
 
 /// The analytical multinomial distribution of featured and non-featured S-Arcs
 /// within ten independent natural draws (before batch guarantees).
-fn arc_batch_outcomes() -> Vec<(usize, usize, f64)> {
+fn arc_batch_outcomes() -> &'static [(usize, usize, f64)] {
+    static OUTCOMES: OnceLock<Vec<(usize, usize, f64)>> = OnceLock::new();
+    OUTCOMES.get_or_init(|| {
     let mut outcome = vec![(0, 0, 1.0)];
     for _ in 0..10 {
         let mut next = vec![vec![0.0; 11]; 11];
@@ -281,6 +291,7 @@ fn arc_batch_outcomes() -> Vec<(usize, usize, f64)> {
         }
     }
     outcome
+    }).as_slice()
 }
 
 fn valid_probability(x: f64) -> bool { x.is_finite() && (0.0..=1.0).contains(&x) }
