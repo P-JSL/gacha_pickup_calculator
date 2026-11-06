@@ -370,7 +370,12 @@ fn standalone_ticket_shortage(gap: &GoalFunding, setup: &GameSetup, weapon: bool
         else { gap.character_single_shared };
     let missing_pulls = needed_pulls.saturating_sub(gap.available_shared);
     let units_per_pull = if weapon { setup.game.weapon_ticket_units_per_pull() } else { 1 };
-    missing_pulls.saturating_mul(units_per_pull)
+    let missing_units = missing_pulls.saturating_mul(units_per_pull);
+    if weapon && setup.game == Game::StellaSora {
+        missing_units.saturating_sub(setup.weapon_ticket_remainder)
+    } else {
+        missing_units
+    }
 }
 
 /// Game-specific ticket equivalents for the Dashboard and Analytics summary.
@@ -393,7 +398,11 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         let (target, owned, missing, raw, dedicated, _) = counts;
         let ticket_name = i18n::ticket_name(language, setup.game, weapon);
         let units_per_pull = if weapon { setup.game.weapon_ticket_units_per_pull() } else { 1 };
-        let inventory_units = dedicated.saturating_mul(units_per_pull);
+        let inventory_units = if weapon && setup.game == Game::StellaSora {
+            setup.weapon_ticket_inventory()
+        } else {
+            dedicated.saturating_mul(units_per_pull)
+        };
         let missing_units = standalone_ticket_shortage(gap, setup, weapon);
         let unit = if units_per_pull == 300 {
             t(language, "Units")
@@ -2771,12 +2780,17 @@ mod chart_tests {
         assert_eq!(standalone_ticket_shortage(&gap, &setup, false), 1);
         assert_eq!(standalone_ticket_shortage(&gap, &setup, true), 300);
 
-        setup.weapon_dedicated = 1;
+        setup.set_weapon_ticket_inventory(299);
+        let almost_owned = GoalFunding::calculate(
+            &setup, &deterministic_goals(&setup), 1, 1, 90);
+        assert_eq!(standalone_ticket_shortage(&almost_owned, &setup, true), 1);
+
+        setup.set_weapon_ticket_inventory(300);
         let owned_equipment = GoalFunding::calculate(
             &setup, &deterministic_goals(&setup), 1, 1, 90);
         assert_eq!(standalone_ticket_shortage(&owned_equipment, &setup, true), 0);
 
-        setup.weapon_dedicated = 0;
+        setup.set_weapon_ticket_inventory(0);
         setup.premium_currency = setup.game.cost_per_pull();
         let funded = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
             1, 1, 90);
