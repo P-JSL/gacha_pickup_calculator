@@ -300,6 +300,26 @@ mod tests {
         assert_eq!(parse_system_locale("fr-FR"), Language::English);
     }
     #[test]
+    fn featured_ticket_shortfall_labels_have_no_common_pass_wording() {
+        let languages = [
+            Language::Korean, Language::English, Language::Japanese,
+            Language::ChineseSimplified, Language::ChineseTraditional,
+        ];
+        for language in languages {
+            assert!(!t(language, "Additional featured ticket equivalents").is_empty());
+            assert!(!t(language, "Featured ticket equivalents").is_empty());
+            assert!(!t(language, "Copies unit").is_empty());
+        }
+        for key in [
+            "Funding Gap", "After dedicated passes", "Required shared passes",
+            "Available shared passes", "Additional featured ticket equivalents",
+        ] {
+            assert!(!t(Language::Korean, key).contains("공용권"));
+        }
+        assert!(t(Language::Korean, "Additional featured ticket equivalents")
+            .contains("전용"));
+    }
+    #[test]
     fn preference_selection_overrides_system_language() {
         assert_eq!(LanguagePreference::Automatic.effective(Language::Japanese), Language::Japanese);
         assert_eq!(LanguagePreference::Korean.effective(Language::Japanese), Language::Korean);
