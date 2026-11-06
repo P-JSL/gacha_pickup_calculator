@@ -1,4 +1,5 @@
 //! Finite-state absorbing Markov/DP probability engine.
+#![forbid(unsafe_code)]
 //!
 //! `pity` is the number of completed attempts without the relevant success.
 //! A rate schedule's `chance(next)` takes the 1-based attempt since reset.

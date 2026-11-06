@@ -41,6 +41,9 @@ jobs:
       - name: Public API documentation build
         if: runner.os == 'Linux'
         run: cargo doc --locked --no-deps --lib
+      - name: Measured performance reference (release optimized; no machine-specific limits)
+        if: runner.os == 'Linux'
+        run: cargo test --locked --release --test performance_regression -- --ignored --nocapture
       - name: RustSec dependency vulnerability audit (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -50,6 +53,13 @@ jobs:
           cargo audit
       - name: Build release
         run: cargo build --locked --release
+      - name: Optional trusted Authenticode signing (requires protected certificate secrets)
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          WIN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WIN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: ./scripts/sign_windows_release.ps1
       - name: Linux GUI startup smoke (virtual display)
         if: runner.os == 'Linux'
         shell: bash
@@ -207,6 +217,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -309,6 +322,34 @@ jobs:
             "gacha-pickup-calculator-source-v$VERSION.zip" \
             "gacha-pickup-calculator-screenshots-v$VERSION.zip" > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
+      # OIDC/Sigstore provenance signs build identity without a repository PFX.
+      # Sign and verify *final* packaged bytes before the assets are published.
+      - name: Attest five release artifacts with GitHub OIDC and Sigstore
+        if: steps.version.outputs.publish == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            dist/gacha_pickup_calculator.exe
+            dist/gacha-pickup-calculator-windows-x64-v${{ steps.version.outputs.version }}.zip
+            dist/gacha-pickup-calculator-source-v${{ steps.version.outputs.version }}.zip
+            dist/gacha-pickup-calculator-screenshots-v${{ steps.version.outputs.version }}.zip
+            dist/SHA256SUMS.txt
+      - name: Verify signed provenance before publishing
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in dist/gacha_pickup_calculator.exe \
+            "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
+            "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
+            "dist/gacha-pickup-calculator-screenshots-v$VERSION.zip" \
+            dist/SHA256SUMS.txt; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/rust.yml"
+          done
       - name: Publish release and validate asset list
         if: steps.version.outputs.publish == 'true'
         env:
