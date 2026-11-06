@@ -198,7 +198,7 @@ pub fn t(language: Language, text: &'static str) -> &'static str {
         "Calculating" => ["계산 중", "Calculating", "計算中", "计算中", "計算中"],
         "Use game-specific guarantee" => ["게임별 별도 보장", "Use game-specific guarantee", "ゲーム別の保証方式", "使用游戏特定保底", "使用遊戲特定保底"],
         "Target settings and refund recycling are shared across tabs." => ["캐릭터·무기 목표와 환급 재투입을 계산합니다.", "Target settings and refund recycling are shared across tabs.", "キャラ・武器目標と還元再投入を計算します。", "角色、武器目标与返还循环在各页面同步。", "角色、武器目標與回饋循環在各頁同步。"],
-        "Individual curves assume full allocation of flexible tickets." => ["단독 그래프는 공용 티켓 전량 배정을 가정합니다.", "Individual curves assume full allocation of flexible tickets.", "個別グラフは共通チケットの全量配分を仮定します。", "单独曲线假设全部通用票投入对应卡池。", "單獨曲線假設全部通用票投入對應卡池。"],
+        "Individual curves assume full allocation of flexible tickets." => ["단독 그래프는 전환 가능한 재화 전량을 각각 배정한 참고값입니다.", "Individual curves assume full allocation of flexible tickets.", "個別グラフは共通チケットの全量配分を仮定します。", "单独曲线假设全部通用票投入对应卡池。", "單獨曲線假設全部通用票投入對應卡池。"],
         "Application settings" => ["화면 및 동작 설정", "Application settings", "アプリ設定", "应用设置", "應用設定"],
         "Change the appearance and calculation behavior, not banner inputs." => ["뽑기 설정이 아닌 프로그램의 표시와 계산 동작을 변경합니다.", "Change the appearance and calculation behavior, not banner inputs.", "ガチャ設定ではなく、表示と計算動作を変更します。", "调整应用外观和计算行为，而非抽卡参数。", "調整應用外觀和計算行為，而非抽卡參數。"],
         "Auto calculation" => ["실시간 계산", "Auto calculation", "自動計算", "自动计算", "自動計算"],
