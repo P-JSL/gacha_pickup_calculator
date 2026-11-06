@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Capture actual v0.1.14 desktop GUI screens, using the sanitized local PNG library.
+# Capture actual v0.1.15 desktop GUI screens with sanitized local PNG images.
 # Requires: xvfb-run, xdotool, scrot, Python3/Pillow; no generated mockups.
 set -euo pipefail
 test -x target/release/gacha_pickup_calculator
 test -s target/release/Image/SHA256SUMS.txt
 mkdir -p ci-readme-shots
 
+# In the screenshot runner only, enable automatic calculation so each newly
+# selected game produces its own real probability curves. The user-facing
+# UiPreferences default remains OFF on Windows/Linux without this variable.
 xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   export LIBGL_ALWAYS_SOFTWARE=1
+  export GACHA_CI_AUTO_REFRESH=1
   ./target/release/gacha_pickup_calculator >/tmp/gacha-documentation-screens.log 2>&1 &
   app=$!
   trap "kill $app 2>/dev/null || true" EXIT
@@ -22,12 +26,28 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     xdotool mousemove 90 "$1" click 1
     sleep 2
   }
+  active_tab() {
+    scrot -q 92 ci-readme-shots/_tab-probe.png
+    python3 scripts/ui_capture_tab.py ci-readme-shots/_tab-probe.png
+    rm -f ci-readme-shots/_tab-probe.png
+  }
   game() {
-    # Click actual game tabs. Header search+Enter did not change the
-    # selected game in an earlier verified CI capture.
-    xdotool mousemove "$1" 540 click 1
-    sleep 10
-    capture "$2"
+    local index="$1" file="$2" offset active_x active_y target_x
+    case "$index" in
+      1) offset=114 ;;
+      2) offset=228 ;;
+      3) offset=325 ;;
+      *) echo "Invalid game index $index" >&2; exit 1 ;;
+    esac
+    # Find the selected tab in the *current* rendered layout, not y=540.
+    read -r active_x active_y < <(active_tab)
+    target_x=$((hsr_x + offset))
+    xdotool mousemove "$target_x" "$active_y" click 1
+    sleep 11
+    capture "$file"
+    # Screenshot evidence must prove the new game is selected.
+    python3 scripts/ui_capture_tab.py "ci-readme-shots/$file.png" \
+      --expected-index "$index" --hsr-x "$hsr_x"
   }
 
   sleep 12
@@ -37,19 +57,18 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   navigate 343; capture characters
   navigate 400; capture weapons
   navigate 548; capture preferences
-  # The README photo retains default auto-refresh OFF. Enable it only for
-  # subsequent screenshots so switching game finishes the chart simulation.
-  xdotool mousemove 420 230 click 1
-  sleep 1
   navigate 168
-  game 650 dashboard-wuwa-latest
-  game 766 dashboard-stellasora-latest
-  game 866 dashboard-nte-latest
+  read -r hsr_x hsr_y < <(active_tab)
+  echo "Initial game tab found at x=$hsr_x, y=$hsr_y"
+  game 1 dashboard-wuwa-latest
+  game 2 dashboard-stellasora-latest
+  game 3 dashboard-nte-latest
 '
 
 python3 - <<'PY'
 from pathlib import Path
 from PIL import Image
+from scripts.ui_capture_tab import selected_game_tab
 
 paths = sorted(Path("ci-readme-shots").glob("*.png"))
 required = {
@@ -64,19 +83,17 @@ for p in paths:
         im.verify()
     with Image.open(p) as im:
         assert im.size == (1536, 864), f"Incorrect GUI capture dimensions: {p.name}"
-# Verify actual selected tabs, not merely differing cursor positions/history.
-# A previous CI run produced HSR images under all three game-specific names.
-selected_tabs = {
-    "dashboard-hsr-aha.png": (503, 535),
-    "dashboard-wuwa-latest.png": (600, 535),
-    "dashboard-stellasora-latest.png": (731, 535),
-    "dashboard-nte-latest.png": (827, 535),
-}
-for name, (x, y) in selected_tabs.items():
-    with Image.open("ci-readme-shots/" + name) as original:
-        rgb = original.convert("RGB").getpixel((x, y))
-        assert rgb[0] < 115 and rgb[1] > 185 and rgb[2] > 185, (
-            f"Wrong game selected in {name}: tab color {rgb}"
-        )
-print(f"Verified {len(paths)} actual graphical desktop screenshots")
+
+hsr_x, _ = selected_game_tab("ci-readme-shots/dashboard-hsr-aha.png")
+for index, name in enumerate([
+    "dashboard-hsr-aha.png", "dashboard-wuwa-latest.png",
+    "dashboard-stellasora-latest.png", "dashboard-nte-latest.png"
+]):
+    x, y = selected_game_tab("ci-readme-shots/" + name)
+    expected = hsr_x + (0, 114, 228, 325)[index]
+    assert abs(x - expected) <= 20, (
+        f"Wrong game selected in {name}: actual tab center ({x},{y}), "
+        f"expected x around {expected}"
+    )
+print(f"Verified {len(paths)} actual graphical desktop screenshots and game tabs")
 PY
