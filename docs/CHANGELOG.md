@@ -1,5 +1,7 @@
 # 변경 이력 · Gacha Pickup Calculator
 
+현재 릴리즈는 **v0.2.1**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
 ## v0.2.1 (2026-11-06)
 - 실제 게임 데이터에서 확인된 스텔라 소라의 25명 전용 레코드 매핑 완성(기존 1쌍 → 16쌍 → 25쌍). 전 게임 자동 연결 101→116→125쌍. StellaDB 33개 모집 배너와 공식 공지를 교차검증.
 - 스텔라 소라의 임시 별칭 `firstlight_noya`, `guiding_star_disc` 삭제 및 정식 ID 162/214066으로 교체; 임시 중복 이미지까지 삭제(677→675개).
@@ -14,15 +16,15 @@
 - 캐릭터를 선택하면 확인된 전용 무기·광추·Arc·레코드로 자동 선택. 게임별 총 101건 연결표 검증, 미매칭 캐릭터는 기존 수동 장비 선택을 보존.
 - 리다이렉트와 이미지 소스 URL 검증 강화, 중복 이름·소스 URL·PNG SHA-256 검사, 다른 캐릭터 사진을 임의 대체하지 않는 플레이스홀더.
 - 실구동 Linux GUI 캡처를 새 버전 릴리즈 아티팩트로 추가하고, README·설치/보안 설명과 Windows 이미지 패키징 개수를 실제 카탈로그 기준으로 정리.
-- [릴리즈 노트](../RELEASE_NOTES_v0.2.0.md) · [보안 검토](SECURITY_AUDIT_v0.2.0.md).
+- [과거 배포 상세](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.0).
 
 ## v0.1.16 (2026-11-06)
 - 스타레일 캐릭터 풀돌 이후 5성 100 스타라이트, 4성 20 스타라이트; 이환 S급 80 Warp Pieces, A급 12 Warp Pieces 기본 모델.
 - 4성/A급 캐릭터의 풀돌 보유 비율 입력과 환급 재투자 경계 테스트 추가.
-- [릴리즈 노트](../RELEASE_NOTES_v0.1.16.md).
+- [과거 배포 상세](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.1.16).
 
 
-변경 사항은 역순으로 정리합니다. 자세한 최신 내용은 [README](../README.md)를 확인하세요. 과거 설명을 보존한 [이전 README](README_legacy_pre_v014.md)는 **역사 기록**이므로 현행 UI의 동작을 설명하지 않을 수 있습니다.
+변경 사항은 역순으로 정리합니다. 최신 사용법은 [README](../README.md)를 확인하세요.
 
 ## v0.1.15 (2026-11-06)
 - 대시보드 중앙 UI의 재화/목표 입력을 반응형 2×2 구성으로 조정하고 실행 버튼을 독립된 행에 배치.
@@ -30,7 +32,7 @@
 - 그래프 확률 호버 라벨을 차트 영역 안으로 제한하여 주변 카드·그래프에 겹치지 않도록 수정.
 - Windows 사용자 로캘 및 Linux 환경 로캘을 인식해 자동 언어 선택; 헤더·Settings에서 한/영/일/중 간체/번체 직접 선택 후 유지.
 - 주요 KPI·차트·빠른 설정 및 결과 기록 UI 현지화, Linux/Windows 컴파일 오류 보정.
-- 자세한 내역: [RELEASE_NOTES_v0.1.15.md](../RELEASE_NOTES_v0.1.15.md).
+- 자세한 내역: [과거 배포 상세](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.1.15).
 
 ## v0.1.14 (2026-11-06)
 - 681개 캐릭터·광추·무기·레코드·Arc 이미지를 릴리즈 빌드에서 수집·재인코딩·검사 후 Windows 휴대용 ZIP의 `Image/게임명/`에 포함.
@@ -38,18 +40,18 @@
 - GitHub Actions: ClamAV 이미지 정적 검사, 해시 파일, 실제 GUI 스크린샷과 README 자동 갱신.
 - 스텔라 소라 2.0 레코드 `My Guiding Star`를 최신 목록에 추가(원본 이미지 부재 시 플레이스홀더).
 - README를 현행 UI·보안·게임 규칙·실제 캡처 중심으로 재편.
-- 자세한 내역: [RELEASE_NOTES_v0.1.14.md](../RELEASE_NOTES_v0.1.14.md).
+- 자세한 내역: [과거 배포 상세](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.1.14).
 
 ## v0.1.13
 - 명조 여파의 산호 **뽑기권 교환 / 돌파 최대 1개 / 최대 2개** 전략, 실제 구매 횟수·추가 재화 비교.
 - 실시간 재계산 기본 OFF, 캐릭터/무기 입력 탭 분리, 차트 확률 툴팁, 좁은 화면 UI 개선.
 - 신규 발표 캐릭터 우선 정렬; 이미지 다운로드 HTTP 호스트/리다이렉트 제한 및 RustSec/Dependabot 도입.
-- 자세한 내역: [RELEASE_NOTES_v0.1.13.md](../RELEASE_NOTES_v0.1.13.md).
+- 자세한 내역: [과거 배포 상세](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.1.13).
 
 ## v0.1.12
 - 게임별 캐릭터·무기 이름/아이콘 선택, 한정 공용 티켓과 개별 전용권 구분.
 - 게임 변경 시 보유권·천장·목표·환급 상태 보존, Settings와 Simulator 구분.
-- 비동기 이미지 처리/차트 캐시 및 화면 깜박임 개선(현행 v0.1.14는 로컬 이미지만 사용).
+- 비동기 이미지 처리/차트 캐시 및 화면 깜박임 개선(이후 릴리즈는 로컬 이미지만 사용).
 
 ## v0.1.11
 - 왼쪽 내비게이션, 4개 KPI 카드, 캐릭터·무기·전체 그래프를 가진 다크 네이비 대시보드.

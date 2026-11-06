@@ -1,6 +1,8 @@
-# v0.2.0 코드 및 패키징 보안 검토
+# 보안 및 패키징 검토
 
 검토 대상: `src/main.rs`, `src/catalog.rs`, `src/catalog_data.tsv`, `src/signature_pairs.tsv`, `src/feedback.rs`, `src/observations.rs`, `src/i18n.rs`, `scripts/build_offline_images.py`, `.github/workflows/rust.yml`, `Cargo.toml`.
+
+이 문서는 기존 보안 점검 항목을 유지하는 **v0.2.1 문서 참조본**입니다. 이번 문서 정리에서 별도의 전체 보안 재감사를 시행한 것은 아닙니다. 최신 캐릭터·장비 데이터 검증 범위는 [카탈로그 검증 보고서](CATALOG_AUDIT_v0.2.1.md)를 참조하세요.
 
 ## 검토 결과 및 조치
 

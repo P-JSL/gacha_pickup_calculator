@@ -3,21 +3,13 @@
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표에 필요한 뽑기 횟수, 보유 재화, 환급 재투자를 분석하는 **Rust/egui 데스크톱 프로그램**입니다.
 
 **최신 문서: v0.2.1 (2026-11-06)**  
-[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.1) · [v0.2.1 변경사항](RELEASE_NOTES_v0.2.1.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT_v0.2.0.md)
+[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.1) · [v0.2.1 변경사항](RELEASE_NOTES_v0.2.1.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
 
 > **정확도 범위:** 희귀도 및 픽업 확률은 선택된 배너 규칙에 대한 유한 상태 DP로 계산합니다. 소프트 천장·게임 내 숨겨진 처리 등 미공개 조건이 있으면 실제 서비스 확률과 다를 수 있습니다. 4성 중복, 상점 환급, 재화 재투자는 개별 계정의 소장 상태를 모두 알 수 없어 **Monte Carlo 추정치**입니다. 서로 다른 결과를 혼동하지 마십시오.
 
 ## 화면
 
-기존 실사용 GUI 캡처는 [v0.1.15 기록](docs/screenshots/v0.1.15/)으로 보존합니다. 디자인 시안이 아니라 Linux 가상 디스플레이에서 실제 프로그램을 실행해 얻은 이미지이며, **v0.2.1 현재 화면과 세부 UI가 다를 수 있습니다**.
-
-![대시보드 실행 캡처 — 이전 v0.1.15 기록](docs/screenshots/v0.1.15/dashboard-hsr-aha.png)
-
-| 시뮬레이터 | 캐릭터 선택 | 전용 장비 선택 |
-|:---:|:---:|:---:|
-| ![시뮬레이터 v0.1.15](docs/screenshots/v0.1.15/simulator-hsr-aha.png) | ![캐릭터 v0.1.15](docs/screenshots/v0.1.15/characters.png) | ![장비 v0.1.15](docs/screenshots/v0.1.15/weapons.png) |
-
-**v0.2.1 실구동 캡처**는 릴리즈에 별도 첨부되는 `gacha-pickup-calculator-screenshots-v0.2.1.zip`에서 확인할 수 있습니다. 이 파일은 CI가 프로그램을 구동하고 생성한 PNG들로 구성됩니다.
+현재 버전 **v0.2.1의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.1/gacha-pickup-calculator-screenshots-v0.2.1.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
 
 ## 주요 기능
 
@@ -59,7 +51,7 @@
 
 ## 설치 (Windows x64)
 
-1. [v0.2.0 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.1)에서 `gacha-pickup-calculator-windows-x64-v0.2.1.zip`을 받습니다.
+1. [v0.2.1 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.1)에서 `gacha-pickup-calculator-windows-x64-v0.2.1.zip`을 받습니다.
 2. ZIP 전체를 압축 해제합니다. **실행 파일과 `Image/` 폴더 구조를 그대로 유지**하십시오.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 별도 관리자 권한이나 외부 API 키는 필요하지 않습니다.
 
@@ -111,6 +103,6 @@ CI는 Linux/Windows Rust 검사, Linux GUI 가상 디스플레이 실행 및 실
 
 ## 보안 및 책임 범위
 
-로컬 이미지 경로에는 디렉터리 이탈·심볼릭 링크·파일 크기·디코더 크기 제한을 사용합니다. CSV는 **8 MiB** 한도와 일반 파일 여부를 확인한 후 파싱하며, 계산 입력의 범위와 Monte Carlo 샘플 개수도 제한합니다. 상세한 확인 항목 및 남은 공급망·콘텐츠 검증 제한은 [보안 검토 보고서](docs/SECURITY_AUDIT_v0.2.0.md)를 참고하십시오.
+로컬 이미지 경로에는 디렉터리 이탈·심볼릭 링크·파일 크기·디코더 크기 제한을 사용합니다. CSV는 **8 MiB** 한도와 일반 파일 여부를 확인한 후 파싱하며, 계산 입력의 범위와 Monte Carlo 샘플 개수도 제한합니다. 상세한 확인 항목 및 남은 공급망·콘텐츠 검증 제한은 [보안 검토 보고서](docs/SECURITY_AUDIT.md)를 참고하십시오.
 
 **이 프로그램은 가챠 확률 및 예산의 분석 도구이며 실제 획득을 보증하지 않습니다.** 프로젝트 저장소: [P-JSL/gacha_pickup_calculator](https://github.com/P-JSL/gacha_pickup_calculator).
