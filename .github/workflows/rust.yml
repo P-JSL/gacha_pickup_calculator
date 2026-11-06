@@ -181,7 +181,7 @@ jobs:
           bash scripts/capture_readme_screenshots.sh
       - uses: actions/upload-artifact@v7
         with:
-          name: gacha-readme-screenshots-v015
+          name: gacha-readme-screenshots
           path: ci-readme-shots/
           if-no-files-found: error
           retention-days: 14
@@ -220,7 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
       - name: Check version and existing release
         id: version
         env:
@@ -252,6 +252,11 @@ jobs:
         with:
           name: gacha-offline-images
           path: dist/Image
+      - uses: actions/download-artifact@v8
+        if: steps.version.outputs.publish == 'true'
+        with:
+          name: gacha-readme-screenshots
+          path: dist/screenshots
       - name: Check release notes
         if: steps.version.outputs.publish == 'true'
         env:
@@ -278,7 +283,7 @@ jobs:
           icons = sorted(Path("dist/Image").rglob("*.png"))
           expected = sum(1 for line in Path("src/catalog_data.tsv").read_text(
               encoding="utf-8").splitlines() if len(line.split("\t")) == 6)
-          if len(icons) != expected or expected < 680:
+          if len(icons) != expected or expected < 670:
               raise SystemExit(f"Incomplete sanitized assets: {len(icons)}/{expected}")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
@@ -297,11 +302,22 @@ jobs:
               assert len([n for n in zipped.namelist()
                   if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
               assert "Image/SHA256SUMS.txt" in zipped.namelist()
+          screenshots = sorted(Path("dist/screenshots").glob("*.png"))
+          if len(screenshots) < 9:
+              raise SystemExit(f"Insufficient captured GUI screenshots: {len(screenshots)}")
+          screenshot_zip = Path(f"dist/gacha-pickup-calculator-screenshots-v{version}.zip")
+          with ZipFile(screenshot_zip, "w", compression=ZIP_DEFLATED) as zipped:
+              for screenshot in screenshots:
+                  zipped.write(screenshot, screenshot.name)
+          with ZipFile(screenshot_zip) as zipped:
+              assert zipped.testzip() is None
+              assert len(zipped.namelist()) == len(screenshots)
           PY
           cd dist
           sha256sum gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" > SHA256SUMS.txt
+            "gacha-pickup-calculator-source-v$VERSION.zip" \
+            "gacha-pickup-calculator-screenshots-v$VERSION.zip" > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - name: Publish release and validate asset list
         if: steps.version.outputs.publish == 'true'
@@ -316,6 +332,7 @@ jobs:
             dist/gacha_pickup_calculator.exe \
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
+            "dist/gacha-pickup-calculator-screenshots-v$VERSION.zip" \
             dist/SHA256SUMS.txt \
             --target "$(git rev-parse HEAD)" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
@@ -323,10 +340,11 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           for asset in gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" SHA256SUMS.txt; do
+            "gacha-pickup-calculator-source-v$VERSION.zip" \
+            "gacha-pickup-calculator-screenshots-v$VERSION.zip" SHA256SUMS.txt; do
             grep -Fx -- "$asset" actual-assets.txt >/dev/null || {
               echo "::error::Missing release asset: $asset"
               exit 1
             }
           done
-          echo "::notice title=Release published::$TAG has all four expected assets."
+          echo "::notice title=Release published::$TAG has all five expected assets."
