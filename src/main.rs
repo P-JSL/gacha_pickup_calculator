@@ -350,12 +350,16 @@ struct GameSession {
 
 impl GameSession {
     fn defaults(game: Game) -> Self {
+        let character_id = catalog::first(game, catalog::Kind::Character);
+        let weapon_id = catalog::signature_weapon(game, &character_id)
+            .map(|entry| entry.id.clone())
+            .unwrap_or_else(|| catalog::first(game, catalog::Kind::Weapon));
         Self {
             setup: GameSetup::new(game),
             feedback: FeedbackConfig::for_game(game),
             eid: 0, refine: 1,
-            character_id: catalog::first(game, catalog::Kind::Character),
-            weapon_id: catalog::first(game, catalog::Kind::Weapon),
+            character_id,
+            weapon_id,
         }
     }
 }
@@ -440,6 +444,7 @@ impl Calculator {
         if std::env::var("GACHA_CI_AUTO_REFRESH").as_deref() == Ok("1") {
             ui_preferences.auto_recalculate = true;
         }
+        let initial_selection = GameSession::defaults(Game::StarRail);
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
@@ -475,8 +480,8 @@ impl Calculator {
             catalog_ui: catalog::CatalogUi::new(&cc.egui_ctx),
             picker_kind: None,
             picker_filter: String::new(),
-            selected_character_id: catalog::first(Game::StarRail, catalog::Kind::Character),
-            selected_weapon_id: catalog::first(Game::StarRail, catalog::Kind::Weapon),
+            selected_character_id: initial_selection.character_id,
+            selected_weapon_id: initial_selection.weapon_id,
             game_sessions: HashMap::new(),
         };
         app.recalculate();
@@ -543,7 +548,16 @@ impl Calculator {
             &mut open, &mut self.picker_filter, &current);
         if let Some(id) = choice {
             match kind {
-                catalog::Kind::Character => self.selected_character_id = id,
+                catalog::Kind::Character => {
+                    self.selected_character_id = id;
+                    // Change the secondary target only when an explicit signature
+                    // pairing exists; otherwise preserve the user's manual choice.
+                    if let Some(weapon) = catalog::signature_weapon(
+                        self.setup.game, &self.selected_character_id
+                    ) {
+                        self.selected_weapon_id = weapon.id.clone();
+                    }
+                }
                 catalog::Kind::Weapon => self.selected_weapon_id = id,
             }
             self.picker_kind = None;
