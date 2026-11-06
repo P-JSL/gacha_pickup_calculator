@@ -1,0 +1,62 @@
+name: Vendor previously sanitized artwork (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/vendor-artwork.yml]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: vendor-offline-artwork
+  cancel-in-progress: false
+
+jobs:
+  vendor:
+    if: github.repository == 'P-JSL/gacha_pickup_calculator'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+      - name: Retrieve approved, previously sanitized 677 PNGs from own Actions artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e Image
+          gh run download 42149571938 -R "$GITHUB_REPOSITORY" \
+            --name gacha-offline-images --dir Image
+          cd Image
+          sha256sum -c SHA256SUMS.txt
+          cd ..
+          python3 - <<'PY'
+          from pathlib import Path
+          pngs = sorted(Path("Image").glob("*/*.png"))
+          if len(pngs) != 677:
+              raise SystemExit(f"Wrong embedded image count: {len(pngs)}")
+          for p in pngs:
+              if p.parent.name not in {"HSR", "WutheringWaves", "StellaSora", "Neverness"}:
+                  raise SystemExit(f"Unexpected game directory: {p}")
+              if not p.is_file() or p.is_symlink() or not p.name.startswith(("c-", "w-")):
+                  raise SystemExit(f"Unexpected image entry: {p}")
+              if p.stat().st_size > 512 * 1024 or not p.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
+                  raise SystemExit(f"Unsafe PNG entry: {p}")
+          print(f"Validated {len(pngs)} static source-owned icons")
+          PY
+      - name: Commit reproducible offline image snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add Image/
+          if git diff --cached --quiet; then
+            echo "Image is already committed."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'build(assets): vendor 677 checked PNGs [skip ci]'
+          git push origin HEAD:main
