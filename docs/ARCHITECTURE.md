@@ -1,4 +1,4 @@
-# v1.0.1 Rust 모듈 책임 및 접근 계약
+# Rust 모듈 책임 및 공개 API 경계 (v1.0.3 기준)
 
 ## 외부 계약
 
@@ -39,3 +39,11 @@
 - `src/lib.rs`에서 재수출하는 `Banner`, `Distribution`, `optimal_allocation`과 공개된 `games`, `feedback`, `tracker`, `observations`는 기존 외부 사용자에게 제공하는 **계약**이므로 호환성을 유지합니다.
 - `src/app/`, `src/data/`, `src/ui/`는 실행 파일 전용 구현으로 Rust의 외부 import가 불가능해야 합니다. 내부 형식은 `pub(crate)` 이하를 사용하며 CI가 공개 범위를 검사합니다.
 - Rust `pub(crate)`는 호출 경계일 뿐 소스 코드 기밀성이나 악성 로컬 프로세스로부터의 보호를 의미하지 않습니다. 자세한 위협 모델은 [보안 경계](SECURITY_BOUNDARY_V1_0_2.md)를 참조합니다.
+
+## CI의 책임 분리와 경량 검증
+
+- `.github/workflows/rust.yml`은 문서·릴리즈 계약 검사와 코드·이미지·GUI·배포 작업을 별도 Job으로 구분합니다.
+- Markdown/라이선스·과거 릴리즈 노트만 변경되면 문서 무결성 검사를 수행하고, Rust 빌드·PNG 바이러스 검사·실제 GUI 캡처·릴리즈 재발행은 생략합니다.
+- Rust 확률·관측 분석 변경은 Windows/Linux 컴파일·테스트·Clippy를 실행합니다. 이미지/카탈로그 또는 UI 변경 시 관련 검증을 추가하며, 새 버전 릴리즈가 필요할 때에는 모든 필수 게이트를 수행합니다.
+- 브랜치 보호의 필수 체크를 Pending으로 만들지 않도록 workflow-level `paths-ignore` 대신 Job-level 조건을 사용합니다. 판별이 불가능한 변경은 전체 검사로 처리합니다.
+- 최초 v1.0.1의 책임별 분리는 런타임 성능 배수를 증명하지 않습니다. [v1.0.3 실측 결과](PERFORMANCE_V1_0_3.md)에 기록된 FFT/분위수 개선은 알고리즘별 비교입니다.

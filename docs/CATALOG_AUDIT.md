@@ -1,6 +1,6 @@
 # 캐릭터·장비·이미지 정합성 검토 (v0.2.3)
 
-기준: `P-JSL/gacha_pickup_calculator` main · 2026-11-06.
+**검증 스냅샷:** `P-JSL/gacha_pickup_calculator`의 2026-11-06 자료를 기준으로 작성한 카탈로그 점검 기록입니다. 이후 릴리즈 전체의 최신성이나 신규 캐릭터의 실시간 출시 여부를 의미하지 않습니다.
 
 ## 총괄
 
@@ -28,7 +28,7 @@
 | 5★ 전용 광추 | `23065` | 「아하」가 처음 울리는 순간 | `Image/HSR/w-23065.png` |
 | 4★ 광추 | `22009` | 세상 끝에서 만나자! | `Image/HSR/w-22009.png` |
 
-각 이미지의 URL은 `scripts/pinned_icon_sources.py`에 **게임·종류·ID 단위로 고정**되어 있으며, 아이콘 수집 작업에서는 다른 임의 URL을 받지 않습니다. 수집·PNG 정규화 및 개별 SHA-256 생성은 검증된 GitHub Actions 실행에서 완료됐고, `Image/SHA256SUMS.txt` 및 별도 고정 해시로 확인합니다. 앱 실행 중 외부 이미지를 다운로드하지 않습니다.
+각 이미지의 URL은 `scripts/pinned_icon_sources.py`에 **게임·종류·ID 단위로 고정**되어 있으며, 아이콘 수집 작업에서는 다른 임의 URL을 받지 않습니다. 수집·PNG 정규화 및 개별 SHA-256 생성은 검증된 GitHub Actions 실행에서 완료됐고, `Image/SHA256SUMS.txt` 및 별도 고정 해시로 확인합니다. 앱은 원본 제3자 자산 URL을 직접 사용하지 않지만, 검증된 `main` 커밋에서 **변경된 PNG를 HTTPS로 다운로드할 수 있습니다.** 일반 릴리즈 빌드가 외부 원본 이미지를 매번 내려받거나 재인코딩하는 것은 아닙니다.
 
 Gachabase 게임 데이터: [아하](https://hsr.gachabase.net/characters/1511/aeon-aha/beta), [4★ 광추](https://hsr.gachabase.net/lightcones/22009/see-you-at-the-worlds-end/beta?lang=en), [5★ 광추](https://hsr.gachabase.net/lightcones/23065/upon-the-first-echo-of-aha/beta?lang=ko). 공개 정보에는 정식 출시 전 변동 가능성이 있습니다.
 
