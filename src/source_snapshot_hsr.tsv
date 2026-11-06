@@ -1,0 +1,271 @@
+# Pinned StarRailRes data snapshot commit dbe8cdfcfb0bf657b9fe1cf92d5537f118ccb487
+# role\tgame_id\tKorean_name\trarity\tpath
+# Character localized displays (March 7th forms, Trailblazers) may be annotated separately in calculator UI.
+c	1001	Mar. 7th	4	Knight
+c	1002	단항	4	Rogue
+c	1003	히메코	5	Mage
+c	1004	웰트	5	Warlock
+c	1005	카프카	5	Warlock
+c	1006	은랑	5	Warlock
+c	1008	아를란	4	Warrior
+c	1009	아스타	4	Shaman
+c	1013	헤르타	4	Mage
+c	1014	세이버	5	Warrior
+c	1015	아처	5	Rogue
+c	1101	브로냐	5	Shaman
+c	1102	제레	5	Rogue
+c	1103	서벌	4	Mage
+c	1104	게파드	5	Knight
+c	1105	나타샤	4	Priest
+c	1106	페라	4	Warlock
+c	1107	클라라	5	Warrior
+c	1108	삼포	4	Warlock
+c	1109	후크	4	Warrior
+c	1110	링스	4	Priest
+c	1111	루카	4	Warlock
+c	1112	토파즈&복순이	5	Rogue
+c	1201	청작	4	Mage
+c	1202	정운	4	Shaman
+c	1203	나찰	5	Priest
+c	1204	경원	5	Mage
+c	1205	블레이드	5	Warrior
+c	1206	소상	4	Rogue
+c	1207	어공	4	Shaman
+c	1208	부현	5	Knight
+c	1209	연경	5	Rogue
+c	1210	계네빈	4	Warlock
+c	1211	백로	5	Priest
+c	1212	경류	5	Warrior
+c	1213	단항•음월	5	Warrior
+c	1214	설의	4	Warrior
+c	1215	한아	4	Shaman
+c	1217	곽향	5	Priest
+c	1218	초구	5	Warlock
+c	1220	비소	5	Rogue
+c	1221	운리	5	Warrior
+c	1222	영사	5	Priest
+c	1223	맥택	4	Rogue
+c	1224	Mar. 7th	4	Rogue
+c	1225	망귀인	5	Warlock
+c	1301	갤러거	4	Priest
+c	1302	아젠티	5	Mage
+c	1303	완•매	5	Shaman
+c	1304	어벤츄린	5	Knight
+c	1305	Dr. 레이시오	5	Rogue
+c	1306	스파클	5	Shaman
+c	1307	블랙 스완	5	Warlock
+c	1308	아케론	5	Warlock
+c	1309	로빈	5	Shaman
+c	1310	반디	5	Warrior
+c	1312	미샤	4	Warrior
+c	1313	선데이	5	Shaman
+c	1314	제이드	5	Mage
+c	1315	부트힐	5	Rogue
+c	1317	라파	5	Mage
+c	1321	달리아	5	Warlock
+c	1401	더 헤르타	5	Mage
+c	1402	아글라이아	5	Memory
+c	1403	트리비	5	Shaman
+c	1404	마이데이	5	Warrior
+c	1405	아낙사	5	Mage
+c	1406	사이퍼	5	Warlock
+c	1407	카스토리스	5	Memory
+c	1408	파이논	5	Warrior
+c	1409	히아킨	5	Memory
+c	1410	히실렌스	5	Warlock
+c	1412	케리드라	5	Shaman
+c	1413	에버나이트	5	Memory
+c	1414	단항•등황	5	Knight
+c	1415	키레네	5	Memory
+c	1501	스파키	5	Elation
+c	1502	효광	5	Elation
+c	1503	펄	5	Elation
+c	1504	애쉬베일	5	Rogue
+c	1505	에바네시아	5	Elation
+c	1506	은랑 LV.999	5	Elation
+c	1507	천야•블레이드	5	Warlock
+c	1508	토오사카 린	5	Mage
+c	1509	길가메시	5	Warrior
+c	1510	히메코•노바	5	Mage
+c	1512	로빈•서머레토	5	Memory
+c	1513	어벤츄린•웨이브	5	Elation
+c	8001	{NICKNAME}	5	Warrior
+c	8002	{NICKNAME}	5	Warrior
+c	8003	{NICKNAME}	5	Knight
+c	8004	{NICKNAME}	5	Knight
+c	8005	{NICKNAME}	5	Shaman
+c	8006	{NICKNAME}	5	Shaman
+c	8007	{NICKNAME}	5	Memory
+c	8008	{NICKNAME}	5	Memory
+c	8009	{NICKNAME}	5	Elation
+c	8010	{NICKNAME}	5	Elation
+w	20000	화살촉	3	Rogue
+w	20001	풍작	3	Priest
+w	20002	천경	3	Warrior
+w	20003	앰버	3	Knight
+w	20004	그윽	3	Warlock
+w	20005	합창	3	Shaman
+w	20006	아카이브	3	Mage
+w	20007	시위를 떠난 화살	3	Rogue
+w	20008	알찬 열매	3	Priest
+w	20009	무너진 행복	3	Warrior
+w	20010	수비	3	Knight
+w	20011	심연의 고리	3	Warlock
+w	20012	맞물린 톱니	3	Shaman
+w	20013	영험한 열쇠	3	Mage
+w	20014	대립	3	Rogue
+w	20015	증식	3	Priest
+w	20016	전멸	3	Warrior
+w	20017	강토 개척	3	Knight
+w	20018	숨은 그림자	3	Warlock
+w	20019	어울림	3	Shaman
+w	20020	식견	3	Mage
+w	20021	불타는 그림자	3	Memory
+w	20022	추억 회상	3	Memory
+w	20023	비웃음	3	Elation
+w	20024	눈물의 흔적	3	Elation
+w	21000	수술 후의 대화	4	Priest
+w	21001	밤 인사와 잠든 얼굴	4	Warlock
+w	21002	여생의 첫날	4	Knight
+w	21003	침묵만이	4	Rogue
+w	21004	기억 속 모습	4	Shaman
+w	21005	두더지파가 환영해	4	Warrior
+w	21006	「나」의 탄생	4	Mage
+w	21007	같은 심정	4	Priest
+w	21008	사냥감의 시선	4	Warlock
+w	21009	랜도의 선택	4	Knight
+w	21010	논검	4	Rogue
+w	21011	행성과의 만남	4	Shaman
+w	21012	비밀 맹세	4	Warrior
+w	21013	세상을 진정시키지 마	4	Mage
+w	21014	알맞은 타이밍	4	Priest
+w	21015	땀방울처럼 빛나는 결심	4	Warlock
+w	21016	우주 시장 동향	4	Knight
+w	21017	팔로우를 부탁해!	4	Rogue
+w	21018	댄스! 댄스! 댄스!	4	Shaman
+w	21019	푸른 하늘 아래	4	Warrior
+w	21020	천재들의 휴식	4	Mage
+w	21021	등가교환	4	Priest
+w	21022	페르마타	4	Warlock
+w	21023	우리는 와일드 파이어	4	Knight
+w	21024	움트는 봄물	4	Rogue
+w	21025	과거와 미래	4	Shaman
+w	21026	멍! 산책 시간!	4	Warrior
+w	21027	느낌 있는 아침 식사 루틴	4	Mage
+w	21028	따듯한 밤은 길지 않고	4	Priest
+w	21029	훗날 기약	4	Warlock
+w	21030	이게 바로 나야!	4	Knight
+w	21031	또다시 저승으로	4	Rogue
+w	21032	누월재운의 뜻	4	Shaman
+w	21033	도망칠 곳은 없다	4	Warrior
+w	21034	오늘도 평화로운 하루	4	Mage
+w	21035	무엇이 진실인가	4	Priest
+w	21036	좋은꿈 마을 대모험	4	Shaman
+w	21037	최후의 승자	4	Rogue
+w	21038	불의 먼 곳에서	4	Warrior
+w	21039	운명의 실을 엮다	4	Knight
+w	21040	은하 함락의 날	4	Mage
+w	21041	쇼타임	4	Warlock
+w	21042	마음에 새긴 약속	4	Warrior
+w	21043	두 사람의 콘서트	4	Knight
+w	21044	끝없는 춤	4	Warlock
+w	21045	조화가 침묵한 후	4	Mage
+w	21046	피어나길 기다리는 꽃	4	Shaman
+w	21047	그림자처럼 뒤따르는 밤	4	Rogue
+w	21048	꿈의 몽타주	4	Priest
+w	21050	찰나에 결정되는 승리	4	Memory
+w	21051	천재들의 안부 인사	4	Memory
+w	21052	땀은 많이, 눈물은 적게	4	Memory
+w	21053	언제나 여정이 평탄하기를	4	Knight
+w	21054	이야기의 다음 페이지	4	Memory
+w	21055	내일의 내일이 올 때까지	4	Priest
+w	21056	바람을 쫓을 때	4	Shaman
+w	21057	꽃은 잊지 않는다	4	Memory
+w	21058	과거의 핏자국	4	Warrior
+w	21060	밀 내음이 가득한 꿈	4	Mage
+w	21061	휴일의 목욕탕 대모험	4	Warlock
+w	21062	그 종착지에서 다시 만나자	4	Rogue
+w	21064	슈룸 모험기	4	Elation
+w	21065	오늘의 행운	4	Elation
+w	21066	짧은 휴가	4	Elation
+w	22000	초보자 임무 시작 전	4	Warlock
+w	22001	저기, 나 여기 있어	4	Priest
+w	22002	내일을 위한 여정	4	Shaman
+w	22003	인사록•음률 사냥	4	Warrior
+w	22004	우주 대사업	4	Mage
+w	22005	영원한 미궁의 식사	4	Shaman
+w	22006	핑크빛 내일을 향해	4	Memory
+w	22007	미래엔 우리가 함께할 거야	4	Elation
+w	22008	지평선의 끝을 향해	4	Rogue
+w	23000	은하철도의 밤	5	Mage
+w	23001	야경 속에서	5	Rogue
+w	23002	대체할 수 없는 것	5	Warrior
+w	23003	아직 전투는 끝나지 않았다	5	Shaman
+w	23004	세계의 이름으로	5	Warlock
+w	23005	승리의 순간	5	Knight
+w	23006	필요한 건 기다림뿐	5	Warlock
+w	23007	계속 내리는 비	5	Warlock
+w	23008	관의 울림	5	Priest
+w	23009	닿을 수 없는 저편	5	Warrior
+w	23010	동트기 전	5	Mage
+w	23011	그녀는 두 눈을 감았네	5	Knight
+w	23012	깊게 든 단잠	5	Rogue
+w	23013	세월은 흐를 뿐	5	Priest
+w	23014	이 몸이 검이니	5	Warrior
+w	23015	태양보다 밝게 빛나는 것	5	Warrior
+w	23016	고민, 그리고 행복	5	Rogue
+w	23017	섬뜩한 밤	5	Priest
+w	23018	눈에 담긴 순간	5	Mage
+w	23019	거울 속 지난날의 나	5	Shaman
+w	23020	순수 사유의 세례	5	Rogue
+w	23021	속세에서의 유희	5	Shaman
+w	23022	시간의 기억에 대한 재구성	5	Warlock
+w	23023	언제나 불공평한 운명	5	Knight
+w	23024	흘러가는 강가를 따라	5	Warlock
+w	23025	꿈은 어디로 돌아가야 하는가	5	Warrior
+w	23026	찬란하게 빛나는 밤	5	Shaman
+w	23027	두 번째 생명을 향해	5	Rogue
+w	23028	값을 매길 수 없는 건 희망뿐	5	Mage
+w	23029	그 무수한 봄날	5	Warlock
+w	23030	해 질 무렵 시작되는 춤	5	Warrior
+w	23031	정복하고 사냥하리	5	Rogue
+w	23032	오직 향만이 변함없이	5	Priest
+w	23033	인법첩•요란 파마	5	Mage
+w	23034	대지로 돌아온 비행	5	Shaman
+w	23035	먼 길 끝의 귀로	5	Warlock
+w	23036	시간을 황금으로 엮어	5	Memory
+w	23037	추궁할 수 없는 곳을 향해	5	Mage
+w	23038	시간이 한 송이 꽃이라면	5	Shaman
+w	23039	피의 불꽃이여, 앞길을 태워라	5	Warrior
+w	23040	이별이 더 아름답도록	5	Memory
+w	23041	생명은 불태워야 하는 것	5	Mage
+w	23042	무지개가 영원히 하늘에 머물길	5	Memory
+w	23043	바람에 흩날리는 거짓말	5	Warlock
+w	23044	이와 같이 타오르는 여명	5	Warrior
+w	23045	보답 없는 왕관	5	Warrior
+w	23046	이상이 불타는 지옥	5	Rogue
+w	23047	바다는 왜 노래하는가	5	Warlock
+w	23048	황금 피가 새긴 시대	5	Shaman
+w	23049	긴 밤의 별빛에게	5	Memory
+w	23050	그녀의 불꽃을 잊지 말라	5	Warlock
+w	23051	끝없는 산과 강을 거치더라도	5	Knight
+w	23052	이 순간처럼 영원한 사랑	5	Memory
+w	23053	눈부신 파키의 세상	5	Elation
+w	23054	그녀가 보기로 결심했을 때	5	Elation
+w	23055	내일에 바치는 색채	5	Elation
+w	23056	거짓말의 종막	5	Rogue
+w	23057	갤럭시 시티에 오신 것을 환영합니다	5	Elation
+w	23058	다음 꽃피는 계절의 만남	5	Elation
+w	23059	연옥을 불사른 새로운 몸	5	Warlock
+w	23060	별이 밤하늘을 밝힐 때	5	Mage
+w	23061	고요히 빛나는 불티	5	Mage
+w	23062	보이는 것이 곧 나	5	Warrior
+w	23063	그대는 나아가 노래하리니	5	Memory
+w	23064	파도에 내던진 한여름	5	Elation
+w	24000	어떤 에이언즈의 몰락	5	Warrior
+w	24001	별바다 순항	5	Rogue
+w	24002	기억의 소재	5	Knight
+w	24003	고독의 치유	5	Warlock
+w	24004	멈추지 않는 연산	5	Mage
+w	24005	기억은 영원히 막을 내리지 않는다	5	Memory
+w	24006	넘치는 환락의 축복	5	Elation
