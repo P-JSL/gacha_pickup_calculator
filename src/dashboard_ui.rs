@@ -110,7 +110,7 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
 }
 
 /// Compact 3-column chart panel: header, right-aligned result badge, area graph.
-fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32, appearance: UiPreferences) {
+fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32, appearance: UiPreferences, language: Language) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
@@ -137,7 +137,7 @@ fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[Cha
                         .show(ui, |ui| { ui.label(label); });
                 });
             });
-            draw_probability_chart(ui, source, appearance);
+            draw_probability_chart(ui, source, appearance, language);
         });
 }
 
@@ -238,21 +238,21 @@ impl Calculator {
             if ui.available_width() >= 900.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], "Character Probability",
-                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
+                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
                     probability_card(&mut columns[1], &format!("{banner_name} Probability"),
-                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences);
+                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                     probability_card(&mut columns[2], "Overall Result",
-                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
+                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
             } else {
                 probability_card(ui, "Character Probability",
-                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences);
+                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences, self.language());
                 ui.add_space(8.0);
                 probability_card(ui, &format!("{banner_name} Probability"),
-                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences);
+                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                 ui.add_space(8.0);
                 probability_card(ui, "Overall Result",
-                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
+                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
         } else if self.calculating {
@@ -335,7 +335,7 @@ impl Calculator {
                             });
                     });
                 } else {
-                    ui.columns(4, |cols| {
+                    ui.columns(2, |cols| {
                         setting_tile(&mut cols[0], "♧",
                             &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
                                 dirty |= edit_ticket_inventory(
@@ -349,12 +349,15 @@ impl Calculator {
                                     ui, &mut self.setup, TicketRole::Weapon
                                 );
                             });
-                        setting_tile(&mut cols[2], "◆",
+                    });
+                    ui.add_space(5.0);
+                    ui.columns(2, |cols| {
+                        setting_tile(&mut cols[0], "◆",
                             &format!("공용 재화 · {}", game.currency_name()), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
                                     .range(0..=100_000_000).speed(1)).changed();
                             });
-                        setting_tile(&mut cols[3], "◌",
+                        setting_tile(&mut cols[1], "◌",
                             &format!("환급 · {}", game.exchange_points_name()), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                                     .range(0..=1_000_000)).changed();
@@ -368,7 +371,9 @@ impl Calculator {
                     }
                 }
                 ui.add_space(8.0);
-                ui.columns(4, |cols| {
+                // Two rows prevent long selections and number inputs from
+                // overflowing their peers at normal Windows window sizes.
+                ui.columns(2, |cols| {
                     setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
                         self.catalog_selector(ui, catalog::Kind::Character);
                         egui::ComboBox::from_id_salt("workspace_character_goal")
@@ -401,7 +406,10 @@ impl Calculator {
                                     }
                                 });
                         });
-                    setting_tile(&mut cols[2], "⚑", "Pity (Current)", |ui| {
+                });
+                ui.add_space(5.0);
+                ui.columns(2, |cols| {
+                    setting_tile(&mut cols[0], "⚑", "Pity (Current)", |ui| {
                         let hard = match &self.setup.character.rule {
                             BannerRule::Standard { rarity, .. } => rarity.hard,
                             BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
@@ -410,7 +418,7 @@ impl Calculator {
                         dirty |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
                             .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
                     });
-                    setting_tile(&mut cols[3], "♧", "Rate-up Guarantee", |ui| {
+                    setting_tile(&mut cols[1], "♧", "Rate-up Guarantee", |ui| {
                         if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
                             if *featured_share < 1.0 {
                                 ui.horizontal(|ui| {
@@ -439,21 +447,19 @@ impl Calculator {
                 ui.add_space(5.0);
                 ui.separator();
                 ui.add_space(5.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("ⓘ  캐릭터·무기 목표와 환급 재투입을 계산합니다.\n     캐릭터/무기 단독 그래프는 자유권을 각각 전량 배정한 가정입니다.")
-                        .color(MUTED).size(10.0));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add(
-                            egui::Button::new(RichText::new("▶   Run Simulation")
-                                .size(15.0).strong().color(BG))
-                                .fill(CYAN).corner_radius(11)
-                                .min_size(egui::vec2(206.0, 43.0))
-                        ).clicked() {
+                // Buttons have their own row. A long hint can no longer consume
+                // width from the primary action or paint outside the center panel.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.add(egui::Button::new(
+                            RichText::new("▶  Run Simulation").size(14.0).strong().color(BG))
+                            .fill(CYAN).corner_radius(11)
+                            .min_size(egui::vec2(175.0, 40.0))).clicked() {
                             self.manual_calculation_requested = true;
                         }
                         if ui.add(egui::Button::new("↻  Reset")
                             .fill(DEEP_CARD).corner_radius(9)
-                            .min_size(egui::vec2(92.0, 40.0))).clicked() {
+                            .min_size(egui::vec2(86.0, 38.0))).clicked() {
                             self.change_game(self.setup.game);
                             self.manual_calculation_requested = true;
                         }
@@ -462,6 +468,9 @@ impl Calculator {
                         }
                     });
                 });
+                ui.label(RichText::new(
+                    "ⓘ  캐릭터·무기 목표 및 환급 재투입을 계산합니다. 단독 그래프는 자유권 전량 배정 기준입니다.")
+                    .color(MUTED).size(10.0));
             });
         dirty
     }
