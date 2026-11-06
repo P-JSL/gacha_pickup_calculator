@@ -269,6 +269,7 @@ w	24003	고독의 치유	5	Warlock
 w	24004	멈추지 않는 연산	5	Mage
 w	24005	기억은 영원히 막을 내리지 않는다	5	Memory
 w	24006	넘치는 환락의 축복	5	Elation
-# 4.7 independent nanoka/Gachabase source cross-check; older pinned StarRailRes snapshot lacks these.
+# 4.7 beta Nanoka/Gachabase ID cross-check; older pinned StarRailRes snapshot lacks these.
+c	1511	에이언즈★아하	5	Elation
 w	22009	세상 끝에서 만나자!	4	Elation
 w	23065	「아하」가 처음 울리는 순간	5	Elation

@@ -82,7 +82,7 @@ fn game_code(game: Game) -> &'static str {
 /// Other roster entries remain available below these; unverified leaks are excluded.
 fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
     match (game, id) {
-        (Game::StarRail, "upcoming_aeon_aha") => (20261111, "4.7 공식 발표"),
+        (Game::StarRail, "1511") => (20261111, "4.7 공식 발표"),
         (Game::StarRail, "upcoming_astra_yao") => (20261028, "4.8 공식 공개 · 배너 미확정"),
         (Game::StarRail, "upcoming_ellen_joe") => (20261027, "4.8 공식 공개 · 배너 미확정"),
         (Game::StarRail, "1503") => (20261015, "최신 4.6"),
@@ -397,7 +397,7 @@ mod tests {
     use super::*;
     #[test]
     fn upcoming_and_released_characters_are_prioritized() {
-        assert_eq!(first(Game::StarRail, Kind::Character), "upcoming_aeon_aha");
+        assert_eq!(first(Game::StarRail, Kind::Character), "1511");
         assert_eq!(first(Game::Neverness, Kind::Character), "upcoming_exe");
         assert_eq!(first(Game::StellaSora, Kind::Character), "162");
         assert_eq!(first(Game::WutheringWaves, Kind::Character), "1312");
@@ -445,7 +445,7 @@ mod tests {
             count += 1;
         }
         assert_eq!(count, 141, "signature mapping coverage changed unexpectedly");
-        assert_eq!(signature_weapon(Game::StarRail, "upcoming_aeon_aha").unwrap().id, "23065");
+        assert_eq!(signature_weapon(Game::StarRail, "1511").unwrap().id, "23065");
         assert!(signature_weapon(Game::StarRail, "upcoming_ellen_joe").is_none());
         assert!(signature_weapon(Game::StarRail, "upcoming_astra_yao").is_none());
         assert_eq!(by_id(Game::StarRail, Kind::Weapon, "22009").unwrap().rarity, 4);

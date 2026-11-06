@@ -2365,8 +2365,8 @@ mod chart_tests {
             "1503", &mut character, &mut weapon));
         assert_eq!(weapon, "23055"); // Pearl -> Colors for Tomorrow
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
-            "upcoming_aeon_aha", &mut character, &mut weapon));
-        assert_eq!(character, "upcoming_aeon_aha");
+            "1511", &mut character, &mut weapon));
+        assert_eq!(character, "1511");
         assert_eq!(weapon, "23065"); // Confirmed v4.7 Aha signature
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
             "23028", &mut character, &mut weapon));
@@ -2381,7 +2381,7 @@ mod chart_tests {
             "upcoming_ellen_joe", &mut character, &mut weapon));
         assert!(weapon.is_empty());
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
-            "upcoming_aeon_aha", &mut character, &mut weapon));
+            "1511", &mut character, &mut weapon));
         assert_eq!(weapon, "23065"); // Restores Aha signature
         assert!(!apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
             "none", &mut character, &mut weapon));
@@ -2391,7 +2391,7 @@ mod chart_tests {
     #[test]
     fn default_selection_does_not_assign_unrelated_weapon() {
         let session = GameSession::defaults(Game::StarRail);
-        assert_eq!(session.character_id, "upcoming_aeon_aha");
+        assert_eq!(session.character_id, "1511");
         assert_eq!(session.weapon_id, "23065");
     }
 

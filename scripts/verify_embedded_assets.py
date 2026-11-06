@@ -139,8 +139,7 @@ def audit_pinned_game_sources(catalog):
         hsr_rows[key] = True
     extra_hsr = {key for key in catalog if key[0] == "hsr"} - set(hsr_rows)
     # Explicitly allow only the announced characters with provisional UI IDs.
-    if extra_hsr != {("hsr", "c", "upcoming_aeon_aha"),
-                     ("hsr", "c", "upcoming_ellen_joe"),
+    if extra_hsr != {("hsr", "c", "upcoming_ellen_joe"),
                      ("hsr", "c", "upcoming_astra_yao")}:
         raise ValueError(f"HSR unverified game data IDs changed: {sorted(extra_hsr)}")
     if len([k for k in hsr_rows if k[1] == "w"]) != 172:
