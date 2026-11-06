@@ -167,7 +167,7 @@ fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
     let chars: Vec<char> = name.chars().collect();
     let (mut low, mut high) = (0usize, chars.len());
     while low < high {
-        let middle = low + (high - low + 1) / 2;
+        let middle = low + (high - low).div_ceil(2);
         let prefix: String = chars[..middle].iter().collect();
         if fits(&format!("{prefix}...")) { low = middle; }
         else { high = middle - 1; }
