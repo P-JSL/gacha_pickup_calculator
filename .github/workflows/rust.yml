@@ -177,7 +177,13 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
+          # Noto CJK is ~61 MB and can stall on Azure's Ubuntu mirror.
+          # Use the smaller Korean Nanum font for the screenshot runner instead.
+          sudo apt-get install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
+          nanum_font=$(find /usr/share/fonts/truetype/nanum -type f -iname 'NanumGothic.ttf' -print -quit)
+          test -s "$nanum_font"
+          sudo install -d /usr/share/fonts/truetype/noto
+          sudo ln -sfn "$nanum_font" /usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc
           chmod +x target/release/gacha_pickup_calculator
           if timeout --signal=TERM --kill-after=10s 420s bash scripts/capture_readme_screenshots.sh; then
             echo 'README GUI capture and game selection succeeded.'
