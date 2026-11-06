@@ -26,11 +26,10 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     xdotool mousemove 90 "$1" click 1
     sleep 2
   }
-  active_tab() {
-    scrot -q 92 ci-readme-shots/_tab-probe.png
-    python3 scripts/ui_capture_tab.py ci-readme-shots/_tab-probe.png
-    rm -f ci-readme-shots/_tab-probe.png
-  }
+  # Derive click coordinates from the preceding verified screenshot.
+  # Avoid creating/deleting a transient probe image, which intermittently
+  # vanished before Python could open it on the hosted virtual X11 runner.
+  last_tab_capture=dashboard-hsr-aha
   game() {
     local index="$1" file="$2" offset active_x active_y target_x
     case "$index" in
@@ -39,8 +38,10 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
       3) offset=325 ;;
       *) echo "Invalid game index $index" >&2; exit 1 ;;
     esac
-    # Find the selected tab in the *current* rendered layout, not y=540.
-    read -r active_x active_y < <(active_tab)
+    # Find the selected tab in the last captured real dashboard image.
+    read -r active_x active_y < <(
+      python3 scripts/ui_capture_tab.py "ci-readme-shots/$last_tab_capture.png"
+    )
     target_x=$((hsr_x + offset))
     xdotool mousemove "$target_x" "$active_y" click 1
     sleep 11
@@ -48,6 +49,7 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     # Screenshot evidence must prove the new game is selected.
     python3 scripts/ui_capture_tab.py "ci-readme-shots/$file.png" \
       --expected-index "$index" --hsr-x "$hsr_x"
+    last_tab_capture="$file"
   }
 
   sleep 12
@@ -58,7 +60,9 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   navigate 400; capture weapons
   navigate 548; capture preferences
   navigate 168
-  read -r hsr_x hsr_y < <(active_tab)
+  read -r hsr_x hsr_y < <(
+    python3 scripts/ui_capture_tab.py ci-readme-shots/dashboard-hsr-aha.png
+  )
   echo "Initial game tab found at x=$hsr_x, y=$hsr_y"
   game 1 dashboard-wuwa-latest
   game 2 dashboard-stellasora-latest
