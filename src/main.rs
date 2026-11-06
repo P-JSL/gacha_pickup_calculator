@@ -1137,7 +1137,12 @@ impl Calculator {
             }
             if self.setup.game == Game::Neverness {
                 ui.colored_label(GOLD,
-                    "이환: Warp Pieces 교환 단가·보드 보상·Tri-Key 전환 조건은 추가 검증이 필요한 추정값입니다.");
+                    "이환: Warp Pieces 24개=빨간 주사위 1개. S급 중복 40개, 풀돌 후 80개; A급 중복 6개, 풀돌 후 12개; A급 Arc 4개.");
+                ui.small("Annulith 160개=빨간 주사위 1개. Arc S급 환급·Tri-Key 교환 및 보드 추가 보상은 별도 검증이 필요한 설정값입니다.");
+            }
+            if self.setup.game == Game::StarRail {
+                ui.colored_label(GOLD,
+                    "스타레일: 스타라이트 20개=전용 티켓 1장. 캐릭터 중복 5성 40개(풀돌 후 100개), 4성 8개(풀돌 후 20개); 광추 5성 40개, 4성 8개.");
             }
             if self.setup.game == Game::StellaSora {
                 ui.colored_label(GOLD,
@@ -1174,6 +1179,9 @@ impl Calculator {
                     ui.label("중복 장당");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.featured_duplicate)
                         .range(0..=100_000)).changed();
+                    ui.label("풀돌 후 중복");
+                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.featured_maxed)
+                        .range(0..=100_000)).changed();
                     ui.label("픽뚫 최고 등급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.off_banner_rare)
                         .range(0..=100_000)).changed();
@@ -1188,6 +1196,17 @@ impl Calculator {
                     ui.label("캐릭터 4성 평균 환급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_reward)
                         .range(0..=100_000)).changed();
+                    if matches!(self.setup.game, Game::StarRail | Game::Neverness) {
+                        ui.label("풀돌 4성/A급 환급");
+                        dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_maxed)
+                            .range(0..=100_000)).changed();
+                        ui.label("풀돌 4성/A급 획득 비율(%)");
+                        let mut share = self.feedback_cfg.four_star_maxed_share * 100.0;
+                        if ui.add(egui::DragValue::new(&mut share).range(0.0..=100.0).speed(1.0)).changed() {
+                            self.feedback_cfg.four_star_maxed_share = share / 100.0;
+                            dirty = true;
+                        }
+                    }
                     ui.label(format!("{} 4성 평균 환급", self.setup.game.secondary_banner_name()));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_reward)
                         .range(0..=100_000)).changed();
