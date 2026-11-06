@@ -370,10 +370,12 @@ pub fn parse_bundle(
             !names.insert((game, kind, f[3].to_owned())) {
             return Err(format!("중복 카탈로그 항목: {}", f[2]));
         }
-        let status = catalog::by_id(game, kind, f[2]).map_or("업데이트", |entry| entry.status);
+        let previous = catalog::by_id(game, kind, f[2]);
+        let status = previous.map_or("업데이트", |entry| entry.status);
+        let release_order = previous.map_or(u32::MAX, |entry| entry.release_order);
         entries.push(catalog::Entry {
             game, kind, id: f[2].to_owned(), name: f[3].to_owned(),
-            rarity, icon_url: f[5].to_owned(), release_order: 0, status,
+            rarity, icon_url: f[5].to_owned(), release_order, status,
         });
         if entries.len() > MAX_RECORDS { return Err("최대 카탈로그 개수 초과".to_owned()); }
     }
@@ -417,8 +419,10 @@ pub fn parse_bundle(
         return Err("이미지 매니페스트와 카탈로그 개수가 일치하지 않습니다.".to_owned());
     }
     entries.sort_by(|a, b| {
-        a.game.label().cmp(b.game.label())
+        game_code(a.game).cmp(game_code(b.game))
             .then_with(|| (a.kind == catalog::Kind::Weapon).cmp(&(b.kind == catalog::Kind::Weapon)))
+            .then_with(|| b.release_order.cmp(&a.release_order))
+            .then_with(|| b.rarity.cmp(&a.rarity))
             .then_with(|| a.name.cmp(&b.name))
     });
     Ok(VerifiedBundle { entries, pairs, hashes, revision, image_dir })
