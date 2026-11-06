@@ -1,6 +1,6 @@
 //! Offline desktop localization. No IP geolocation, web requests or external dependencies.
 use gacha_pickup_calculator::games::Game;
-use std::{env, fs, io::{self, Write}, path::{Path, PathBuf}};
+use std::{env, fs, io::{self, Read, Write}, path::{Path, PathBuf}};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Language { Korean, English, Japanese, ChineseSimplified, ChineseTraditional }
@@ -95,9 +95,29 @@ fn settings_path() -> Option<PathBuf> {
     }
 }
 pub(crate) fn load_preference() -> LanguagePreference {
-    settings_path().and_then(|p| fs::read_to_string(p).ok())
-        .and_then(|s| LanguagePreference::from_key(&s))
+    settings_path().as_deref().and_then(load_preference_from)
         .unwrap_or(LanguagePreference::Automatic)
+}
+
+/// Read only the few bytes required for one language key. An attacker-controlled
+/// configuration file must never allocate an unbounded string at app startup.
+fn load_preference_from(path: &Path) -> Option<LanguagePreference> {
+    const MAX_PREFERENCE_BYTES: u64 = 32;
+    let before = fs::symlink_metadata(path).ok()?;
+    if !before.file_type().is_file() || before.len() > MAX_PREFERENCE_BYTES {
+        return None;
+    }
+    let handle = fs::File::open(path).ok()?;
+    let opened = handle.metadata().ok()?;
+    if !opened.is_file() || opened.len() > MAX_PREFERENCE_BYTES { return None; }
+    #[cfg(unix)] {
+        use std::os::unix::fs::MetadataExt;
+        if before.dev() != opened.dev() || before.ino() != opened.ino() { return None; }
+    }
+    let mut bytes = Vec::with_capacity(opened.len() as usize);
+    handle.take(MAX_PREFERENCE_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    if bytes.len() as u64 > MAX_PREFERENCE_BYTES { return None; }
+    LanguagePreference::from_key(std::str::from_utf8(&bytes).ok()?)
 }
 pub(crate) fn save_preference(pref: LanguagePreference) -> io::Result<()> {
     let path = settings_path().ok_or_else(|| io::Error::new(
@@ -345,14 +365,19 @@ mod tests {
         let path = base.join("language.txt");
         save_preference_to(&path, LanguagePreference::Korean).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "ko");
+        assert_eq!(load_preference_from(&path), Some(LanguagePreference::Korean));
         save_preference_to(&path, LanguagePreference::Japanese).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "ja");
+        assert_eq!(load_preference_from(&path), Some(LanguagePreference::Japanese));
+        fs::write(&path, "x".repeat(100)).unwrap();
+        assert_eq!(load_preference_from(&path), None);
         #[cfg(unix)] {
             use std::os::unix::fs::symlink;
             let victim = base.join("do-not-overwrite");
             fs::write(&victim, "protected").unwrap();
             fs::remove_file(&path).unwrap();
             symlink(&victim, &path).unwrap();
+            assert_eq!(load_preference_from(&path), None);
             assert!(save_preference_to(&path, LanguagePreference::English).is_err());
             assert_eq!(fs::read_to_string(victim).unwrap(), "protected");
         }

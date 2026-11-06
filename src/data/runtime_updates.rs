@@ -291,6 +291,12 @@ fn read_bounded_cache(path: &Path, max_bytes: usize) -> Result<String, String> {
     if !opened.is_file() || opened.len() > max_bytes as u64 {
         return Err("캐시 파일 크기가 읽기 도중 변경되었습니다.".to_owned());
     }
+    #[cfg(unix)] {
+        use std::os::unix::fs::MetadataExt;
+        if meta.dev() != opened.dev() || meta.ino() != opened.ino() {
+            return Err("캐시 파일이 검사와 열기 사이 교체되었습니다.".to_owned());
+        }
+    }
     let mut bytes = Vec::with_capacity(opened.len() as usize);
     file.take(max_bytes as u64 + 1).read_to_end(&mut bytes)
         .map_err(|e| format!("캐시 파일 읽기 실패: {e}"))?;
