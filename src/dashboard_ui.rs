@@ -407,6 +407,11 @@ impl Calculator {
                                         format!("E{level} / {}", level + 1)).changed();
                                 }
                             });
+                        ui.horizontal(|ui| {
+                            ui.label(t(language, "Owned copies"));
+                            dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
+                                .range(0..=7).suffix(t(language, "Passes"))).changed();
+                        });
                     });
                     setting_tile(&mut cols[1], "⚔",
                         &format!("{} · {}", t(language, "Target Weapon"), i18n::banner_name(language, self.setup.game)), |ui| {
@@ -427,6 +432,11 @@ impl Calculator {
                                         ).changed();
                                     }
                                 });
+                            ui.horizontal(|ui| {
+                                ui.label(t(language, "Owned copies"));
+                                dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
+                                    .range(0..=5).suffix(t(language, "Passes"))).changed();
+                            });
                         });
                 });
                 ui.add_space(5.0);
