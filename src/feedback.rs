@@ -415,6 +415,22 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     };
     while won < rule.target_copies {
         wallet.pay(dedicated);
+        if matches!(kind, BannerKind::Character) {
+            wallet.begin_character_pull(model);
+            // A community estimate only: actual NTE tile odds depend on board position.
+            if model.nte_one_die_chance + model.nte_five_dice_chance > 0.0 {
+                let tile = rng.uniform();
+                let returned: usize = if tile < model.nte_one_die_chance {
+                    1
+                } else if tile < model.nte_one_die_chance + model.nte_five_dice_chance {
+                    5
+                } else {
+                    0
+                };
+                *dedicated = dedicated.saturating_add(returned);
+                wallet.board_dice_earned += returned;
+            }
+        }
         let rare = rng.hits(rarity.chance(pity + 1, mode));
         if maybe_four_star(rng, model, kind, &mut four_pity, rare) {
             wallet.refund(match kind {
@@ -455,6 +471,9 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     let mut progress = rule.spark.as_ref().map_or(0, |s| s.progress);
     while won < rule.target_copies {
         wallet.pay(dedicated);
+        if matches!(kind, BannerKind::Character) {
+            wallet.begin_character_pull(model);
+        }
         let success = rng.hits(if pity + 1 >= *hard_featured { 1.0 } else { *featured_rate });
         // Sampling the nonfeatured rate conditional on a featured miss retains
         // the desired unconditional rarity rate. Nonfeatured Stella Sora
@@ -550,6 +569,12 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
     let mut total_returns = 0.0;
     let mut total_wavebands = 0.0;
     let mut total_waveband_cost = 0.0;
+    let mut total_character_raw = 0.0;
+    let mut total_weapon_raw = 0.0;
+    let mut total_character_points = 0.0;
+    let mut total_weapon_points = 0.0;
+    let mut total_board_dice = 0.0;
+    let mut total_record_discs = 0.0;
     for _ in 0..model.samples {
         let mut wallet = Wallet::new(model);
         let mut dedicated_character = setup.character_dedicated;
@@ -558,6 +583,16 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
             (BannerKind::Character, &setup.character, setup.character_owned, &mut dedicated_character),
             (BannerKind::Weapon, &setup.weapon, setup.weapon_owned, &mut dedicated_weapon),
         ] {
+            // Record-only credits can be combined with the player's partial
+            // Gold Disc balance. Never use these credits for character draws.
+            if matches!(kind, BannerKind::Weapon) && setup.game == Game::StellaSora {
+                let disc_units = wallet.record_disc_units
+                    .saturating_add(setup.weapon_ticket_remainder);
+                *dedicated = dedicated.saturating_add(
+                    disc_units / setup.game.weapon_ticket_units_per_pull());
+            }
+            let raw_before = wallet.raw_pulls;
+            let points_before = wallet.points;
             match &banner.rule {
                 BannerRule::Standard { .. } => {
                     let max_wavebands = if setup.game == Game::WutheringWaves
@@ -574,7 +609,22 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
                     roll_arc(&mut rng, banner, model, &mut wallet, owned, dedicated);
                 }
             }
+            let draws = (wallet.raw_pulls - raw_before) as f64;
+            let points = (wallet.points - points_before) as f64;
+            match kind {
+                BannerKind::Character => {
+                    total_character_raw += draws;
+                    total_character_points += points;
+                    wallet.reward_multiplier = 1;
+                }
+                BannerKind::Weapon => {
+                    total_weapon_raw += draws;
+                    total_weapon_points += points;
+                }
+            }
         }
+        total_board_dice += wallet.board_dice_earned as f64;
+        total_record_discs += wallet.record_disc_units as f64;
         budgets.push(wallet.initial_flexible_required);
         raw_pulls.push(wallet.raw_pulls);
         scenarios.push(RefundScenario::from_wallet(&wallet, model.initial_points));
@@ -592,7 +642,13 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         average_raw: total_raw / n, average_initial_flexible: total_flexible / n,
         total_returned_points_average: total_returns / n,
         average_wavebands_purchased: total_wavebands / n,
-        average_waveband_corals_spent: total_waveband_cost / n })
+        average_waveband_corals_spent: total_waveband_cost / n,
+        average_character_raw: total_character_raw / n,
+        average_weapon_raw: total_weapon_raw / n,
+        average_character_return_points: total_character_points / n,
+        average_weapon_return_points: total_weapon_points / n,
+        average_board_dice_earned: total_board_dice / n,
+        average_record_disc_units_earned: total_record_discs / n })
 }
 
 #[cfg(test)]
