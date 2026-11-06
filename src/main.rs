@@ -363,7 +363,17 @@ impl GoalFunding {
     }
 }
 
-/// Shared, compact funding summary displayed on Dashboard and Analytics.
+/// Standalone ticket deficits are informational, not additive: both banner
+/// estimates assume the full existing premium-currency balance is available.
+fn standalone_ticket_shortage(gap: &GoalFunding, setup: &GameSetup, weapon: bool) -> usize {
+    let needed_pulls = if weapon { gap.weapon_single_shared }
+        else { gap.character_single_shared };
+    let missing_pulls = needed_pulls.saturating_sub(gap.available_shared);
+    let units_per_pull = if weapon { setup.game.weapon_ticket_units_per_pull() } else { 1 };
+    missing_pulls.saturating_mul(units_per_pull)
+}
+
+/// Game-specific ticket equivalents for the Dashboard and Analytics summary.
 fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
                        language: Language) {
     let secondary = i18n::banner_name(language, setup.game);
@@ -378,9 +388,18 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     });
     ui.add_space(5.0);
 
-    let individual = |ui: &mut egui::Ui, label: &str,
+    let individual = |ui: &mut egui::Ui, label: &str, weapon: bool,
                       counts: (usize, usize, usize, usize, usize, usize)| {
-        let (target, owned, missing, raw, dedicated, shared) = counts;
+        let (target, owned, missing, raw, dedicated, _) = counts;
+        let ticket_name = i18n::ticket_name(language, setup.game, weapon);
+        let units_per_pull = if weapon { setup.game.weapon_ticket_units_per_pull() } else { 1 };
+        let inventory_units = dedicated.saturating_mul(units_per_pull);
+        let missing_units = standalone_ticket_shortage(gap, setup, weapon);
+        let unit = if units_per_pull == 300 {
+            t(language, "Units")
+        } else {
+            t(language, "Passes")
+        };
         ui.label(RichText::new(label).color(PRIMARY).strong());
         ui.label(format!(
             "{} {}  ·  {} {}  ·  {} {}",
@@ -391,49 +410,53 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         ui.label(RichText::new(format!(
             "{}: {}{}  ·  {}: {}{}",
             t(language, "Solo requirement"), raw, t(language, "Pulls"),
-            t(language, "After dedicated passes"), shared, t(language, "Pulls"),
+            t(language, "Owned dedicated passes"), inventory_units, unit,
         )).color(MUTED).size(11.0));
-        if dedicated > 0 {
-            ui.small(format!(
-                "{} {}{}",
-                t(language, "Owned dedicated passes"), dedicated, t(language, "Passes"),
-            ));
-        }
+        ui.label(RichText::new(format!(
+            "{} ({})",
+            t(language, "Standalone ticket shortfall"), ticket_name,
+        )).color(MUTED).size(11.0));
+        ui.label(RichText::new(format!("+{} {}", missing_units, unit))
+            .color(if missing_units == 0 { MINT } else { GOLD })
+            .strong());
     };
     let shortage = |ui: &mut egui::Ui| {
-        ui.label(RichText::new(t(language, "Additional funding needed")).color(GOLD).strong());
+        ui.label(RichText::new(t(language, "Additional featured tickets"))
+            .color(GOLD).strong());
         ui.label(RichText::new(format!(
             "+{} {}  ·  +{} {}",
-            gap.additional_shared, t(language, "Pulls"),
+            gap.additional_shared, t(language, "Pull equivalents"),
             gap.additional_currency, native,
         )).size(17.0).strong().color(
             if gap.additional_shared == 0 { MINT } else { GOLD },
         ));
         ui.small(format!(
             "{} {}{}  ·  {} {}{}",
-            t(language, "Required shared passes"), gap.required_shared, t(language, "Pulls"),
-            t(language, "Available shared passes"), gap.available_shared, t(language, "Pulls"),
+            t(language, "Total ticket equivalents needed"),
+            gap.required_shared, t(language, "Pull equivalents"),
+            t(language, "Already available equivalents"),
+            gap.available_shared, t(language, "Pull equivalents"),
         ));
     };
     if ui.available_width() >= 780.0 {
         ui.columns(3, |cols| {
-            individual(&mut cols[0], t(language, "Characters"), (
+            individual(&mut cols[0], t(language, "Characters"), false, (
                 gap.character_target, gap.character_owned, gap.character_missing,
                 gap.character_single_raw, gap.dedicated_character,
                 gap.character_single_shared));
-            individual(&mut cols[1], secondary, (
+            individual(&mut cols[1], secondary, true, (
                 gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
                 gap.weapon_single_raw, gap.dedicated_weapon,
                 gap.weapon_single_shared));
             shortage(&mut cols[2]);
         });
     } else {
-        individual(ui, t(language, "Characters"), (
+        individual(ui, t(language, "Characters"), false, (
             gap.character_target, gap.character_owned, gap.character_missing,
             gap.character_single_raw, gap.dedicated_character,
             gap.character_single_shared));
         ui.add_space(6.0);
-        individual(ui, secondary, (
+        individual(ui, secondary, true, (
             gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
             gap.weapon_single_raw, gap.dedicated_weapon,
             gap.weapon_single_shared));
@@ -442,13 +465,20 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
     }
     ui.add_space(5.0);
     ui.label(RichText::new(format!(
-        "{} {}{} + {} {} ({}{}).",
-        t(language, "Already owned flexible passes"), setup.flexible,
-        t(language, "Passes"),
+        "{}: {}{} + {} {} ({}{}).",
+        t(language, "Owned featured tickets"),
+        setup.flexible, t(language, "Passes"),
         setup.premium_currency, native,
-        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pull equivalents"),
     )).color(MUTED).size(11.0));
-    ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
+    ui.small(format!(
+        "{}: {} / {}",
+        t(language, "Featured ticket types"),
+        i18n::ticket_name(language, setup.game, false),
+        i18n::ticket_name(language, setup.game, true),
+    ));
+    ui.label(RichText::new(t(language,
+        "Banner-only shortages each assume all premium currency; combined funding is calculated separately."))
         .color(MUTED).size(11.0));
     if setup.game == Game::StellaSora {
         ui.small(format!(
