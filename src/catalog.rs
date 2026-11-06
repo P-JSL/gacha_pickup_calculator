@@ -467,6 +467,37 @@ mod tests {
     }
 
     #[test]
+    fn all_unpaired_five_star_targets_are_explicitly_classified() {
+        let mut exceptions = HashSet::new();
+        for line in include_str!("unpaired_five_star_targets.tsv").lines() {
+            if line.starts_with('#') || line.is_empty() { continue; }
+            let fields: Vec<_> = line.split('\t').collect();
+            assert_eq!(fields.len(), 4, "bad unpaired target: {line}");
+            let game = match fields[0] {
+                "hsr" => Game::StarRail, "wuwa" => Game::WutheringWaves,
+                "nte" => Game::Neverness, "sora" => Game::StellaSora,
+                _ => panic!("unknown game in exception: {line}"),
+            };
+            let ch = by_id(game, Kind::Character, fields[1]).expect("unknown exception identity");
+            assert_eq!(ch.name, fields[3]);
+            assert_eq!(ch.rarity, 5);
+            assert!(signature_weapon(game, fields[1]).is_none(),
+                "exception has a mapped signature: {line}");
+            assert!(exceptions.insert((game, fields[1])), "duplicate exception: {line}");
+        }
+        assert_eq!(exceptions.len(), 30, "unmapped target coverage changed");
+        for entry in entries().iter().filter(|entry|
+            entry.kind == Kind::Character && entry.rarity == 5
+        ) {
+            if signature_weapon(entry.game, &entry.id).is_none() {
+                assert!(exceptions.contains(&(entry.game, entry.id.as_str())),
+                    "five-star character missing a signature and an explicit exception: {}",
+                    entry.id);
+            }
+        }
+    }
+
+    #[test]
     fn portraits_and_names_do_not_cross_link_between_character_identities() {
         let mut names = HashSet::new();
         let mut source_urls = HashSet::new();

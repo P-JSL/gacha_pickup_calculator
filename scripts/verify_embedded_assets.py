@@ -14,11 +14,14 @@ import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 
-from pinned_icon_sources import approved_pinned_url, validate_pinned_identity, PINNED_SOURCES
+from pinned_icon_sources import (
+    approved_pinned_url, validate_pinned_identity, PINNED_SOURCES, PINNED_PNG_SHA256,
+)
 
 ROOT = Path("Image")
 CATALOG = Path("src/catalog_data.tsv")
 PAIRS = Path("src/signature_pairs.tsv")
+UNPAIRED = Path("src/unpaired_five_star_targets.tsv")
 GAME_DIR = {"hsr": "HSR", "wuwa": "WutheringWaves",
             "nte": "Neverness", "sora": "StellaSora"}
 PREFIXES = (
@@ -112,6 +115,35 @@ def audit_signature_pairs(catalog):
         count += 1
     if count != 141:
         raise ValueError(f"Signature catalog count changed unexpectedly: {count}")
+    # Every five-star identity must have a real signature or an explicit, justified
+    # exception. No newly added unreleased character may silently inherit a
+    # random 5-star weapon when its signature has not been announced.
+    allowed_reasons = {
+        "story_protagonist", "standard_nonlimited",
+        "no_exclusive_arc_in_game_snapshot",
+        "banner_or_signature_unconfirmed",
+    }
+    exceptions = {}
+    for lineno, line in enumerate(UNPAIRED.read_text(encoding="utf-8").splitlines(), 1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 4:
+            raise ValueError(f"{UNPAIRED}:{lineno}: invalid unpaired entry")
+        game, char_id, reason, display_name = fields
+        key = (game, char_id)
+        if (reason not in allowed_reasons or key in exceptions
+                or (game, "c", char_id) not in catalog
+                or catalog[game, "c", char_id][3] != display_name
+                or catalog[game, "c", char_id][4] != "5"):
+            raise ValueError(f"{UNPAIRED}:{lineno}: unexpected unpaired exception")
+        exceptions[key] = reason
+    unpaired = {(g, char_id) for g, role, char_id in catalog
+                if role == "c" and catalog[g, role, char_id][4] == "5"
+                and (g, char_id) not in seen}
+    if set(exceptions) != unpaired or len(unpaired) != 30:
+        raise ValueError(f"Signature coverage mismatch: unexpected={unpaired - set(exceptions)} "
+                         f"obsolete={set(exceptions) - unpaired}")
     return count
 
 
@@ -232,6 +264,10 @@ def audit_pngs(catalog):
             raise ValueError(f"Invalid manifest entry: {key}")
         manifest[key] = digest
     actual = {p.relative_to(ROOT).as_posix() for p in ROOT.glob("*/*.png")}
+    for (game, role, ident), checked_hash in PINNED_PNG_SHA256.items():
+        rel = f"{GAME_DIR[game]}/{role}-{ident}.png"
+        if manifest.get(rel) != checked_hash:
+            raise ValueError(f"Reviewed character/light-cone image changed: {rel}")
     if set(manifest) != expected or actual != expected:
         raise ValueError(f"Manifest/directory/catalog mismatch: expected={len(expected)} "
                          f"manifest={len(manifest)} actual={len(actual)}")

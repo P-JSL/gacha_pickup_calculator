@@ -14,6 +14,13 @@ REFERENCE_PAGES = {
     ("hsr", "w", "22009"): "https://hsr.gachabase.net/lightcones/22009/see-you-at-the-worlds-end/beta?lang=en",
     ("hsr", "w", "23065"): "https://hsr.gachabase.net/lightcones/23065/upon-the-first-echo-of-aha/beta?lang=ko",
 }
+# SHA-256 of each reviewed and normalized PNG committed by the 4.7 vendor workflow.
+# Intentionally independent of the general Image/SHA256SUMS.txt manifest.
+PINNED_PNG_SHA256 = {
+    ("hsr", "c", "1511"): "e5cae622d77a3466d2791e9ef0ac291d5072587efc01320e1a4eb94a86791c60",
+    ("hsr", "w", "22009"): "565c4bb6e032553b3df5af5c83cd6423549c695d8d8b79d21377eb10b41ad6ea",
+    ("hsr", "w", "23065"): "f9c6e6ca3a40478b210b33b3f760bcffb9cb6fdd26f6dedbbfcede7a70b87ed2",
+}
 PINNED_URLS = frozenset(PINNED_SOURCES.values())
 
 
