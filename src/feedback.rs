@@ -1008,6 +1008,7 @@ mod tests {
         let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
         cfg.samples = 10;
         cfg.featured_duplicate = 0;
+        cfg.featured_maxed = 0;
         cfg.weapon_rare = 0;
         cfg.weapon_first = 0;
         cfg.off_banner_rare = 0;
