@@ -1,9 +1,13 @@
 [package]
 name = "gacha_pickup_calculator"
-version = "0.2.7"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
-description = "Exact finite-state gacha probability calculator for four games"
+description = "Desktop probability and resource estimator for four gacha games"
+repository = "https://github.com/P-JSL/gacha_pickup_calculator"
+readme = "README.md"
+keywords = ["probability", "simulation", "gacha", "egui"]
+categories = ["games", "science"]
 
 [dependencies]
 eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }

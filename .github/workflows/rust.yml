@@ -31,10 +31,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev
       - name: Format Rust sources before verification
         run: cargo fmt --all
+      - name: Validate 1.0 release source contract
+        if: runner.os == 'Linux'
+        run: python3 scripts/verify_release_contract.py
       - name: Unit tests
         run: cargo test --locked --all-targets
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Public API documentation build
+        if: runner.os == 'Linux'
+        run: cargo doc --locked --no-deps --lib
       - name: RustSec dependency vulnerability audit (Linux)
         if: runner.os == 'Linux'
         shell: bash

@@ -39,7 +39,9 @@ impl Distribution {
         for (i, &a) in self.pmf.iter().enumerate() {
             if a == 0.0 { continue; }
             for (j, &b) in other.pmf.iter().enumerate() {
-                combined[i + j] += a * b;
+                // Preserve exact first-passage arithmetic while skipping
+                // unreachable (zero-probability) states in sparse banners.
+                if b != 0.0 { combined[i + j] += a * b; }
             }
         }
         Self::new(combined)
