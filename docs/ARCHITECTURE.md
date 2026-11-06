@@ -42,7 +42,7 @@
 
 ## CI의 책임 분리와 경량 검증
 
-- `.github/workflows/rust.yml`은 문서·릴리즈 계약, Linux/Windows 테스트·빌드, RustSec, Release 성능 비교, PNG 무결성, ClamAV, 실제 GUI 캡처, 배포를 **독립 Job**으로 구분합니다. 상호 의존이 없는 작업은 병렬 실행하며, 새 릴리즈는 모두 성공해야 진행합니다.
+- `.github/workflows/rust.yml`은 문서·릴리즈 계약, **OS별 테스트·Clippy와 OS별 Release 빌드를 서로 독립 Job**으로 분리하고, RustSec·성능·PNG 무결성·ClamAV를 별도로 실행합니다. 실제 GUI 캡처는 Linux Release 실행 파일만 기다리며, 새 릴리즈는 모든 Job의 성공을 확인한 후 진행합니다.
 - Markdown/라이선스·과거 릴리즈 노트만 변경되면 문서 무결성 검사를 수행하고, Rust 빌드·PNG 바이러스 검사·실제 GUI 캡처·릴리즈 재발행은 생략합니다.
 - Rust 확률·관측 분석 변경은 Windows/Linux 컴파일·테스트·Clippy를 실행합니다. 이미지/카탈로그 또는 UI 변경 시 관련 검증을 추가하며, 새 버전 릴리즈가 필요할 때에는 모든 필수 게이트를 수행합니다.
 - 브랜치 보호의 필수 체크를 Pending으로 만들지 않도록 workflow-level `paths-ignore`를 피하고, Windows/Ubuntu 및 CodeQL **매트릭스 Job 이름을 유지한 채 Job 내부의 무거운 단계만 조건부 실행**합니다. 판별이 불가능한 변경은 전체 검사로 처리합니다.

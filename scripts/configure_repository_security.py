@@ -23,6 +23,8 @@ CHECKS = [
     "Validate documentation and release contracts",
     "Verify (windows-latest)",
     "Verify (ubuntu-24.04)",
+    "Build Linux GUI executable",
+    "Build Windows release executable",
     "RustSec dependency audit",
     "Measure probability performance",
     "Verify bundled image integrity",
