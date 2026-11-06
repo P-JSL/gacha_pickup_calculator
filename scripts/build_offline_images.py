@@ -87,7 +87,7 @@ def entries():
             raise ValueError("Unexpected catalog type")
         if not name.strip() or name.startswith("{") or name.isdecimal():
             raise ValueError(f"Unresolved character/weapon name: {game}/{ident}")
-        if rarity not in ("3", "4", "5"):
+        if rarity not in ("1", "2", "3", "4", "5"):
             raise ValueError(f"Invalid rarity: {game}/{ident}")
         visible_name = (game, role, name)
         if visible_name in names:
