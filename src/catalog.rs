@@ -433,7 +433,7 @@ mod tests {
             assert_eq!(signature_weapon(game, parts[1]).unwrap().id, parts[2]);
             count += 1;
         }
-        assert_eq!(count, 125, "signature mapping coverage changed unexpectedly");
+        assert_eq!(count, 140, "signature mapping coverage changed unexpectedly");
         assert_eq!(signature_weapon(Game::Neverness, "1056").map(|e| &e.id), None);
         assert!(signature_weapon(Game::StarRail, "8001").is_none());
         // IDs come from the official 2.0 data snapshot, not earlier aliases.

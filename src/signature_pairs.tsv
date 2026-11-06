@@ -1,6 +1,6 @@
 # Game	character_id	weapon_id	source_url
 # Explicit character-to-featured-equipment pairs; no inferred fallback on missing data.
-# IDs refer to catalog_data.tsv; selecting other entries keeps the manually selected weapon.
+# IDs refer to catalog_data.tsv; unverified pairings clear stale equipment, with manual selection available.
 hsr	1003	23000	https://www.prydwen.gg/star-rail/characters/
 hsr	1102	23001	https://www.prydwen.gg/star-rail/characters/
 hsr	1107	23002	https://www.prydwen.gg/star-rail/characters/
@@ -51,6 +51,21 @@ hsr	1015	23046	https://www.prydwen.gg/star-rail/characters/
 hsr	1410	23047	https://www.prydwen.gg/star-rail/characters/
 hsr	1412	23048	https://www.prydwen.gg/star-rail/characters/
 hsr	1413	23049	https://www.prydwen.gg/star-rail/characters/
+hsr	1321	23050	https://riragamehub.com/gallery/hsr/character/dahlia/guide
+hsr	1414	23051	https://hsr.gachabase.net/lightcones/23051/though-worlds-apart/beta/4.1.51/14394020?lang=ko
+hsr	1415	23052	https://hsr.gachabase.net/lightcones/23052/this-love-forever/beta/4.0.51/14066405?lang=ko
+hsr	1501	23053	https://bananapanya.com/ko/game/starrail/sparxie/
+hsr	1502	23054	https://www.laqoos.com/ko-KR/hsr/weapons/23054
+hsr	1503	23055	https://www.hoyolab.com/article/46851682?lang=ko-kr
+hsr	1504	23056	https://easyjwork.tistory.com/538
+hsr	1505	23058	https://www.hoyolab.com/article/46851682?lang=ko-kr
+hsr	1506	23057	https://easyjwork.tistory.com/558
+hsr	1507	23059	https://www.hoyolab.com/article/47142215
+hsr	1508	23061	https://m.gamemeca.com/smart.php?gcode=mobile_userreview&gid=1778382&p=1&rts=board&start_gid=1779730
+hsr	1509	23062	https://hsr.gachabase.net/lightcones/beta/4.6.54/16833202?filter=r%3A5&lang=ko
+hsr	1510	23060	https://hsr.gachabase.net/lightcones/23060/a-star-that-lights-the-night/release/4.6.0/16688351?lang=en
+hsr	1512	23063	https://hsr.gachabase.net/lightcones/23063/rise-and-sing/beta/4.5.53/16399740?lang=ko
+hsr	1513	23064	https://bananapanya.com/ko/game/starrail/aventurine-waveflair/
 wuwa	1312	21020107	https://metammo.com/wuthering-waves-guide/resonators/suoming
 wuwa	1311	21050116	https://metammo.com/wuthering-waves-guide/resonators/hsin
 wuwa	1212	21010076	https://metammo.com/wuthering-waves-guide/resonators/jingran

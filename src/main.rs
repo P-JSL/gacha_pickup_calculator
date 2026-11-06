@@ -359,11 +359,10 @@ fn apply_catalog_choice(
     match kind {
         catalog::Kind::Character => {
             *character = id.to_owned();
-            if let Some(signature) = catalog::signature_weapon(game, id) {
-                *weapon = signature.id.clone();
-            }
-            // No verified signature: preserve explicit manual equipment instead
-            // of pretending an arbitrary five-star equipment is exclusive.
+            *weapon = catalog::signature_weapon(game, id)
+                .map(|signature| signature.id.clone()).unwrap_or_default();
+            // Unknown signature: clear the previous character's equipment rather
+            // than silently presenting an unrelated five-star as this one's own.
         }
         catalog::Kind::Weapon => *weapon = id.to_owned(),
     }
@@ -374,8 +373,7 @@ impl GameSession {
     fn defaults(game: Game) -> Self {
         let character_id = catalog::first(game, catalog::Kind::Character);
         let weapon_id = catalog::signature_weapon(game, &character_id)
-            .map(|entry| entry.id.clone())
-            .unwrap_or_else(|| catalog::first(game, catalog::Kind::Weapon));
+            .map(|entry| entry.id.clone()).unwrap_or_default();
         Self {
             setup: GameSetup::new(game),
             feedback: FeedbackConfig::for_game(game),
@@ -549,7 +547,13 @@ impl Calculator {
             if let Some(item) = item {
                 self.catalog_ui.image(ui, item, 30.0);
             }
-            let name = item.map(|x| x.name.as_str()).unwrap_or(t(self.language(), "No target"));
+            let name = item.map(|x| x.name.as_str()).unwrap_or_else(|| {
+                if kind == catalog::Kind::Weapon {
+                    t(self.language(), "Signature unverified (select manually)")
+                } else {
+                    t(self.language(), "No target")
+                }
+            });
             let width = ui.available_width().clamp(70.0, 230.0);
             let shortened = truncated_selection(ui, name, width);
             if ui.add_sized(egui::vec2(width, 27.0),
@@ -2354,16 +2358,32 @@ mod chart_tests {
     }
 
     #[test]
-    fn unmapped_character_preserves_manual_weapon_and_rejects_nonexistent_ids() {
-        let mut character = "1308".to_owned();
-        let mut weapon = "23024".to_owned();
+    fn unmapped_character_clears_stale_equipment_but_allows_manual_choice() {
+        let mut character = "1503".to_owned();
+        let mut weapon = "23028".to_owned();
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
-            "1321", &mut character, &mut weapon));
-        assert_eq!(character, "1321");
-        assert_eq!(weapon, "23024");
+            "1503", &mut character, &mut weapon));
+        assert_eq!(weapon, "23055"); // Pearl -> Colors for Tomorrow
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "upcoming_aeon_aha", &mut character, &mut weapon));
+        assert_eq!(character, "upcoming_aeon_aha");
+        assert!(weapon.is_empty()); // No source-verified signature for Aha yet
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
+            "23028", &mut character, &mut weapon));
+        assert_eq!(weapon, "23028"); // Explicit manual choice remains available
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "1503", &mut character, &mut weapon));
+        assert_eq!(weapon, "23055"); // Changing character restores its signature
         assert!(!apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
             "none", &mut character, &mut weapon));
-        assert_eq!(weapon, "23024");
+        assert_eq!(weapon, "23055");
+    }
+
+    #[test]
+    fn default_selection_does_not_assign_unrelated_weapon() {
+        let session = GameSession::defaults(Game::StarRail);
+        assert_eq!(session.character_id, "upcoming_aeon_aha");
+        assert!(session.weapon_id.is_empty());
     }
 
     #[test]

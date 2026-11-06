@@ -139,6 +139,7 @@ pub fn t(language: Language, text: &'static str) -> &'static str {
         "Character Tickets" => ["캐릭터 티켓", "Character Tickets", "キャラチケット", "角色票", "角色票"],
         "Weapon Tickets" => ["무기 티켓", "Weapon Tickets", "武器チケット", "武器票", "武器票"],
         "No target" => ["선택 안 함", "No target", "選択なし", "未选择", "未選擇"],
+        "Signature unverified (select manually)" => ["전용 장비 미확인 · 직접 선택", "Signature unverified · choose manually", "専用装備未確認・手動で選択", "专属装备未确认 · 手动选择", "專屬裝備未確認 · 手動選擇"],
         "Not needed" => ["필요 없음", "Not needed", "不要", "不需要", "不需要"],
         "Always On" => ["항상 적용", "Always On", "常に適用", "始终启用", "始終啟用"],
         "Run Simulation" => ["시뮬레이션 실행", "Run Simulation", "シミュレーション実行", "运行模拟", "執行模擬"],
