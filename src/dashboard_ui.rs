@@ -410,7 +410,7 @@ impl Calculator {
                         ui.horizontal(|ui| {
                             ui.label(t(language, "Owned copies"));
                             dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
-                                .range(0..=7).suffix(t(language, "Passes"))).changed();
+                                .range(0..=7).suffix(t(language, "Copies unit"))).changed();
                         });
                     });
                     setting_tile(&mut cols[1], "⚔",
@@ -435,7 +435,7 @@ impl Calculator {
                             ui.horizontal(|ui| {
                                 ui.label(t(language, "Owned copies"));
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
-                                    .range(0..=5).suffix(t(language, "Passes"))).changed();
+                                    .range(0..=5).suffix(t(language, "Copies unit"))).changed();
                             });
                         });
                 });
