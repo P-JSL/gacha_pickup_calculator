@@ -106,6 +106,64 @@ def audit_signature_pairs(catalog):
     return count
 
 
+
+def audit_pinned_game_sources(catalog):
+    """Cross-check catalog identities against independently captured game data.
+
+    Sora: pinned localized Character/Disc tables (IDs and real names).
+    NTE: pinned internal ForkItemData icon/quality/exclusivity metadata.
+    This checks data existence, not whether an item is a currently available banner.
+    """
+    sora_rows = {}
+    for line in Path("src/source_snapshot_sora.tsv").read_text(
+            encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        role, ident, name, available, visible = line.split("\t")
+        if role not in ("c", "w") or available != "Y" or visible != "Y":
+            raise ValueError(f"Unreleased/hidden Sora source entry: {ident}")
+        key = ("sora", role, ident)
+        if key in sora_rows or key not in catalog or catalog[key][3] != name:
+            raise ValueError(f"Sora game source ID/name mismatch: {ident} {name}")
+        sora_rows[key] = True
+    if set(sora_rows) != {k for k in catalog if k[0] == "sora"}:
+        raise ValueError("Sora catalog has uncrosschecked or missing rows")
+
+    nte_rows = {}
+    nte_exclusive = set()
+    for line in Path("src/source_snapshot_nte_arcs.tsv").read_text(
+            encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        ident, internal_key, stem, rarity, exclusive = line.split("\t")
+        key = ("nte", "w", ident)
+        if key in nte_rows or key not in catalog:
+            raise ValueError(f"NTE internal arc ID not in catalog: {ident}")
+        actual = catalog[key]
+        if not internal_key.startswith("fork_") or actual[4] != rarity:
+            raise ValueError(f"NTE fork rarity or internal ID mismatch: {ident}")
+        if not actual[5].endswith("/" + stem + ".png"):
+            raise ValueError(f"NTE arc icon does not match game data: {ident}")
+        nte_rows[key] = True
+        if exclusive != "-":
+            for char_id in exclusive.split(","):
+                if ("nte", "c", char_id) in catalog:
+                    nte_exclusive.add((char_id, ident))
+    if set(nte_rows) != {k for k in catalog if k[0] == "nte" and k[1] == "w"}:
+        raise ValueError("NTE fork catalog has unverified internal equipment")
+    configured_nte = {
+        (fields[1], fields[2])
+        for line in PAIRS.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+        for fields in [line.split("\t")] if fields[0] == "nte"
+    }
+    if nte_exclusive != configured_nte:
+        raise ValueError(f"NTE exclusive-character matching differs from game table: "
+                         f"missing={nte_exclusive - configured_nte}; "
+                         f"unsupported={configured_nte - nte_exclusive}")
+    return len(sora_rows), len(nte_rows), len(nte_exclusive)
+
+
 def audit_pngs(catalog):
     expected = {
         f"{GAME_DIR[g]}/{role}-{ident}.png"
@@ -152,9 +210,11 @@ def audit_pngs(catalog):
 def main():
     catalog = catalog_entries()
     paired = audit_signature_pairs(catalog)
+    sora_checked, nte_checked, nte_mapped = audit_pinned_game_sources(catalog)
     images = audit_pngs(catalog)
-    print(f"Offline catalog integrity OK: {images} PNGs and {paired} signature mappings, "
-          "no image network requests")
+    print(f"Offline catalog integrity OK: {images} PNGs and {paired} signatures; "
+          f"{sora_checked} Sora game IDs, {nte_checked} NTE forks, "
+          f"{nte_mapped} exclusive NTE mappings; no image network requests")
 
 
 if __name__ == "__main__":
