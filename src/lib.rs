@@ -361,7 +361,12 @@ pub fn optimal_allocation(
     // is the adaptive strategy, not the static allocation's probability.
     let mut answer = Allocation { success_probability: success_probability.clamp(0.0, 1.0), ..Allocation::default() };
     let mut best_fixed = -1.0_f64;
-    for allotted in 0..=flexible {
+    // Once the character banner's maximum stopping time is fully funded,
+    // further character allocation cannot improve its probability. Searching
+    // beyond that point only wastes O(flexible) CPU and removes weapon tickets.
+    let useful_character_budget = character.pmf.len().saturating_sub(1)
+        .saturating_sub(dedicated_character).min(flexible);
+    for allotted in 0..=useful_character_budget {
         let c = dedicated_character.saturating_add(allotted);
         let w = dedicated_weapon.saturating_add(flexible - allotted);
         let fixed = character.at(c) * weapon.at(w);
@@ -383,6 +388,31 @@ mod tests {
             rule: BannerRule::Standard { rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None }, featured_share: share },
             pity: 0, guaranteed, target_copies: count, spark: None, any_rare_pity: 0,
         }
+    }
+
+    #[test]
+    fn static_allocation_bound_preserves_exact_previous_search_results() {
+        let character = Distribution::new(vec![0.0, 0.4, 0.6]);
+        let weapon = Distribution::new(vec![0.0, 0.2, 0.5, 0.3]);
+        for dc in 0..=4 {
+            for dw in 0..=4 {
+                for budget in 0..=40 {
+                    let output = optimal_allocation(&character, &weapon, dc, dw, budget);
+                    let mut reference = (0, 0, -1.0_f64);
+                    for allotment in 0..=budget {
+                        let c = dc + allotment;
+                        let w = dw + budget - allotment;
+                        let score = character.at(c) * weapon.at(w);
+                        if score > reference.2 { reference = (c, w, score); }
+                    }
+                    assert_eq!((output.character_pulls, output.weapon_pulls),
+                               (reference.0, reference.1));
+                }
+            }
+        }
+        let huge = optimal_allocation(&character, &weapon, 0, 0, 50_000_000);
+        assert!(huge.success_probability > 0.999_999);
+        assert_eq!(huge.character_pulls, 0);
     }
 
     #[test]
