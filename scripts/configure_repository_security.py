@@ -14,9 +14,18 @@ import sys
 
 DEFAULT_REPO = "P-JSL/gacha_pickup_calculator"
 RULESET_NAME = "Protect main (verified PR and CI)"
+# Keep in sync with .github/workflows/rust.yml. The new parallel
+# security/performance jobs must not silently disappear from branch protection.
+# A skipped optional PR job is reported by GitHub as successful; every new
+# release nevertheless requires these jobs to finish successfully via needs.
 CHECKS = [
+    "Classify CI scope",
+    "Validate documentation and release contracts",
     "Verify (windows-latest)",
     "Verify (ubuntu-24.04)",
+    "RustSec dependency audit",
+    "Measure probability performance",
+    "Verify bundled image integrity",
     "Audit and scan checked-in offline images",
     "Capture latest-character GUI for README",
     "CodeQL (rust)",
