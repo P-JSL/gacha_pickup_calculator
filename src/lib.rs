@@ -653,7 +653,10 @@ mod tests {
 
     #[test]
     fn star_rail_e6_s5_independent_reference_mean() {
-        let profile = games::GameSetup::new(games::Game::StarRail);
+        let mut profile = games::GameSetup::new(games::Game::StarRail);
+        // Preserve the historical reference fixture, not the fresh-account preset.
+        profile.character.pity = 3;
+        profile.character.guaranteed = true;
         let ch = profile.character.distribution(RateMode::CommunityEstimate).unwrap();
         let lc = profile.weapon.distribution(RateMode::CommunityEstimate).unwrap();
         let both = ch.combine(&lc);
