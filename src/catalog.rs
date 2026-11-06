@@ -1,10 +1,11 @@
 //! Game-specific target identity catalog (UI only). Probability models remain rarity-banner models.
 //! Snapshot sources are documented next to catalog_data.tsv; icons load lazily and asynchronously.
 use eframe::egui;
+use crate::security;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -222,10 +223,15 @@ impl CatalogUi {
         }
         let canonical = candidate.canonicalize().ok()?;
         if !canonical.starts_with(root.canonicalize().ok()?) { return None; }
-        let bytes = fs::read(canonical).ok()?;
-        if bytes.len() as u64 > MAX_ICON_BYTES
-            || !approved_icon_bytes(&bytes)
-            || !bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+        // Read the already-checked path through a single bounded file handle.
+        // An attacker replacing the source between checks cannot supply a
+        // different portrait: its content must match the embedded SHA-256.
+        let handle = fs::File::open(&candidate).ok()?;
+        if !handle.metadata().ok()?.is_file() { return None; }
+        let mut bytes = Vec::new();
+        handle.take(MAX_ICON_BYTES + 1).read_to_end(&mut bytes).ok()?;
+        if !approved_icon_bytes(&bytes)
+            || security::verify_image_bytes(relative, &bytes).is_err()
         { return None; }
         let mut reader = image::ImageReader::new(Cursor::new(bytes))
             .with_guessed_format().ok()?;
