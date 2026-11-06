@@ -173,12 +173,23 @@ jobs:
           path: target/release/Image/
       - name: Actual Linux UI with packaged images
         shell: bash
+        timeout-minutes: 12
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
-          bash scripts/capture_readme_screenshots.sh
+          if timeout --signal=TERM --kill-after=10s 420s bash scripts/capture_readme_screenshots.sh; then
+            echo 'README GUI capture and game selection succeeded.'
+          else
+            code=$?
+            echo "::error::README GUI capture failed or exceeded 420 seconds (exit=$code)."
+            if [ -f /tmp/gacha-documentation-screens.log ]; then
+              tail -n 140 /tmp/gacha-documentation-screens.log || true
+            fi
+            ls -lh ci-readme-shots/ || true
+            exit "$code"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: gacha-readme-screenshots-v015
