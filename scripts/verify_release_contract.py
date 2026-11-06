@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = {
     "src/probability/rates.rs", "src/probability/banners.rs",
-    "src/probability/distributions.rs", "src/domain/games.rs",
+    "src/probability/distributions.rs", "src/probability/fft.rs", "src/domain/games.rs",
     "src/domain/feedback.rs", "src/analysis/observations.rs",
     "src/analysis/tracker.rs", "src/data/catalog.rs",
     "src/data/runtime_updates.rs", "src/data/security.rs",
@@ -17,7 +17,7 @@ REQUIRED = {
     "src/app/controller_session.rs", "src/app/controller_editor.rs",
     "src/app/controller_refunds.rs", "src/app/controller_analytics.rs",
     "src/app/controller_evidence.rs", "src/app/lifecycle.rs",
-    "src/ui/navigation.rs", "src/ui/charts.rs", "src/ui/dashboard.rs",
+    "src/ui/navigation.rs", "src/ui/charts.rs", "src/ui/funding_view.rs", "src/ui/dashboard.rs",
     "src/ui/i18n.rs", "tests/v1_contracts.rs",
 }
 OLD_FLAT = {
@@ -27,6 +27,7 @@ OLD_FLAT = {
 }
 MACROS = re.compile(r'include(?:_bytes|_str)?!\s*\(\s*"([^"]+)"\s*\)')
 MODULE = re.compile(r'#\[path\s*=\s*"([^"]+)"\]\s*(?:pub\s+)?mod\s+[A-Za-z_][A-Za-z_0-9]*')
+SOURCE_INCLUDE = re.compile(r'(?<![A-Za-z])include!\s*\(')
 DOC_LINK = re.compile(r'\]\(([^)]+)\)')
 
 
@@ -48,6 +49,8 @@ def check() -> int:
     inspected = 0
     for path in (ROOT / "src").rglob("*.rs"):
         text = path.read_text(encoding="utf-8")
+        if SOURCE_INCLUDE.search(text):
+            errors.append(f"Legacy source include! in {path.relative_to(ROOT)}")
         for pattern in (MACROS, MODULE):
             for found in pattern.finditer(text):
                 reference = (path.parent / found.group(1)).resolve()

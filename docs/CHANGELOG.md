@@ -1,6 +1,13 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-현재 릴리즈는 **v1.0.0**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+현재 릴리즈는 **v1.0.1**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v1.0.1 (2026-11-07)
+- `src/lib.rs` 및 `src/main.rs`의 crate-root `include!`를 명시적인 Rust 모듈과 crate-private 인터페이스로 전환하고 기존 공개 1.x 라이브러리 API는 재수출로 유지.
+- `app/funding.rs` 확률·재화 계산을 `ui/funding_view.rs`의 위젯·편집 처리와 분리. 게임별 세션·캐릭터 연동·egui 이벤트·재계산 generation 보존.
+- 대형 밀집 분포 합성에 반복형 radix-2 FFT O(N log N) 경로 적용, 소형·희소/비정상 케이스는 기존 직접 합성 이용. FFT 질량 합·음수 오차 검증 및 폴백.
+- 공동 잔여 필요권 분포를 한 번 합성해 6개 목표 성공률을 O(log N) 분위수 질의로 산출. 비환급 적응 배분 결과와 비교하는 회귀 테스트 추가.
+- 검증·복잡도 문서 [ARCHITECTURE](ARCHITECTURE.md), [PERFORMANCE](PERFORMANCE_V1_0_1.md)를 현행화.
 
 ## v1.0.0 (2026-11-06)
 - 안정 API 계약: 4개 게임의 목표 수량·보유권·프리미엄 재화·배너 천장·공식/커뮤니티 확률 모델의 입력 및 결과 호환성 유지.

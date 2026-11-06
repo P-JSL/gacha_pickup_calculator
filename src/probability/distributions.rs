@@ -27,6 +27,7 @@ impl Distribution {
     pub fn quantile(&self, chance: f64) -> usize {
         // A mathematical guarantee must never be shortened by floating-point
         // accumulation or by a tolerance intended for ordinary quantiles.
+        if chance.is_nan() { return self.cdf.len().saturating_sub(1); }
         if chance >= 1.0 { return self.pmf.len().saturating_sub(1); }
         if chance <= 0.0 { return 0; }
         self.cdf.partition_point(|&p| p < chance).min(self.cdf.len().saturating_sub(1))

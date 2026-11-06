@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RateMode {
     /// Use only officially published base and hard guarantee numbers.
