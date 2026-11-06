@@ -1,6 +1,8 @@
+use super::*;
+
 impl Calculator {
 
-    fn dashboard(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn dashboard(&mut self, ui: &mut egui::Ui) {
         let Some(stats) = self.stats.as_ref().filter(|_| self.stats_game == Some(self.setup.game)) else {
             if self.calculating {
                 ui.horizontal(|ui| {

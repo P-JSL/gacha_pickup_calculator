@@ -1,16 +1,18 @@
-const BG: Color32 = Color32::from_rgb(5, 23, 34);
-const CARD: Color32 = Color32::from_rgb(17, 42, 63);
-const MUTED: Color32 = Color32::from_rgb(166, 194, 209);
-const PRIMARY: Color32 = Color32::from_rgb(60, 207, 242);
-const MINT: Color32 = Color32::from_rgb(142, 234, 171);
-const GOLD: Color32 = Color32::from_rgb(244, 210, 75);
-const BORDER: Color32 = Color32::from_rgb(43, 80, 107);
-const SIDEBAR: Color32 = Color32::from_rgb(3, 20, 30);
-const SELECTED_NAV: Color32 = Color32::from_rgb(30, 77, 112);
-const SURFACE: Color32 = Color32::from_rgb(12, 35, 54);
+use super::*;
+
+pub(crate) const BG: Color32 = Color32::from_rgb(5, 23, 34);
+pub(crate) const CARD: Color32 = Color32::from_rgb(17, 42, 63);
+pub(crate) const MUTED: Color32 = Color32::from_rgb(166, 194, 209);
+pub(crate) const PRIMARY: Color32 = Color32::from_rgb(60, 207, 242);
+pub(crate) const MINT: Color32 = Color32::from_rgb(142, 234, 171);
+pub(crate) const GOLD: Color32 = Color32::from_rgb(244, 210, 75);
+pub(crate) const BORDER: Color32 = Color32::from_rgb(43, 80, 107);
+pub(crate) const SIDEBAR: Color32 = Color32::from_rgb(3, 20, 30);
+pub(crate) const SELECTED_NAV: Color32 = Color32::from_rgb(30, 77, 112);
+pub(crate) const SURFACE: Color32 = Color32::from_rgb(12, 35, 54);
 
 /// Paint navigation icons with egui primitives rather than OS/font-specific glyphs.
-fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, color: Color32) {
+pub(crate) fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, color: Color32) {
     let p = |x: f32, y: f32| egui::pos2(center.x + x, center.y + y);
     let stroke = egui::Stroke::new(1.8_f32, color);
     match view {
@@ -74,7 +76,7 @@ fn draw_nav_icon(painter: &egui::Painter, center: egui::Pos2, view: ViewMode, co
 
 /// Crisp DPI-independent sci-fi star orbit and gacha pass artwork.
 /// All geometry is rendered as vectors. No blurry upscaled raster crops.
-fn paint_navigation_art(ui: &egui::Ui) {
+pub(crate) fn paint_navigation_art(ui: &egui::Ui) {
     let rect = ui.max_rect().expand(11.0);
     let painter = ui.painter_at(rect);
     let cyan = Color32::from_rgb(99, 232, 251);
@@ -138,7 +140,7 @@ fn paint_navigation_art(ui: &egui::Ui) {
     }
 }
 
-fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
+pub(crate) fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
     let font = egui::FontId::proportional(13.0);
     let max_width = (button_width - 35.0).max(5.0);
     let fits = |s: &str| ui.fonts(|fonts| {
@@ -156,7 +158,7 @@ fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
     format!("{}...", chars[..low].iter().collect::<String>())
 }
 
-fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
+pub(crate) fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
     view: ViewMode, text: &str) {
     let active = *selected == view;
     let (rect, response) = ui.allocate_exact_size(

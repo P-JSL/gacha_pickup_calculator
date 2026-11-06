@@ -1,3 +1,5 @@
+use super::*;
+
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
@@ -200,7 +202,7 @@ impl eframe::App for Calculator {
 /// One theme and logical-point typography for Windows and Linux.
 /// OS-level DPI still controls physical pixel density, but widget dimensions,
 /// colors and CDF Painter are identical in egui points.
-fn configure_dark_desktop(ctx: &egui::Context) {
+pub(crate) fn configure_dark_desktop(ctx: &egui::Context) {
     ctx.set_theme(egui::Theme::Dark);
     let mut visuals = egui::Visuals::dark();
     visuals.panel_fill = BG;
@@ -229,7 +231,7 @@ fn configure_dark_desktop(ctx: &egui::Context) {
     });
 }
 
-fn install_korean_font(ctx: &egui::Context) {
+pub(crate) fn install_korean_font(ctx: &egui::Context) {
     let locations = [
         r"C:\Windows\Fonts\malgun.ttf",
         r"C:\Windows\Fonts\malgunbd.ttf",

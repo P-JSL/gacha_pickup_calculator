@@ -1,6 +1,8 @@
+use super::*;
+
 impl Calculator {
 
-    fn feedback_controls(&mut self, ui: &mut egui::Ui) -> bool {
+    pub(crate) fn feedback_controls(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
         section(ui, "04", "교환 재화 · 피드백 모델", "획득한 교환 재화를 다음 뽑기에 즉시 재사용합니다.", |ui| {
             dirty |= ui.checkbox(&mut self.feedback_cfg.enabled,
