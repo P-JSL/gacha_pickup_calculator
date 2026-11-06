@@ -114,6 +114,35 @@ def audit_pinned_game_sources(catalog):
     NTE: pinned internal ForkItemData icon/quality/exclusivity metadata.
     This checks data existence, not whether an item is a currently available banner.
     """
+    hsr_rows = {}
+    for line in Path("src/source_snapshot_hsr.tsv").read_text(
+            encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        role, ident, localized, rarity, path = line.split("\t")
+        key = ("hsr", role, ident)
+        if key not in catalog or key in hsr_rows:
+            raise ValueError(f"HSR source ID missing or duplicated: {ident}")
+        current = catalog[key]
+        if current[4] != rarity or not path:
+            raise ValueError(f"HSR rarity/path mismatch: {ident}")
+        # Two March 7th variants and each named/elemental protagonist are
+        # deliberately more descriptive than the base game's placeholder.
+        if role == "w" and current[3] != localized:
+            raise ValueError(f"HSR Light Cone name mismatch: {ident}")
+        if role == "c" and not (
+                current[3] == localized or
+                (ident in {"1001", "1224"} and current[3].startswith(localized + " (")) or
+                (ident in {str(n) for n in range(8001, 8011)}
+                 and localized == "{NICKNAME}" and current[3].startswith("개척자 ("))):
+            raise ValueError(f"HSR character name mismatch: {ident}")
+        hsr_rows[key] = True
+    extra_hsr = {key for key in catalog if key[0] == "hsr"} - set(hsr_rows)
+    if extra_hsr != {("hsr", "c", "upcoming_aeon_aha")}:
+        raise ValueError(f"HSR unverified game data IDs changed: {sorted(extra_hsr)}")
+    if len([k for k in hsr_rows if k[1] == "w"]) != 170:
+        raise ValueError("HSR Light Cone coverage unexpectedly changed")
+
     sora_rows = {}
     for line in Path("src/source_snapshot_sora.tsv").read_text(
             encoding="utf-8").splitlines():
@@ -161,7 +190,7 @@ def audit_pinned_game_sources(catalog):
         raise ValueError(f"NTE exclusive-character matching differs from game table: "
                          f"missing={nte_exclusive - configured_nte}; "
                          f"unsupported={configured_nte - nte_exclusive}")
-    return len(sora_rows), len(nte_rows), len(nte_exclusive)
+    return len(hsr_rows), len(sora_rows), len(nte_rows), len(nte_exclusive)
 
 
 def audit_pngs(catalog):
@@ -210,10 +239,10 @@ def audit_pngs(catalog):
 def main():
     catalog = catalog_entries()
     paired = audit_signature_pairs(catalog)
-    sora_checked, nte_checked, nte_mapped = audit_pinned_game_sources(catalog)
+    hsr_checked, sora_checked, nte_checked, nte_mapped = audit_pinned_game_sources(catalog)
     images = audit_pngs(catalog)
     print(f"Offline catalog integrity OK: {images} PNGs and {paired} signatures; "
-          f"{sora_checked} Sora game IDs, {nte_checked} NTE forks, "
+          f"{hsr_checked} HSR IDs, {sora_checked} Sora game IDs, {nte_checked} NTE forks, "
           f"{nte_mapped} exclusive NTE mappings; no image network requests")
 
 
