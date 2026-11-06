@@ -44,10 +44,18 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
     let exact_shared_required = if feedback.is_none() {
         // Construct the exact residual-ticket distribution once, then reuse
         // its monotone CDF for all six O(log n) quantile lookups.
-        let demand = remaining_shared_distribution(
-            &character, &weapon, request.setup.character_dedicated,
-            request.setup.weapon_dedicated,
-        );
+        let demand = if request.setup.character_dedicated == 0
+            && request.setup.weapon_dedicated == 0
+        {
+            // Most new sessions have no dedicated tickets. The already-built
+            // combined PMF is exactly the residual demand, so reuse it.
+            combined.clone()
+        } else {
+            remaining_shared_distribution(
+                &character, &weapon, request.setup.character_dedicated,
+                request.setup.weapon_dedicated,
+            )
+        };
         Some(CONFIDENCE_LEVELS.map(|confidence|
             demand.quantile(confidence as f64 / 100.0)))
     } else { None };
