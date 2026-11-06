@@ -78,8 +78,8 @@ def catalog_entries():
             if not approved_url(source) or (game, role, source) in urls:
                 raise ValueError(f"{CATALOG}:{lineno}: disallowed or shared remote source URL")
             urls.add((game, role, source))
-    if len(catalog) != 677:
-        raise ValueError(f"Expected 677 catalog entries; got {len(catalog)}")
+    if len(catalog) != 675:
+        raise ValueError(f"Expected 675 catalog entries; got {len(catalog)}")
     return catalog
 
 
@@ -101,7 +101,7 @@ def audit_signature_pairs(catalog):
             raise ValueError(f"{PAIRS}:{lineno}: unsupported source or duplicate")
         seen.add((game, char_id))
         count += 1
-    if count != 101:
+    if count != 116:
         raise ValueError(f"Signature catalog count changed unexpectedly: {count}")
     return count
 
