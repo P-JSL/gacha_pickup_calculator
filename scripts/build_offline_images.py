@@ -184,12 +184,26 @@ def main():
     # This is a strong but not exhaustive identity check: perceptual matches or
     # mislabeled unique portraits still require manual source review.
     hashes = {}
+    # The different elemental forms of the same protagonist can legitimately
+    # share a portrait. Explicitly permit only that exact observed Rover pair.
+    same_subject_variants = {
+        frozenset({"c-1502.png", "c-1604.png"}),
+    }
+    unexpected_duplicates = []
     for path, digest in completed:
         kind = path.name.split("-", 1)[0]
         key = (path.parent.name, kind, digest)
         if key in hashes:
-            raise SystemExit(f"Duplicate packaged artwork: {hashes[key]} and {path}")
-        hashes[key] = path
+            prior = hashes[key]
+            if not (path.parent.name == "WutheringWaves" and
+                    frozenset({prior.name, path.name}) in same_subject_variants):
+                unexpected_duplicates.append((str(prior), str(path)))
+        else:
+            hashes[key] = path
+    if unexpected_duplicates:
+        for prior, current in sorted(unexpected_duplicates):
+            print(f"UNEXPECTED DUPLICATE ART: {prior} and {current}")
+        raise SystemExit(f"Duplicate packaged artwork: {len(unexpected_duplicates)} collisions")
     manifest = ROOT / "SHA256SUMS.txt"
     manifest.write_text(
         "".join(f"{digest}  {path.relative_to(ROOT).as_posix()}\n"
