@@ -24,6 +24,8 @@ pub use distributions::{Allocation, Distribution, optimal_allocation};
 
 #[cfg(test)]
 mod tests {
+    use super::banners::arc_batch_outcomes;
+    use super::rates::NTE_COMMUNITY_FIRST_S_CDF;
     use super::*;
 
     fn always_rare(share: f64, guaranteed: bool, count: usize) -> Banner {

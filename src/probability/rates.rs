@@ -62,7 +62,7 @@ impl RateSchedule {
 /// For pity-free starts, these anchors reproduce the study's cumulative
 /// probability of *first* S-character. Piecewise conditional hazards replace
 /// unknown board positions; they are NOT a complete Markov transition model.
-const NTE_COMMUNITY_FIRST_S_CDF: &[(usize, f64)] = &[
+pub(super) const NTE_COMMUNITY_FIRST_S_CDF: &[(usize, f64)] = &[
     (0, 0.0), (10, 0.0913), (20, 0.1788), (30, 0.2559),
     (40, 0.3281), (50, 0.3917), (60, 0.4500), (70, 0.5027),
     (71, 0.5986), (80, 0.9424), (89, 0.9918),
