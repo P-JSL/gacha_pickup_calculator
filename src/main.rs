@@ -401,12 +401,13 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         }
     };
     let shortage = |ui: &mut egui::Ui| {
-        ui.label(RichText::new(t(language, "Additional funding needed")).color(GOLD).strong());
+        ui.label(RichText::new(t(language, "Additional featured ticket equivalents"))
+            .color(GOLD).strong());
         ui.label(RichText::new(format!(
             "+{} {}  ·  +{} {}",
-            gap.additional_shared, t(language, "Pulls"),
+            gap.additional_shared, t(language, "Featured ticket equivalents"),
             gap.additional_currency, native,
-        )).size(17.0).strong().color(
+        )).size(16.0).strong().color(
             if gap.additional_shared == 0 { MINT } else { GOLD },
         ));
         ui.small(format!(
@@ -441,13 +442,31 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         shortage(ui);
     }
     ui.add_space(5.0);
-    ui.label(RichText::new(format!(
-        "{} {}{} + {} {} ({}{}).",
-        t(language, "Already owned flexible passes"), setup.flexible,
-        t(language, "Passes"),
-        setup.premium_currency, native,
-        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
-    )).color(MUTED).size(11.0));
+    if setup.game.shares_featured_ticket() {
+        ui.label(RichText::new(format!(
+            "{} {}{} + {} {} ({}{}).",
+            i18n::ticket_name(language, setup.game, false), setup.flexible,
+            t(language, "Passes"),
+            setup.premium_currency, native,
+            setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+    } else {
+        let weapon_inventory = if setup.game == Game::StellaSora {
+            format!("{} {} ({}{})",
+                setup.weapon_ticket_inventory(), t(language, "Currency units"),
+                setup.weapon_dedicated, t(language, "Pulls"))
+        } else {
+            format!("{}{}", setup.weapon_dedicated, t(language, "Passes"))
+        };
+        ui.label(RichText::new(format!(
+            "{} {}{} · {} {} · {} {} ({}{}).",
+            i18n::ticket_name(language, setup.game, false),
+            setup.character_dedicated, t(language, "Passes"),
+            i18n::ticket_name(language, setup.game, true), weapon_inventory,
+            setup.premium_currency, native,
+            setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+    }
     ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
         .color(MUTED).size(11.0));
     if setup.game == Game::StellaSora {
@@ -1329,7 +1348,7 @@ impl Calculator {
                 let game = self.setup.game;
                 if game.shares_featured_ticket() {
                     ui.label(RichText::new(format!(
-                        "캐릭터·광추 공용 · {}", game.character_ticket_name()
+                        "캐릭터·광추 동일 한정 전용권 · {}", game.character_ticket_name()
                     )).color(PRIMARY).strong());
                     changed |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
                     ui.label(RichText::new(
@@ -1367,7 +1386,7 @@ impl Calculator {
                 ui.horizontal_wrapped(|ui| {
                     let currency = game.currency_name();
                     let price = game.cost_per_pull();
-                    ui.label(format!("공용 전환 재화 · {currency}"));
+                    ui.label(format!("전용 뽑기권 교환 재화 · {currency}"));
                     changed |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
                         .range(0..=100_000_000).speed(1).suffix("개")).changed();
                     ui.label(RichText::new(format!(
@@ -1377,7 +1396,7 @@ impl Calculator {
                     )).color(MINT));
                 });
                 ui.label(RichText::new(
-                    "전용권은 각 배너에만 사용하고, 공용 전환 재화는 계산 엔진이 두 배너에 배분합니다."
+                    "캐릭터와 장비 전용권은 지정 배너에서만 사용합니다. 교환 가능한 재화는 두 배너에 중복 계산 없이 배분합니다."
                 ).color(MUTED).size(11.0));
             });
         changed
@@ -1694,7 +1713,7 @@ impl Calculator {
         };
         ui.add_space(8.0);
         section(ui, "07", "현재 보유량 대비 목표 달성 추가 비용",
-            "기보유 캐릭터·장비, 전용권과 공용 재화를 반영한 목표 달성 비용입니다.",
+            "기보유 캐릭터·장비, 배너별 전용권 및 교환 재화를 반영한 목표 달성 비용입니다.",
             |ui| {
                 if let Some(gap) = self.current_goal_funding() {
                     render_goal_funding(ui, &gap, &self.setup, self.language());
