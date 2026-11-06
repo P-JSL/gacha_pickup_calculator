@@ -556,11 +556,11 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
 pub fn estimate(setup: &GameSetup, mode: RateMode,
                 model: &FeedbackConfig) -> Result<FeedbackEstimate, String> {
     model.validate()?;
-    // This estimator is public and may be called without the UI's preceding
-    // exact DP calculation. Reject invalid or impossible banner transitions
-    // before entering potentially unbounded sampling loops.
-    setup.character.distribution(mode)?;
-    setup.weapon.distribution(mode)?;
+    // This estimator is public and can be called without the UI's exact
+    // DP. Validate the same input bounds without redundantly constructing two
+    // full distributions (or doing so three times for WuWa strategies).
+    setup.character.validate_inputs()?;
+    setup.weapon.validate_inputs()?;
     for (banner, extra) in [
         (&setup.character, model.character_other_five_star_rate),
         (&setup.weapon, model.weapon_other_five_star_rate),
