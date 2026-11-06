@@ -666,7 +666,9 @@ mod tests {
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
             weapon_four_star_rate: 0.0, character_other_five_star_rate: 0.0,
             weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10,
-            wuwa_waveband_max: 0, wuwa_waveband_cost: 360 };
+            wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+            nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+            stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0 };
         let mut w = Wallet::new(&conf);
         let mut d = 0;
         w.pay(&mut d);
@@ -950,6 +952,90 @@ mod tests {
         assert_eq!(wallet.initial_flexible_required, 1);
         assert_eq!(wallet.raw_pulls, 4);
         assert_eq!(RefundScenario::from_wallet(&wallet, 0).points_funded_pulls, 3);
+    }
+
+    #[test]
+    fn nte_board_dice_are_reusable_after_the_roll_not_before() {
+        let mut setup = GameSetup::new(Game::Neverness);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 3,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut cfg = FeedbackConfig::for_game(Game::Neverness);
+        cfg.samples = 10;
+        cfg.nte_one_die_chance = 1.0;
+        cfg.nte_five_dice_chance = 0.0;
+        cfg.featured_first = 0;
+        cfg.featured_duplicate = 0;
+        cfg.featured_maxed = 0;
+        let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let scenario = &result.scenarios[0];
+        assert_eq!(scenario.raw_pulls, 3);
+        assert_eq!(scenario.initial_flexible_required, 1);
+        assert_eq!(scenario.board_dice_earned, 3);
+        assert_eq!(result.average_board_dice_earned, 3.0);
+        cfg.nte_five_dice_chance = 0.1;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stella_record_only_credit_cannot_pay_for_character_pulls() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 10,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.samples = 10;
+        cfg.featured_duplicate = 0;
+        cfg.weapon_rare = 0;
+        cfg.weapon_first = 0;
+        cfg.off_banner_rare = 0;
+        cfg.character_four_star_rate = 0.0;
+        cfg.weapon_four_star_rate = 0.0;
+        cfg.four_star_reward = 0;
+        cfg.weapon_four_star_reward = 0;
+        let actual = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(actual.average_record_disc_units_earned, 300.0);
+        assert_eq!(actual.scenarios[0].initial_flexible_required, 10);
+        assert_eq!(actual.scenarios[0].dedicated_used, 1);
+        cfg.stella_record_discs_per_character_pull = 0;
+        let disabled = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(disabled.scenarios[0].initial_flexible_required, 11);
+    }
+
+    #[test]
+    fn first_ten_multiplier_requires_explicit_account_remaining_count() {
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.stella_first_ten_remaining = 2;
+        let mut wallet = Wallet::new(&cfg);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        assert_eq!(wallet.points, 280); // 3*40 + 3*40 + 40
+        assert_eq!(wallet.record_disc_units, 90);
+        cfg.stella_first_ten_remaining = 11;
+        assert!(cfg.validate().is_err());
     }
 
     #[test]
