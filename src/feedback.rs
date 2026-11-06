@@ -46,6 +46,14 @@ pub struct FeedbackConfig {
     /// limited-character Wavebands before converting the rest to tickets.
     pub wuwa_waveband_max: usize,
     pub wuwa_waveband_cost: usize,
+    /// Approximate per-board-roll chance of an extra character die (NTE only).
+    pub nte_one_die_chance: f64,
+    /// Approximate per-board-roll chance of five extra character dice (NTE only).
+    pub nte_five_dice_chance: f64,
+    /// Stella Sora limited recruitment awards Gold Disc units, never character passes.
+    pub stella_record_discs_per_character_pull: usize,
+    /// Account-specific first-time boosted character draws; zero if unknown or claimed.
+    pub stella_first_ten_remaining: usize,
 }
 
 impl FeedbackConfig {
@@ -61,6 +69,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
@@ -72,6 +82,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::Neverness => Self {
                 // Warp Pieces can buy dice / Tri-Keys. The 24-piece price and
@@ -85,6 +97,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0157, nte_five_dice_chance: 0.0038,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::StellaSora => Self {
                 // Expert Permits: duplicate 5★ Trekker / Disc = 200,
@@ -100,6 +114,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 30, stella_first_ten_remaining: 0,
             },
         }
     }
@@ -115,7 +131,12 @@ impl FeedbackConfig {
             || !valid_probability(self.character_four_star_rate)
             || !valid_probability(self.weapon_four_star_rate)
             || !valid_probability(self.character_other_five_star_rate)
-            || !valid_probability(self.weapon_other_five_star_rate) {
+            || !valid_probability(self.weapon_other_five_star_rate)
+            || !valid_probability(self.nte_one_die_chance)
+            || !valid_probability(self.nte_five_dice_chance)
+            || self.nte_one_die_chance + self.nte_five_dice_chance > 1.0
+            || self.stella_record_discs_per_character_pull > 300
+            || self.stella_first_ten_remaining > 10 {
             return Err("환급 설정의 가격·확률·표본 수가 허용 범위를 벗어났습니다.".to_owned());
         }
         Ok(())
@@ -139,6 +160,8 @@ pub struct RefundScenario {
     pub earned_points: usize,
     pub wavebands_purchased: usize,
     pub corals_spent_on_wavebands: usize,
+    pub board_dice_earned: usize,
+    pub record_disc_units_earned: usize,
 }
 impl RefundScenario {
     fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
@@ -152,6 +175,8 @@ impl RefundScenario {
             earned_points: wallet.points - starting_points,
             wavebands_purchased: wallet.wavebands_bought,
             corals_spent_on_wavebands: wallet.waveband_points_spent,
+            board_dice_earned: wallet.board_dice_earned,
+            record_disc_units_earned: wallet.record_disc_units,
         };
         debug_assert_eq!(scenario.raw_pulls,
             scenario.dedicated_used + scenario.points_funded_pulls
@@ -183,6 +208,12 @@ pub struct FeedbackEstimate {
     pub total_returned_points_average: f64,
     pub average_wavebands_purchased: f64,
     pub average_waveband_corals_spent: f64,
+    pub average_character_raw: f64,
+    pub average_weapon_raw: f64,
+    pub average_character_return_points: f64,
+    pub average_weapon_return_points: f64,
+    pub average_board_dice_earned: f64,
+    pub average_record_disc_units_earned: f64,
 }
 
 impl FeedbackEstimate {
@@ -266,12 +297,19 @@ struct Wallet {
     raw_pulls: usize,
     waveband_points_spent: usize,
     wavebands_bought: usize,
+    board_dice_earned: usize,
+    record_disc_units: usize,
+    stella_first_ten_remaining: usize,
+    reward_multiplier: usize,
 }
 impl Wallet {
     fn new(model: &FeedbackConfig) -> Self {
         Self { points: model.initial_points, price: model.points_per_ticket,
             common_spent: 0, initial_flexible_required: 0, raw_pulls: 0,
-            waveband_points_spent: 0, wavebands_bought: 0 }
+            waveband_points_spent: 0, wavebands_bought: 0,
+            board_dice_earned: 0, record_disc_units: 0,
+            stella_first_ten_remaining: model.stella_first_ten_remaining,
+            reward_multiplier: 1 }
     }
     /// The ticket for the current pull is payable only with returns obtained *before* that pull.
     fn pay(&mut self, dedicated_remaining: &mut usize) {
@@ -282,7 +320,20 @@ impl Wallet {
             self.reconcile_funding();
         }
     }
-    fn refund(&mut self, reward: usize) { self.points += reward; }
+    fn refund(&mut self, reward: usize) {
+        self.points += reward * self.reward_multiplier;
+    }
+
+    /// Activate optional account-specific first-ten rewards and accrue record-only discs.
+    fn begin_character_pull(&mut self, model: &FeedbackConfig) {
+        self.record_disc_units += model.stella_record_discs_per_character_pull;
+        self.reward_multiplier = if self.stella_first_ten_remaining > 0 {
+            self.stella_first_ten_remaining -= 1;
+            3
+        } else {
+            1
+        };
+    }
     fn reconcile_funding(&mut self) {
         // Corals spent on a Waveband cannot also subsidize a ticket.
         let recycled = self.points.saturating_sub(self.waveband_points_spent) / self.price;
