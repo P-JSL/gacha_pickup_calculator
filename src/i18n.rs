@@ -154,6 +154,7 @@ pub fn t(language: Language, text: &'static str) -> &'static str {
         "Additional featured ticket equivalents" => ["추가 필요 전용 뽑기권(환산)", "Additional featured ticket equivalents", "追加の限定募集券換算", "还需限定抽卡券（折算）", "還需限定抽卡券（折算）"],
         "Featured ticket equivalents" => ["전용권 상당", "featured-ticket equivalents", "限定券相当", "限定券等价", "限定券等價"],
         "Copies unit" => ["장", "copies", "枚", "份", "份"],
+        "Currency units" => ["개", "units", "個", "个", "個"],
         "Target confidence" => ["목표 성공률", "Target success rate", "目標達成率", "目标成功率", "目標成功率"],
         "Refund-simulation estimate" => ["환급 재투입 포함 · 표본 추정", "Including recycled refunds · simulated", "還元再投入込み・推定", "包含返还循环 · 抽样估算", "包含回饋循環 · 抽樣估算"],
         "Exact probability model" => ["환급 제외 · 정확 DP", "Without refunds · exact DP", "還元なし・厳密DP", "不含返还 · 精确DP", "不含回饋 · 精確DP"],
