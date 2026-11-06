@@ -85,6 +85,9 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
     let columns: Vec<String> = lines[0].1.split(delimiter)
         .map(|s| s.trim().trim_matches('"').to_ascii_lowercase())
         .collect();
+    if columns.iter().enumerate().any(|(i, name)| columns[..i].contains(name)) {
+        return Err("CSV 헤더에 중복된 열 이름이 있습니다.".into());
+    }
     let find = |field: &str| -> Option<usize> {
         columns.iter().position(|col| col == field)
     };
@@ -94,10 +97,17 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         && find("censored").is_some();
     let has_completed = find("pity").is_some()
         && (find("count").is_some() || find("events").is_some());
-    // A partial aggregate header is not a completed-only histogram:
-    // silently dropping a provided risk set would produce a biased result.
-    if find("at_risk").is_some() && !has_risk {
+    // Never silently reinterpret an incomplete risk-set schema as a
+    // completed-only histogram: censoring would be lost and bias the CDF.
+    if (find("at_risk").is_some() || find("censored").is_some()) && !has_risk {
         return Err("위험집합 자료는 pity,at_risk,events,censored 네 개 열이 모두 필요합니다.".into());
+    }
+    if (find("duration").is_some() || find("event").is_some()) && !has_duration {
+        return Err("개별 관측 자료는 duration,event 두 개 열이 모두 필요합니다.".into());
+    }
+    if (has_duration && find("pity").is_some())
+        || (has_risk && (has_duration || find("count").is_some())) {
+        return Err("서로 다른 관측 형식을 하나의 CSV 헤더에 섞을 수 없습니다.".into());
     }
     let quality = if has_duration {
         ObservationQuality::IndividualRightCensored
@@ -402,8 +412,19 @@ mod tests {
 
     #[test]
     fn partial_risk_set_header_cannot_be_interpreted_as_completed_only() {
-        let csv = "pity,at_risk,events\n1,100,5\n2,95,6\n";
-        assert!(parse_observation_csv(csv, 90).is_err());
+        for csv in [
+            "pity,at_risk,events\n1,100,5\n2,95,6\n",
+            "pity,events,censored\n1,5,3\n",
+            "pity,count,censored\n1,5,3\n",
+            "pity,at_risk,count\n1,10,5\n",
+            "pity,at_risk,events,censored,count\n1,10,5,5,5\n",
+            "duration,pity,count\n1,1,1\n",
+            "duration,event,pity,count\n1,1,1,1\n",
+            "duration,duration,event\n1,1,1\n",
+            "pity,pity,count\n1,1,2\n",
+        ] {
+            assert!(parse_observation_csv(csv, 90).is_err(), "{csv}");
+        }
     }
 
     #[test]
