@@ -7,7 +7,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, Read};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use crate::runtime_updates::VerifiedBundle;
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind { Character, Weapon }
@@ -56,7 +58,7 @@ const PINNED_GACHABASE_ICONS: &[&str] = &[
 const MAX_ICON_BYTES: u64 = 512 * 1024;
 const MAX_ICON_SIDE: u32 = 256;
 
-fn approved_icon_url(url: &str) -> bool {
+pub(crate) fn approved_icon_url(url: &str) -> bool {
     if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
         return false;
     }
@@ -163,10 +165,12 @@ pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
     });
     lookup.get(&(game, kind))?.get(id).copied()
 }
+#[cfg(test)]
 pub fn first(game: Game, kind: Kind) -> String {
     entries().iter().find(|x| x.game == game && x.kind == kind && x.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
+#[cfg(test)]
 pub fn count(game: Game, kind: Kind) -> usize {
     entries().iter().filter(|x| x.game == game && x.kind == kind).count()
 }
@@ -195,17 +199,92 @@ pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry
     by_id(game, Kind::Weapon, weapon_id).filter(|entry| entry.rarity >= 5)
 }
 
-type ImageResult = (String, Option<egui::ColorImage>);
+/// Runtime updates use a single immutable snapshot, published only after the
+/// entire manifest, roster and signature graph have been validated.
+struct ActiveCatalog {
+    entries: Arc<Vec<Entry>>,
+    ids: HashMap<(Game, Kind, String), usize>,
+    pairs: HashMap<(Game, String), String>,
+    hashes: HashMap<String, [u8; 32]>,
+    image_dir: PathBuf,
+}
+static LIVE: OnceLock<RwLock<Option<Arc<ActiveCatalog>>>> = OnceLock::new();
+
+fn snapshot_from_lock(
+    lock: &RwLock<Option<Arc<ActiveCatalog>>>,
+) -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
+    // Never call PoisonError::into_inner: a panicking writer might have left
+    // the active catalog in an inconsistent state.
+    Ok(lock.read().map_err(|_| "카탈로그 공유 상태가 poisoned 되었습니다.")?.clone())
+}
+fn active() -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
+    snapshot_from_lock(LIVE.get_or_init(|| RwLock::new(None)))
+}
+
+pub fn publish_verified(bundle: VerifiedBundle) -> Result<(), &'static str> {
+    let mut ids = HashMap::with_capacity(bundle.entries.len());
+    for (index, entry) in bundle.entries.iter().enumerate() {
+        ids.insert((entry.game, entry.kind, entry.id.clone()), index);
+    }
+    let snapshot = Arc::new(ActiveCatalog {
+        entries: Arc::new(bundle.entries), ids,
+        pairs: bundle.pairs, hashes: bundle.hashes, image_dir: bundle.image_dir,
+    });
+    let lock = LIVE.get_or_init(|| RwLock::new(None));
+    *lock.write().map_err(|_| "Poisoned RwLock: 갱신을 중단했습니다.")? = Some(snapshot);
+    Ok(())
+}
+pub fn live_entries() -> Arc<Vec<Entry>> {
+    static BASE: OnceLock<Arc<Vec<Entry>>> = OnceLock::new();
+    if let Ok(Some(snapshot)) = active() { return Arc::clone(&snapshot.entries); }
+    Arc::clone(BASE.get_or_init(|| Arc::new(entries().to_vec())))
+}
+pub fn live_by_id(game: Game, kind: Kind, id: &str) -> Option<Entry> {
+    match active() {
+        Ok(Some(snapshot)) => snapshot.ids.get(&(game, kind, id.to_owned()))
+            .and_then(|index| snapshot.entries.get(*index)).cloned(),
+        Ok(None) => by_id(game, kind, id).cloned(),
+        Err(_) => None, // poisoned state: do not use potentially corrupt data
+    }
+}
+pub fn live_first(game: Game, kind: Kind) -> String {
+    live_entries().iter()
+        .find(|e| e.game == game && e.kind == kind && e.is_featured_target())
+        .map(|e| e.id.clone()).unwrap_or_default()
+}
+pub fn live_count(game: Game, kind: Kind) -> usize {
+    live_entries().iter().filter(|e| e.game == game && e.kind == kind).count()
+}
+pub fn live_signature_weapon(game: Game, character_id: &str) -> Option<Entry> {
+    match active() {
+        Ok(Some(snapshot)) => {
+            let weapon_id = snapshot.pairs.get(&(game, character_id.to_owned()))?;
+            let index = snapshot.ids.get(&(game, Kind::Weapon, weapon_id.clone()))?;
+            snapshot.entries.get(*index).cloned().filter(|e| e.rarity >= 5)
+        }
+        Ok(None) => signature_weapon(game, character_id).cloned(),
+        Err(_) => None,
+    }
+}
+pub(crate) fn runtime_digest(key: &str) -> Result<Option<[u8; 32]>, &'static str> {
+    Ok(active()?.and_then(|snapshot| snapshot.hashes.get(key).copied()))
+}
+pub(crate) fn active_image_dir() -> Option<PathBuf> {
+    active().ok().flatten().map(|snapshot| snapshot.image_dir.clone())
+}
+
+type ImageResult = (u64, String, Option<egui::ColorImage>);
 pub struct CatalogUi {
     textures: HashMap<String, Option<egui::TextureHandle>>,
     queued: HashSet<String>,
-    send_url: Sender<String>,
+    send_url: Sender<(u64, String)>,
+    generation: u64,
     recv_image: Receiver<ImageResult>,
 }
 
 impl CatalogUi {
     pub fn new(ctx: &egui::Context) -> Self {
-        let (send_url, recv_url) = mpsc::channel::<String>();
+        let (send_url, recv_url) = mpsc::channel::<(u64, String)>();
         let (send_image, recv_image) = mpsc::channel::<ImageResult>();
         // Bounded image I/O: one slow icon must not block the rest of the visible catalog.
         // Each worker locks the queue only while receiving its next URL.
@@ -223,15 +302,15 @@ impl CatalogUi {
                         },
                         Err(_) => break,
                     };
-                    let pixels = Self::fetch_icon(&url);
-                    if send_image.send((url, pixels)).is_err() { break }
+                    let pixels = Self::fetch_icon(&url.1);
+                    if send_image.send((url.0, url.1, pixels)).is_err() { break }
                     repaint.request_repaint();
                 }
             });
         }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
-            send_url, recv_image,
+            send_url, recv_image, generation: 0,
         }
     }
 
@@ -249,46 +328,60 @@ impl CatalogUi {
         { return None; }
 
         let executable = std::env::current_exe().ok()?;
-        let root = executable.parent()?.join("Image");
-        let candidate = root.join(game).join(file);
-        let metadata = fs::symlink_metadata(&candidate).ok()?;
-        if !metadata.file_type().is_file() || metadata.len() > MAX_ICON_BYTES {
-            return None;
+        let local = executable.parent()?.join("Image");
+        let roots = [active_image_dir(), Some(local)];
+        for root in roots.into_iter().flatten() {
+            let candidate = root.join(game).join(file);
+            let Some(decoded) = (|| {
+                let metadata = fs::symlink_metadata(&candidate).ok()?;
+                if !metadata.file_type().is_file() || metadata.len() > MAX_ICON_BYTES {
+                    return None;
+                }
+                if !candidate.canonicalize().ok()?.starts_with(root.canonicalize().ok()?) {
+                    return None;
+                }
+                // No lock is held during disk I/O or decompression.
+                let handle = fs::File::open(&candidate).ok()?;
+                if !handle.metadata().ok()?.is_file() { return None; }
+                let mut bytes = Vec::new();
+                handle.take(MAX_ICON_BYTES + 1).read_to_end(&mut bytes).ok()?;
+                if !approved_icon_bytes(&bytes)
+                    || security::verify_image_bytes(relative, &bytes).is_err()
+                { return None; }
+                let mut reader = image::ImageReader::new(Cursor::new(bytes))
+                    .with_guessed_format().ok()?;
+                if reader.format() != Some(image::ImageFormat::Png) { return None; }
+                let mut limits = image::Limits::default();
+                limits.max_image_width = Some(MAX_ICON_SIDE);
+                limits.max_image_height = Some(MAX_ICON_SIDE);
+                limits.max_alloc = Some(8 * 1024 * 1024);
+                reader.limits(limits);
+                let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
+                Some(egui::ColorImage::from_rgba_unmultiplied(
+                    [image.width() as usize, image.height() as usize], image.as_raw(),
+                ))
+            })() else { continue };
+            return Some(decoded);
         }
-        let canonical = candidate.canonicalize().ok()?;
-        if !canonical.starts_with(root.canonicalize().ok()?) { return None; }
-        // Read the already-checked path through a single bounded file handle.
-        // An attacker replacing the source between checks cannot supply a
-        // different portrait: its content must match the embedded SHA-256.
-        let handle = fs::File::open(&candidate).ok()?;
-        if !handle.metadata().ok()?.is_file() { return None; }
-        let mut bytes = Vec::new();
-        handle.take(MAX_ICON_BYTES + 1).read_to_end(&mut bytes).ok()?;
-        if !approved_icon_bytes(&bytes)
-            || security::verify_image_bytes(relative, &bytes).is_err()
-        { return None; }
-        let mut reader = image::ImageReader::new(Cursor::new(bytes))
-            .with_guessed_format().ok()?;
-        if reader.format() != Some(image::ImageFormat::Png) { return None; }
-        let mut limits = image::Limits::default();
-        limits.max_image_width = Some(MAX_ICON_SIDE);
-        limits.max_image_height = Some(MAX_ICON_SIDE);
-        limits.max_alloc = Some(8 * 1024 * 1024);
-        reader.limits(limits);
-        let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
-        Some(egui::ColorImage::from_rgba_unmultiplied(
-            [image.width() as usize, image.height() as usize], image.as_raw(),
-        ))
+        None
     }
 
     pub fn pump(&mut self, ctx: &egui::Context) {
-        while let Ok((url, decoded)) = self.recv_image.try_recv() {
+        while let Ok((generation, url, decoded)) = self.recv_image.try_recv() {
+            if generation != self.generation { continue; }
             self.queued.remove(&url);
             let texture = decoded.map(|img| {
                 ctx.load_texture(format!("catalog:{}", url), img, egui::TextureOptions::LINEAR)
             });
             self.textures.insert(url, texture);
         }
+    }
+
+    /// Drop previous-version textures and suppress late image-worker responses.
+    pub fn invalidate_after_update(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.textures.clear();
+        self.queued.clear();
     }
 
     /// Failed icon requests can be retried without clearing successfully cached images.
@@ -307,7 +400,7 @@ impl CatalogUi {
         let key = format!("{game}/{role}-{}.png", entry.id);
         if !self.textures.contains_key(&key) && !self.queued.contains(&key) {
             self.queued.insert(key.clone());
-            if self.send_url.send(key.clone()).is_err() {
+            if self.send_url.send((self.generation, key.clone())).is_err() {
                 self.queued.remove(&key);
             }
         }
@@ -346,7 +439,7 @@ pub fn picker(
         .resizable(true)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(format!("등록 {}개", count(game, kind)));
+                ui.label(format!("등록 {}개", live_count(game, kind)));
                 ui.add(egui::TextEdit::singleline(filter)
                     .hint_text("캐릭터/광추/무기/아크/레코드 검색")
                     .desired_width(245.0));
@@ -364,7 +457,8 @@ pub fn picker(
             }
             ui.separator();
             let needle = filter.trim().to_lowercase();
-            let items: Vec<&Entry> = entries().iter().filter(|entry| {
+            let snapshot = live_entries();
+            let items: Vec<&Entry> = snapshot.iter().filter(|entry| {
                 entry.game == game && entry.kind == kind
                     && (needle.is_empty() || entry.name.to_lowercase().contains(&needle)
                         || entry.id.contains(&needle))
@@ -403,6 +497,17 @@ pub fn picker(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn poisoned_catalog_lock_refuses_to_read_unvalidated_state() {
+        let isolated = Arc::new(RwLock::new(None));
+        let writer = Arc::clone(&isolated);
+        assert!(std::thread::spawn(move || {
+            let _guard = writer.write().expect("fresh lock");
+            panic!("intentional write-lock poisoning");
+        }).join().is_err());
+        assert!(snapshot_from_lock(&isolated).is_err());
+    }
     #[test]
     fn upcoming_and_released_characters_are_prioritized() {
         assert_eq!(first(Game::StarRail, Kind::Character), "1511");

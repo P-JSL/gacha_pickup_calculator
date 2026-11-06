@@ -56,13 +56,22 @@ fn approved_image_key(key: &str) -> bool {
         b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+/// Used by the updater to avoid re-downloading unchanged embedded assets.
+/// This map is immutable and independent of runtime (potentially poisoned) locks.
+pub(crate) fn baseline_digest(relative: &str) -> Option<[u8; 32]> {
+    image_digests().get(relative).copied()
+}
+
 /// An image is trusted only if its bytes match the compile-time manifest.
 pub fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'static str> {
     if bytes.len() as u64 > MAX_IMAGE_BYTES || !bytes.starts_with(PNG_MAGIC) {
         return Err("Image is not an approved bounded PNG.");
     }
-    let expected = image_digests().get(relative)
-        .ok_or("Image is not in the immutable asset manifest.")?;
+    // A successfully published update replaces the manifest atomically with
+    // its catalog. An RwLock poisoned during publication is a hard error.
+    let expected = crate::catalog::runtime_digest(relative)?
+        .or_else(|| baseline_digest(relative))
+        .ok_or("Image is not in a verified asset manifest.")?;
     let actual = Sha256::digest(bytes);
     if actual.as_slice() != expected {
         return Err("Local artwork differs from the signed-release source snapshot.");

@@ -15,6 +15,7 @@ mod dashboard_ui;
 mod catalog;
 mod i18n;
 mod security;
+mod runtime_updates;
 use i18n::{Language, LanguagePreference, t};
 
 const BG: Color32 = Color32::from_rgb(5, 23, 34);
@@ -354,12 +355,12 @@ fn apply_catalog_choice(
     game: Game, kind: catalog::Kind, id: &str,
     character: &mut String, weapon: &mut String,
 ) -> bool {
-    let Some(entry) = catalog::by_id(game, kind, id) else { return false; };
+    let Some(entry) = catalog::live_by_id(game, kind, id) else { return false; };
     if !entry.is_featured_target() { return false; }
     match kind {
         catalog::Kind::Character => {
             *character = id.to_owned();
-            *weapon = catalog::signature_weapon(game, id)
+            *weapon = catalog::live_signature_weapon(game, id)
                 .map(|signature| signature.id.clone()).unwrap_or_default();
             // Unknown signature: clear the previous character's equipment rather
             // than silently presenting an unrelated five-star as this one's own.
@@ -371,8 +372,8 @@ fn apply_catalog_choice(
 
 impl GameSession {
     fn defaults(game: Game) -> Self {
-        let character_id = catalog::first(game, catalog::Kind::Character);
-        let weapon_id = catalog::signature_weapon(game, &character_id)
+        let character_id = catalog::live_first(game, catalog::Kind::Character);
+        let weapon_id = catalog::live_signature_weapon(game, &character_id)
             .map(|entry| entry.id.clone()).unwrap_or_default();
         Self {
             setup: GameSetup::new(game),
@@ -425,6 +426,7 @@ struct Calculator {
     show_history: bool,
     search_query: String,
     catalog_ui: catalog::CatalogUi,
+    updates: runtime_updates::UpdateManager,
     picker_kind: Option<catalog::Kind>,
     picker_filter: String,
     selected_character_id: String,
@@ -500,6 +502,7 @@ impl Calculator {
             show_history: false,
             search_query: String::new(),
             catalog_ui: catalog::CatalogUi::new(&cc.egui_ctx),
+            updates: runtime_updates::UpdateManager::new(),
             picker_kind: None,
             picker_filter: String::new(),
             selected_character_id: initial_selection.character_id,
@@ -542,12 +545,12 @@ impl Calculator {
             catalog::Kind::Character => self.selected_character_id.clone(),
             catalog::Kind::Weapon => self.selected_weapon_id.clone(),
         };
-        let item = catalog::by_id(game, kind, &id);
+        let item = catalog::live_by_id(game, kind, &id);
         ui.horizontal(|ui| {
-            if let Some(item) = item {
+            if let Some(item) = item.as_ref() {
                 self.catalog_ui.image(ui, item, 30.0);
             }
-            let name = item.map(|x| x.name.as_str()).unwrap_or_else(|| {
+            let name = item.as_ref().map(|x| x.name.as_str()).unwrap_or_else(|| {
                 if kind == catalog::Kind::Weapon {
                     t(self.language(), "Signature unverified (select manually)")
                 } else {
@@ -885,6 +888,30 @@ impl Calculator {
             ui.checkbox(&mut self.ui_preferences.show_chart_fill, t(language, "Fill area under probability curves"));
             ui.checkbox(&mut self.ui_preferences.show_hover_guides, t(language, "Show in-chart hover probability"));
             ui.checkbox(&mut self.ui_preferences.compact_spacing, t(language, "Compact spacing"));
+        });
+        ui.add_space(10.0);
+        section(ui, "03", "게임 데이터 · 프로그램 업데이트",
+            "실행 시 최신 커밋을 확인하고, 검증된 게임 데이터와 이미지만 자동 반영합니다.", |ui| {
+            ui.label(RichText::new(&self.updates.message).color(MUTED).size(12.0));
+            if let Some(rev) = &self.updates.revision {
+                ui.label(format!("적용된 데이터 revision: {rev}"));
+            }
+            if let Some(version) = &self.updates.release {
+                ui.colored_label(MINT, format!(
+                    "새 프로그램 버전 {version} 확인 · 자동 설치 대신 검증된 릴리즈 페이지에서 설치"
+                ));
+                ui.hyperlink_to("최신 릴리즈 열기", runtime_updates::RELEASE_PAGE);
+            } else {
+                ui.label(format!("현재 프로그램: v{}", env!("CARGO_PKG_VERSION")));
+            }
+            if ui.add_enabled(!self.updates.is_running(),
+                egui::Button::new("지금 업데이트 확인")).clicked() {
+                self.updates.start(ui.ctx());
+            }
+            ui.label(RichText::new(
+                "오프라인·검증 실패·poisoned 잠금 상태에서는 기존 검증 데이터를 유지합니다. \
+                 캐릭터-전용 장비 관계는 임의로 추론하지 않습니다."
+            ).color(MUTED).size(11.0));
         });
         ui.add_space(12.0);
         if ui.button(t(language, "Restore defaults")).clicked() {
@@ -2045,6 +2072,7 @@ fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Col
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_results();
+        if self.updates.poll(ctx) { self.catalog_ui.invalidate_after_update(); }
         self.catalog_ui.pump(ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
