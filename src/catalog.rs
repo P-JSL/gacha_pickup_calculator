@@ -278,7 +278,7 @@ pub struct CatalogUi {
 
 impl CatalogUi {
     pub fn new(ctx: &egui::Context) -> Self {
-        let (send_url, recv_url) = mpsc::channel::<String>();
+        let (send_url, recv_url) = mpsc::channel::<(u64, String)>();
         let (send_image, recv_image) = mpsc::channel::<ImageResult>();
         // Bounded image I/O: one slow icon must not block the rest of the visible catalog.
         // Each worker locks the queue only while receiving its next URL.
