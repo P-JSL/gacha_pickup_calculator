@@ -524,8 +524,8 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
         // current pack must not finance any of its remaining nine pulls.
         for _ in 0..10 { wallet.pay(dedicated); }
         let mut featured = 0;
-        let mut off = 0;
-        let mut pending_four_star_points = 0;
+        let mut off = 0_usize;
+        let mut pending_four_star_points = 0_usize;
         for _ in 0..10 {
             let x = rng.uniform();
             if x < 0.0075 { featured += 1; four_pity = 0; }
