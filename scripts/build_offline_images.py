@@ -28,14 +28,40 @@ MAX_PIXELS = 8_000_000
 MAX_EDGE = 4096
 EXPECTED_FORMATS = {"PNG", "JPEG"}
 HOSTS = {"raw.githubusercontent.com"}
+APPROVED_PATH_PREFIXES = (
+    "/Mar-7th/StarRailRes/",
+    "/ryanbenson/wuthering-waves-assets/",
+    "/JforPlay/sstoy/",
+    "/Waifus-Grace/NTE_Assets/",
+)
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 warnings.simplefilter("error", Image.DecompressionBombWarning)
 
 
+def approved_source_url(url: str) -> bool:
+    if not url or len(url) > 512 or any(ord(ch) < 32 or ord(ch) == 127 for ch in url):
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        return (
+            parsed.scheme == "https"
+            and parsed.hostname in HOSTS
+            and parsed.port in (None, 443)
+            and parsed.username is None and parsed.password is None
+            and not parsed.query and not parsed.fragment
+            and any(parsed.path.startswith(prefix) for prefix in APPROVED_PATH_PREFIXES)
+            and parsed.path.lower().endswith((".png", ".jpg", ".jpeg"))
+            and all(part not in ("", ".", "..") and
+                    all(ch.isascii() and (ch.isalnum() or ch in "-._()") for ch in part)
+                    for part in parsed.path[1:].split("/"))
+        )
+    except ValueError:
+        return False
+
+
 class NoUntrustedRedirects(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        parsed = urllib.parse.urlsplit(newurl)
-        if parsed.scheme != "https" or parsed.hostname not in HOSTS:
+        if not approved_source_url(newurl):
             raise ValueError("Image redirect blocked")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -48,24 +74,35 @@ OPENER = urllib.request.build_opener(
 
 def entries():
     seen = set()
+    names = set()
+    urls = set()
     for row in CATALOG.read_text(encoding="utf-8").splitlines():
         if not row or row.startswith("#"):
             continue
         columns = row.split("\t")
         if len(columns) != 6:
             raise ValueError("Invalid catalog row")
-        game, role, ident, _, _, url = columns
+        game, role, ident, name, rarity, url = columns
         if game not in GAME_DIR or role not in ("c", "w"):
             raise ValueError("Unexpected catalog type")
+        if not name.strip() or name.startswith("{") or name.isdecimal():
+            raise ValueError(f"Unresolved character/weapon name: {game}/{ident}")
+        if rarity not in ("1", "2", "3", "4", "5"):
+            raise ValueError(f"Invalid rarity: {game}/{ident}")
+        visible_name = (game, role, name)
+        if visible_name in names:
+            raise ValueError(f"Duplicate visible identity: {visible_name}")
+        names.add(visible_name)
         if not ident or any(not (c.isascii() and (c.isalnum() or c in "_-"))
                             for c in ident):
             raise ValueError("Unsafe image identifier")
         if url:
-            parsed = urllib.parse.urlsplit(url)
-            if parsed.scheme != "https" or parsed.hostname not in HOSTS:
-                raise ValueError("Unapproved image origin")
-            if parsed.username or parsed.password or parsed.port not in (None, 443):
-                raise ValueError("Credentials or nonstandard port in image URL")
+            if not approved_source_url(url):
+                raise ValueError(f"Unapproved source URL for {game}/{ident}")
+            identity = (game, role, url)
+            if identity in urls:
+                raise ValueError(f"Reused image source for distinct identities: {identity}")
+            urls.add(identity)
         output = ROOT / GAME_DIR[game] / f"{role}-{ident}.png"
         if output in seen:
             raise ValueError(f"Duplicate image destination: {output}")
@@ -76,12 +113,17 @@ def entries():
 def fetch_and_normalize(item):
     url, destination = item
     if not url:
-        # Latest officially announced items can lack redistribution-ready portraits.
-        # Make this visibly a placeholder, not a misleading image of another item.
+        # Never substitute another character's photo. Distinguish all missing
+        # assets with the character's own stable ID rather than a shared "NEW".
         im = Image.new("RGBA", (112, 112), (22, 49, 67, 255))
         draw = ImageDraw.Draw(im)
         draw.rectangle((2, 2, 109, 109), outline=(75, 173, 198, 255), width=2)
-        draw.text((40, 42), "NEW", fill=(239, 246, 250, 255))
+        draw.text((40, 33), "NO ART", fill=(239, 246, 250, 255))
+        ident = destination.stem[2:].replace("upcoming_", "")
+        label = ident[:13].upper()
+        box = draw.textbbox((0, 0), label)
+        draw.text(((112 - (box[2] - box[0])) // 2, 58), label,
+                  fill=(136, 215, 225, 255))
         out = io.BytesIO()
         im.save(out, format="PNG")
         normalized = out.getvalue()
@@ -137,6 +179,31 @@ def main():
     # Fail closed: a release must not claim to ship all icons if any are missing.
     if failures or len(completed) != len(jobs):
         raise SystemExit(f"Offline package incomplete: {len(completed)}/{len(jobs)} images")
+    # Source URLs may differ while serving identical incorrect artwork. Detect
+    # byte-identical PNGs across distinct characters/objects in a game and role.
+    # This is a strong but not exhaustive identity check: perceptual matches or
+    # mislabeled unique portraits still require manual source review.
+    hashes = {}
+    # The different elemental forms of the same protagonist can legitimately
+    # share a portrait. Explicitly permit only that exact observed Rover pair.
+    same_subject_variants = {
+        frozenset({"c-1502.png", "c-1604.png"}),
+    }
+    unexpected_duplicates = []
+    for path, digest in completed:
+        kind = path.name.split("-", 1)[0]
+        key = (path.parent.name, kind, digest)
+        if key in hashes:
+            prior = hashes[key]
+            if not (path.parent.name == "WutheringWaves" and
+                    frozenset({prior.name, path.name}) in same_subject_variants):
+                unexpected_duplicates.append((str(prior), str(path)))
+        else:
+            hashes[key] = path
+    if unexpected_duplicates:
+        for prior, current in sorted(unexpected_duplicates):
+            print(f"UNEXPECTED DUPLICATE ART: {prior} and {current}")
+        raise SystemExit(f"Duplicate packaged artwork: {len(unexpected_duplicates)} collisions")
     manifest = ROOT / "SHA256SUMS.txt"
     manifest.write_text(
         "".join(f"{digest}  {path.relative_to(ROOT).as_posix()}\n"
