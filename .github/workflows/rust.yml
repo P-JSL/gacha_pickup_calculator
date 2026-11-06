@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -108,7 +108,9 @@ jobs:
         with:
           name: gacha-windows-native-ui-smoke
           path: ci-artifacts/windows-ui.png
-          if-no-files-found: warn
+          # The hosted Windows runner has no guaranteed interactive display.
+          # GUI capture is diagnostic, whereas build/tests remain mandatory.
+          if-no-files-found: ignore
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
         if: runner.os == 'Linux'
@@ -128,10 +130,10 @@ jobs:
 
   images:
     name: Build and scan offline image library
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install pinned image decoder
@@ -156,7 +158,7 @@ jobs:
   ui_docs:
     name: Capture latest-character GUI for README
     needs: [verify, images]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -212,7 +214,7 @@ jobs:
     name: Publish versioned release
     needs: [verify, images, ui_docs]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
