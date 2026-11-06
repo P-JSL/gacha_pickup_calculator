@@ -451,12 +451,18 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
             setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
         )).color(MUTED).size(11.0));
     } else {
+        let weapon_inventory = if setup.game == Game::StellaSora {
+            format!("{} {} ({}{})",
+                setup.weapon_ticket_inventory(), t(language, "Currency units"),
+                setup.weapon_dedicated, t(language, "Pulls"))
+        } else {
+            format!("{}{}", setup.weapon_dedicated, t(language, "Passes"))
+        };
         ui.label(RichText::new(format!(
-            "{} {}{} · {} {}{} · {} {} ({}{}).",
+            "{} {}{} · {} {} · {} {} ({}{}).",
             i18n::ticket_name(language, setup.game, false),
             setup.character_dedicated, t(language, "Passes"),
-            i18n::ticket_name(language, setup.game, true),
-            setup.weapon_dedicated, t(language, "Passes"),
+            i18n::ticket_name(language, setup.game, true), weapon_inventory,
             setup.premium_currency, native,
             setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
         )).color(MUTED).size(11.0));
