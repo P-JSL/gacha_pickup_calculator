@@ -401,12 +401,13 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         }
     };
     let shortage = |ui: &mut egui::Ui| {
-        ui.label(RichText::new(t(language, "Additional funding needed")).color(GOLD).strong());
+        ui.label(RichText::new(t(language, "Additional featured ticket equivalents"))
+            .color(GOLD).strong());
         ui.label(RichText::new(format!(
             "+{} {}  ·  +{} {}",
-            gap.additional_shared, t(language, "Pulls"),
+            gap.additional_shared, t(language, "Featured ticket equivalents"),
             gap.additional_currency, native,
-        )).size(17.0).strong().color(
+        )).size(16.0).strong().color(
             if gap.additional_shared == 0 { MINT } else { GOLD },
         ));
         ui.small(format!(
@@ -441,13 +442,25 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         shortage(ui);
     }
     ui.add_space(5.0);
-    ui.label(RichText::new(format!(
-        "{} {}{} + {} {} ({}{}).",
-        t(language, "Already owned flexible passes"), setup.flexible,
-        t(language, "Passes"),
-        setup.premium_currency, native,
-        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
-    )).color(MUTED).size(11.0));
+    if setup.game.shares_featured_ticket() {
+        ui.label(RichText::new(format!(
+            "{} {}{} + {} {} ({}{}).",
+            i18n::ticket_name(language, setup.game, false), setup.flexible,
+            t(language, "Passes"),
+            setup.premium_currency, native,
+            setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+    } else {
+        ui.label(RichText::new(format!(
+            "{} {}{} · {} {}{} · {} {} ({}{}).",
+            i18n::ticket_name(language, setup.game, false),
+            setup.character_dedicated, t(language, "Passes"),
+            i18n::ticket_name(language, setup.game, true),
+            setup.weapon_dedicated, t(language, "Passes"),
+            setup.premium_currency, native,
+            setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+    }
     ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
         .color(MUTED).size(11.0));
     if setup.game == Game::StellaSora {
