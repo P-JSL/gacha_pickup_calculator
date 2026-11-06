@@ -112,8 +112,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn embedded_manifest_has_all_675_images_without_duplicate_keys() {
-        assert_eq!(image_digests().len(), 675);
+    fn embedded_manifest_has_all_679_images_without_duplicate_keys() {
+        assert_eq!(image_digests().len(), 679);
         for line in IMAGE_MANIFEST.lines() {
             let key = line.split_once("  ").expect("sha256 + two spaces").1;
             assert!(approved_image_key(key), "invalid image key: {key}");

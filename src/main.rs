@@ -2367,23 +2367,32 @@ mod chart_tests {
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
             "upcoming_aeon_aha", &mut character, &mut weapon));
         assert_eq!(character, "upcoming_aeon_aha");
-        assert!(weapon.is_empty()); // No source-verified signature for Aha yet
+        assert_eq!(weapon, "23065"); // Confirmed v4.7 Aha signature
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
             "23028", &mut character, &mut weapon));
         assert_eq!(weapon, "23028"); // Explicit manual choice remains available
         assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
             "1503", &mut character, &mut weapon));
         assert_eq!(weapon, "23055"); // Changing character restores its signature
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "upcoming_astra_yao", &mut character, &mut weapon));
+        assert!(weapon.is_empty()); // v4.8 signatures not announced
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "upcoming_ellen_joe", &mut character, &mut weapon));
+        assert!(weapon.is_empty());
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "upcoming_aeon_aha", &mut character, &mut weapon));
+        assert_eq!(weapon, "23065"); // Restores Aha signature
         assert!(!apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
             "none", &mut character, &mut weapon));
-        assert_eq!(weapon, "23055");
+        assert_eq!(weapon, "23065");
     }
 
     #[test]
     fn default_selection_does_not_assign_unrelated_weapon() {
         let session = GameSession::defaults(Game::StarRail);
         assert_eq!(session.character_id, "upcoming_aeon_aha");
-        assert!(session.weapon_id.is_empty());
+        assert_eq!(session.weapon_id, "23065");
     }
 
     #[test]

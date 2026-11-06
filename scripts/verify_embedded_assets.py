@@ -78,8 +78,8 @@ def catalog_entries():
             if not approved_url(source) or (game, role, source) in urls:
                 raise ValueError(f"{CATALOG}:{lineno}: disallowed or shared remote source URL")
             urls.add((game, role, source))
-    if len(catalog) != 675:
-        raise ValueError(f"Expected 675 catalog entries; got {len(catalog)}")
+    if len(catalog) != 679:
+        raise ValueError(f"Expected 679 catalog entries; got {len(catalog)}")
     return catalog
 
 
@@ -101,7 +101,7 @@ def audit_signature_pairs(catalog):
             raise ValueError(f"{PAIRS}:{lineno}: unsupported source or duplicate")
         seen.add((game, char_id))
         count += 1
-    if count != 140:
+    if count != 141:
         raise ValueError(f"Signature catalog count changed unexpectedly: {count}")
     return count
 
@@ -138,9 +138,12 @@ def audit_pinned_game_sources(catalog):
             raise ValueError(f"HSR character name mismatch: {ident}")
         hsr_rows[key] = True
     extra_hsr = {key for key in catalog if key[0] == "hsr"} - set(hsr_rows)
-    if extra_hsr != {("hsr", "c", "upcoming_aeon_aha")}:
+    # Explicitly allow only the announced characters with provisional UI IDs.
+    if extra_hsr != {("hsr", "c", "upcoming_aeon_aha"),
+                     ("hsr", "c", "upcoming_ellen_joe"),
+                     ("hsr", "c", "upcoming_astra_yao")}:
         raise ValueError(f"HSR unverified game data IDs changed: {sorted(extra_hsr)}")
-    if len([k for k in hsr_rows if k[1] == "w"]) != 170:
+    if len([k for k in hsr_rows if k[1] == "w"]) != 172:
         raise ValueError("HSR Light Cone coverage unexpectedly changed")
 
     wuwa_checked = {}

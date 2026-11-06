@@ -677,4 +677,9 @@ wuwa	c	Roverelectromale	Rover: Electro	5	https://raw.githubusercontent.com/ryanb
 nte	c	upcoming_elyms	Elyms	5	
 nte	c	upcoming_exe	Exe	5	
 hsr	c	upcoming_aeon_aha	Aeon ★ Aha	5	
-
+# 4.7 announced Light Cones independently checked with nanoka/Gachabase; no verified source icon yet.
+hsr	w	22009	세상 끝에서 만나자!	4	
+hsr	w	23065	「아하」가 처음 울리는 순간	5	
+# 4.8 announced collab characters use provisional UI IDs, not confirmed in-game IDs.
+hsr	c	upcoming_ellen_joe	엘렌 조 (4.8 공개)	5	
+hsr	c	upcoming_astra_yao	아스트라 야오 (4.8 공개)	5	

@@ -83,6 +83,8 @@ fn game_code(game: Game) -> &'static str {
 fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
     match (game, id) {
         (Game::StarRail, "upcoming_aeon_aha") => (20261111, "4.7 공식 발표"),
+        (Game::StarRail, "upcoming_astra_yao") => (20261028, "4.8 공식 공개 · 배너 미확정"),
+        (Game::StarRail, "upcoming_ellen_joe") => (20261027, "4.8 공식 공개 · 배너 미확정"),
         (Game::StarRail, "1503") => (20261015, "최신 4.6"),
         (Game::WutheringWaves, "1312") => (20261022, "최신 3.7"),
         (Game::WutheringWaves, "1311") => (20260930, "신규 3.7"),
@@ -109,6 +111,10 @@ fn parse() -> Vec<Entry> {
         let kind = match fields[1] { "c" => Kind::Character, "w" => Kind::Weapon, _ => continue };
         let (release_order, status) = if kind == Kind::Character {
             recent_character(game, fields[2])
+        } else if game == Game::StarRail && fields[2] == "23065" {
+            (20261111, "4.7 아하 전용")
+        } else if game == Game::StarRail && fields[2] == "22009" {
+            (20261111, "4.7 무료 광추")
         } else if game == Game::StellaSora && fields[2] == "214066" {
             (20261020, "신규 레코드 2.0")
         } else { (0, "") };
@@ -343,6 +349,11 @@ pub fn picker(
             ui.label(egui::RichText::new(
                 "★5 목표 기준 확률입니다. ★4 목록은 표시되지만 확률 계산 대상은 아닙니다."
             ).color(egui::Color32::from_rgb(165, 190, 208)).size(11.0));
+            if game == Game::StarRail && kind == Kind::Character {
+                ui.label(egui::RichText::new(
+                    "4.8 공개 캐릭터는 실제 배너와 전용 광추가 미확정입니다. 현재 5성 픽업 규칙으로 가정 계산합니다."
+                ).color(egui::Color32::from_rgb(225, 197, 128)).size(11.0));
+            }
             ui.separator();
             let needle = filter.trim().to_lowercase();
             let items: Vec<&Entry> = entries().iter().filter(|entry| {
@@ -433,7 +444,11 @@ mod tests {
             assert_eq!(signature_weapon(game, parts[1]).unwrap().id, parts[2]);
             count += 1;
         }
-        assert_eq!(count, 140, "signature mapping coverage changed unexpectedly");
+        assert_eq!(count, 141, "signature mapping coverage changed unexpectedly");
+        assert_eq!(signature_weapon(Game::StarRail, "upcoming_aeon_aha").unwrap().id, "23065");
+        assert!(signature_weapon(Game::StarRail, "upcoming_ellen_joe").is_none());
+        assert!(signature_weapon(Game::StarRail, "upcoming_astra_yao").is_none());
+        assert_eq!(by_id(Game::StarRail, Kind::Weapon, "22009").unwrap().rarity, 4);
         assert_eq!(signature_weapon(Game::Neverness, "1056").map(|e| &e.id), None);
         assert!(signature_weapon(Game::StarRail, "8001").is_none());
         // IDs come from the official 2.0 data snapshot, not earlier aliases.
