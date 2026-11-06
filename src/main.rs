@@ -470,7 +470,7 @@ impl Calculator {
         let initial_selection = GameSession::defaults(Game::StarRail);
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
-            mode: RateMode::CommunityEstimate,
+            mode: RateMode::PublishedOnly,
             target_eid: 0,
             target_refine: 1,
             confidence: 90,
