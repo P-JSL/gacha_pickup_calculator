@@ -2623,6 +2623,149 @@ mod chart_tests {
         assert!(prefs.show_hover_guides);
     }
 
+    fn deterministic_distribution(pulls: usize) -> Distribution {
+        let mut pmf = vec![0.0; pulls + 1];
+        pmf[pulls] = 1.0;
+        Distribution::new(pmf)
+    }
+
+    fn deterministic_goals(setup: &GameSetup) -> Computed {
+        let character = deterministic_distribution(setup.character.target_copies);
+        let weapon = deterministic_distribution(setup.weapon.target_copies);
+        let combined = character.combine(&weapon);
+        let exact_shared_required = Some(CONFIDENCE_LEVELS.map(|confidence| {
+            minimum_shared_pulls(&character, &weapon,
+                setup.character_dedicated, setup.weapon_dedicated,
+                confidence as f64 / 100.0)
+        }));
+        Computed {
+            character, weapon, combined, feedback: None,
+            wuwa_strategies: None, exact_shared_required,
+        }
+    }
+
+    #[test]
+    fn changing_owned_copies_reduces_goal_budget_in_all_four_games() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            setup.set_targets(3, 2);
+            let initial = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(initial.character_missing, 3);
+            assert_eq!(initial.weapon_missing, 2);
+            assert_eq!(initial.required_shared, 5);
+
+            setup.character_owned = 2;
+            setup.weapon_owned = 1;
+            setup.set_targets(3, 2);
+            let partial = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(partial.character_missing, 1);
+            assert_eq!(partial.weapon_missing, 1);
+            assert_eq!(partial.required_shared, 2);
+
+            setup.character_owned = 3;
+            setup.weapon_owned = 2;
+            setup.set_targets(3, 2);
+            let completed = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(completed.character_missing, 0);
+            assert_eq!(completed.weapon_missing, 0);
+            assert_eq!(completed.additional_shared, 0);
+            assert_eq!(completed.additional_currency, 0);
+        }
+    }
+
+    #[test]
+    fn dedicated_passes_and_partial_native_currency_reduce_only_the_right_budget() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.character_owned = 2;
+        setup.weapon_owned = 1;
+        setup.set_targets(3, 2);
+        setup.character_dedicated = 1;
+        setup.premium_currency = 159;
+        let stats = deterministic_goals(&setup);
+        let gap = GoalFunding::calculate(&setup, &stats, 3, 2, 90);
+        assert_eq!(gap.character_single_shared, 0);
+        assert_eq!(gap.weapon_single_shared, 1);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.available_shared, 0);
+        assert_eq!(gap.additional_shared, 1);
+        assert_eq!(gap.additional_currency, 1); // 159 already owned of the 160 required
+
+        setup.premium_currency = 160;
+        let filled = GoalFunding::calculate(&setup, &stats, 3, 2, 90);
+        assert_eq!(filled.available_shared, 1);
+        assert_eq!(filled.additional_shared, 0);
+        assert_eq!(filled.additional_currency, 0);
+
+        // A weapon pass must not be counted as a character pass.
+        setup.character_dedicated = 0;
+        setup.weapon_dedicated = 1;
+        setup.premium_currency = 0;
+        let new_gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            3, 2, 90);
+        assert_eq!(new_gap.character_single_shared, 1);
+        assert_eq!(new_gap.weapon_single_shared, 0);
+        assert_eq!(new_gap.additional_shared, 1);
+    }
+
+    #[test]
+    fn shared_star_rail_ticket_is_not_counted_twice() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character_owned = 1;
+        setup.set_targets(1, 1);
+        setup.flexible = 1; // Star Rail has one common limited ticket type.
+        let gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            1, 1, 90);
+        assert_eq!(gap.character_missing, 0);
+        assert_eq!(gap.weapon_missing, 1);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.available_shared, 1);
+        assert_eq!(gap.additional_shared, 0);
+    }
+
+    #[test]
+    fn exact_budget_uses_joint_adaptive_success_not_added_solo_quantiles() {
+        let character = Distribution::new(vec![0.0, 0.5, 0.5]);
+        let weapon = deterministic_distribution(1);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 0, 0, 0.5), 2);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 0, 0, 0.9), 3);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 1, 0, 0.9), 2);
+    }
+
+    #[test]
+    fn feedback_budget_uses_recycled_pulls_instead_of_the_raw_sum() {
+        use gacha_pickup_calculator::{Banner, RateSchedule, SoftPity};
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 2,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 10;
+        config.featured_first = 20;
+        config.featured_duplicate = 20;
+        let feedback = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
+        let character = setup.character.distribution(RateMode::PublishedOnly).unwrap();
+        let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
+        let stats = Computed {
+            combined: character.combine(&weapon),
+            character, weapon, feedback: Some(feedback),
+            wuwa_strategies: None, exact_shared_required: None,
+        };
+        let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
+        assert_eq!(gap.character_single_raw, 2);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.additional_shared, 1);
+        assert!(gap.uses_refunds);
+    }
+
     #[test]
     fn selecting_stella_sora_character_updates_correct_disc_across_tabs() {
         let mut character = "162".to_owned();
