@@ -1,3 +1,6 @@
+use crate::{Distribution, RateMode, RateSchedule};
+use std::sync::OnceLock;
+
 #[derive(Clone, Debug)]
 pub enum BannerRule {
     /// A rare item resets rarity pity. Losing the featured chance guarantees the next.
@@ -253,7 +256,7 @@ impl Banner {
 
 /// The analytical multinomial distribution of featured and non-featured S-Arcs
 /// within ten independent natural draws (before batch guarantees).
-fn arc_batch_outcomes() -> &'static [(usize, usize, f64)] {
+pub(super) fn arc_batch_outcomes() -> &'static [(usize, usize, f64)] {
     static OUTCOMES: OnceLock<Vec<(usize, usize, f64)>> = OnceLock::new();
     OUTCOMES.get_or_init(|| {
     let mut outcome = vec![(0, 0, 1.0)];

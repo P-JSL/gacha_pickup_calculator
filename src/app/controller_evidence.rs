@@ -1,6 +1,8 @@
+use super::*;
+
 impl Calculator {
 
-    fn tracker_sources(&self, ui: &mut egui::Ui) {
+    pub(crate) fn tracker_sources(&self, ui: &mut egui::Ui) {
         section(ui, "07", "실측 트래커 교차 검증",
                 "관측 평균과 현재 확률 모델을 비교합니다. 표본은 공식 서버 확률이 아니며 자동 보정하지 않습니다.", |ui| {
             let observed = references(self.setup.game);
@@ -37,7 +39,7 @@ impl Calculator {
     /// The user explicitly provides a local CSV path; data remains on device.
     /// This is offline inspection only: never fetch undocumented tracker APIs
     /// or accept account-authenticated URLs and tokens.
-    fn observation_validation(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn observation_validation(&mut self, ui: &mut egui::Ui) {
         section(ui, "08", "스택별 실측 분포 비교",
                 "CSV를 로컬에서 분석합니다. 완전한 이력·검열 구간이 없는 트래커 그래프는 편향 가능성을 표시합니다.", |ui| {
             let mut banner_changed = false;
@@ -218,7 +220,7 @@ impl Calculator {
 /// Build a monotonic, endpoint-complete CDF curve for both paint and tests.
 /// The DP distribution remains the source of truth; sampling only reduces
 /// screen-level line geometry, not numerical probabilities.
-fn sampled_cdf(distribution: &Distribution, end: usize) -> Vec<(usize, f64)> {
+pub(crate) fn sampled_cdf(distribution: &Distribution, end: usize) -> Vec<(usize, f64)> {
     let end = end.max(1);
     let n = end.min(400);
     (0..=n).map(|i| {

@@ -1,20 +1,22 @@
+use super::*;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum QueryMode { RequiredBudget, AvailableBudget }
+pub(crate) enum QueryMode { RequiredBudget, AvailableBudget }
 
 /// Keep the primary calculator uncluttered. Advanced evidence inspection is
 /// explicitly opened from the header rather than appended to every result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ViewMode { Calculator, Analytics, Settings, Preferences, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
+pub(crate) enum ViewMode { Calculator, Analytics, Settings, Preferences, Currency, Characters, Weapons, TrackerSources, ObservedDistribution }
 
 /// Desktop display and interaction options. These never change the probability model.
 #[derive(Clone, Copy)]
-struct UiPreferences {
-    auto_recalculate: bool,
-    debounce_ms: u64,
-    show_result_panel: bool,
-    show_chart_fill: bool,
-    show_hover_guides: bool,
-    compact_spacing: bool,
+pub(crate) struct UiPreferences {
+    pub(crate) auto_recalculate: bool,
+    pub(crate) debounce_ms: u64,
+    pub(crate) show_result_panel: bool,
+    pub(crate) show_chart_fill: bool,
+    pub(crate) show_hover_guides: bool,
+    pub(crate) compact_spacing: bool,
 }
 impl Default for UiPreferences {
     fn default() -> Self {
@@ -31,18 +33,18 @@ impl Default for UiPreferences {
 
 /// Each game's currency, targets and selected artwork are independent.
 #[derive(Clone)]
-struct GameSession {
-    setup: GameSetup,
-    feedback: FeedbackConfig,
-    eid: usize,
-    refine: usize,
-    character_id: String,
-    weapon_id: String,
+pub(crate) struct GameSession {
+    pub(crate) setup: GameSetup,
+    pub(crate) feedback: FeedbackConfig,
+    pub(crate) eid: usize,
+    pub(crate) refine: usize,
+    pub(crate) character_id: String,
+    pub(crate) weapon_id: String,
 }
 
 /// Apply a catalog choice to the shared game session. All tabs use these
 /// same selected IDs; never infer signature equipment from list order.
-fn apply_catalog_choice(
+pub(crate) fn apply_catalog_choice(
     game: Game, kind: catalog::Kind, id: &str,
     character: &mut String, weapon: &mut String,
 ) -> bool {
@@ -62,7 +64,7 @@ fn apply_catalog_choice(
 }
 
 impl GameSession {
-    fn defaults(game: Game) -> Self {
+    pub(crate) fn defaults(game: Game) -> Self {
         let character_id = catalog::live_first(game, catalog::Kind::Character);
         let weapon_id = catalog::live_signature_weapon(game, &character_id)
             .map(|entry| entry.id.clone()).unwrap_or_default();
@@ -76,52 +78,52 @@ impl GameSession {
     }
 }
 
-struct HistoryEntry {
-    game: Game,
-    eid: usize,
-    refine: usize,
-    chance: f64,
+pub(crate) struct HistoryEntry {
+    pub(crate) game: Game,
+    pub(crate) eid: usize,
+    pub(crate) refine: usize,
+    pub(crate) chance: f64,
 }
 
-struct Calculator {
-    setup: GameSetup,
-    mode: RateMode,
-    target_eid: usize,
-    target_refine: usize,
-    confidence: usize,
-    query_mode: QueryMode,
-    n_query: usize,
-    feedback_cfg: FeedbackConfig,
-    stats: Option<Computed>,
-    stats_game: Option<Game>,
-    input_needs_calculation: bool,
-    manual_calculation_requested: bool,
-    ui_preferences: UiPreferences,
-    language_preference: LanguagePreference,
-    system_language: Language,
-    language_save_error: Option<String>,
-    error: Option<String>,
-    show_help: bool,
-    view_mode: ViewMode,
-    worker: Sender<CalculationRequest>,
-    results: Receiver<CalculationResponse>,
-    generation: u64,
-    pending_since: Option<Instant>,
-    calculating: bool,
-    observation_path: String,
-    observation_expected_sha256: String,
-    observation_data: Option<ObservationDataset>,
-    observation_banner: TrackedBanner,
-    observation_message: String,
-    history: Vec<HistoryEntry>,
-    show_history: bool,
-    search_query: String,
-    catalog_ui: catalog::CatalogUi,
-    updates: runtime_updates::UpdateManager,
-    picker_kind: Option<catalog::Kind>,
-    picker_filter: String,
-    selected_character_id: String,
-    selected_weapon_id: String,
-    game_sessions: HashMap<Game, GameSession>,
+pub(crate) struct Calculator {
+    pub(crate) setup: GameSetup,
+    pub(crate) mode: RateMode,
+    pub(crate) target_eid: usize,
+    pub(crate) target_refine: usize,
+    pub(crate) confidence: usize,
+    pub(crate) query_mode: QueryMode,
+    pub(crate) n_query: usize,
+    pub(crate) feedback_cfg: FeedbackConfig,
+    pub(crate) stats: Option<Computed>,
+    pub(crate) stats_game: Option<Game>,
+    pub(crate) input_needs_calculation: bool,
+    pub(crate) manual_calculation_requested: bool,
+    pub(crate) ui_preferences: UiPreferences,
+    pub(crate) language_preference: LanguagePreference,
+    pub(crate) system_language: Language,
+    pub(crate) language_save_error: Option<String>,
+    pub(crate) error: Option<String>,
+    pub(crate) show_help: bool,
+    pub(crate) view_mode: ViewMode,
+    pub(crate) worker: Sender<CalculationRequest>,
+    pub(crate) results: Receiver<CalculationResponse>,
+    pub(crate) generation: u64,
+    pub(crate) pending_since: Option<Instant>,
+    pub(crate) calculating: bool,
+    pub(crate) observation_path: String,
+    pub(crate) observation_expected_sha256: String,
+    pub(crate) observation_data: Option<ObservationDataset>,
+    pub(crate) observation_banner: TrackedBanner,
+    pub(crate) observation_message: String,
+    pub(crate) history: Vec<HistoryEntry>,
+    pub(crate) show_history: bool,
+    pub(crate) search_query: String,
+    pub(crate) catalog_ui: catalog::CatalogUi,
+    pub(crate) updates: runtime_updates::UpdateManager,
+    pub(crate) picker_kind: Option<catalog::Kind>,
+    pub(crate) picker_filter: String,
+    pub(crate) selected_character_id: String,
+    pub(crate) selected_weapon_id: String,
+    pub(crate) game_sessions: HashMap<Game, GameSession>,
 }
 

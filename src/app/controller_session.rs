@@ -1,5 +1,7 @@
+use super::*;
+
 impl Calculator {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // set_visuals alone changes only the current theme style. The system
         // preference could otherwise switch the UI back to Light on Windows.
         configure_dark_desktop(&cc.egui_ctx);
@@ -77,15 +79,15 @@ impl Calculator {
         app
     }
 
-    fn language(&self) -> Language {
+    pub(crate) fn language(&self) -> Language {
         self.language_preference.effective(self.system_language)
     }
-    fn set_language(&mut self, preference: LanguagePreference) {
+    pub(crate) fn set_language(&mut self, preference: LanguagePreference) {
         if self.language_preference == preference { return; }
         self.language_preference = preference;
         self.language_save_error = i18n::save_preference(preference).err().map(|e| e.to_string());
     }
-    fn language_choices(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn language_choices(&mut self, ui: &mut egui::Ui) {
         let active = self.language_preference;
         let language = self.language();
         for choice in LanguagePreference::ALL {
@@ -98,7 +100,7 @@ impl Calculator {
 
     /// Funding is hidden while inputs are stale: the current owned-copy counts
     /// must never be combined with previous distributions.
-    fn current_goal_funding(&self) -> Option<GoalFunding> {
+    pub(crate) fn current_goal_funding(&self) -> Option<GoalFunding> {
         if self.input_needs_calculation || self.calculating { return None; }
         let results = self.visible_stats()?;
         Some(GoalFunding::calculate(
@@ -109,12 +111,12 @@ impl Calculator {
 
     /// Last completed charts remain visible until the worker finishes for the same game.
     /// A game change never displays distributions from a different game.
-    fn visible_stats(&self) -> Option<&Computed> {
+    pub(crate) fn visible_stats(&self) -> Option<&Computed> {
         if self.stats_game == Some(self.setup.game) { self.stats.as_ref() } else { None }
     }
 
     /// Selection controls all reuse the catalog; target rarity remains a five-star model.
-    fn catalog_selector(&mut self, ui: &mut egui::Ui, kind: catalog::Kind) {
+    pub(crate) fn catalog_selector(&mut self, ui: &mut egui::Ui, kind: catalog::Kind) {
         let game = self.setup.game;
         let id = match kind {
             catalog::Kind::Character => self.selected_character_id.clone(),
@@ -143,7 +145,7 @@ impl Calculator {
         });
     }
 
-    fn show_catalog_picker(&mut self, ctx: &egui::Context) {
+    pub(crate) fn show_catalog_picker(&mut self, ctx: &egui::Context) {
         let Some(kind) = self.picker_kind else { return; };
         let mut open = true;
         let current = match kind {
@@ -163,7 +165,7 @@ impl Calculator {
         }
     }
 
-    fn change_game(&mut self, game: Game) {
+    pub(crate) fn change_game(&mut self, game: Game) {
         if self.setup.game != game {
             // Save all editable fields so switching between four games never loses
             // inventory, target goals, pity state, selected item or refund assumptions.
@@ -202,7 +204,7 @@ impl Calculator {
         self.observation_message.clear();
     }
 
-    fn recalculate(&mut self) {
+    pub(crate) fn recalculate(&mut self) {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
         self.generation = self.generation.wrapping_add(1);
         self.calculating = true;
@@ -221,7 +223,7 @@ impl Calculator {
         }
     }
 
-    fn poll_results(&mut self) {
+    pub(crate) fn poll_results(&mut self) {
         while let Ok(response) = self.results.try_recv() {
             // Ignore results from settings the user has since changed.
             if response.generation != self.generation || self.pending_since.is_some() {
@@ -253,7 +255,7 @@ impl Calculator {
         }
     }
 
-    fn schedule_recalculation(&mut self) {
+    pub(crate) fn schedule_recalculation(&mut self) {
         self.pending_since = Some(Instant::now());
         self.error = None;
         self.calculating = true;
@@ -261,7 +263,7 @@ impl Calculator {
     }
 
     /// Enter-driven navigation search; only actual sections and supported games are matched.
-    fn activate_search(&mut self) -> bool {
+    pub(crate) fn activate_search(&mut self) -> bool {
         let query = self.search_query.trim().to_lowercase();
         if query.is_empty() {
             return false;
@@ -309,7 +311,7 @@ impl Calculator {
     }
 
     /// Compact reference-style header with functional search and utilities.
-    fn header(&mut self, ctx: &egui::Context) -> bool {
+    pub(crate) fn header(&mut self, ctx: &egui::Context) -> bool {
         let mut dirty = false;
         egui::TopBottomPanel::top("header")
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(egui::Margin { left: 15, right: 15, top: 15, bottom: 0 }))
@@ -395,7 +397,7 @@ impl Calculator {
         dirty
     }
 
-    fn sidebar(&mut self, ctx: &egui::Context) {
+    pub(crate) fn sidebar(&mut self, ctx: &egui::Context) {
         let language = self.language();
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)

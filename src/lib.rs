@@ -12,12 +12,20 @@
 #[path = "analysis/observations.rs"] pub mod observations;
 
 
-include!("probability/rates.rs");
-include!("probability/banners.rs");
-include!("probability/distributions.rs");
+#[path = "probability/rates.rs"] mod rates;
+#[path = "probability/banners.rs"] mod banners;
+#[path = "probability/distributions.rs"] mod distributions;
+#[path = "probability/fft.rs"] mod fft;
+
+// Keep all public 1.x entrypoints at the crate root.
+pub use rates::{RateMode, RateSchedule, SoftPity};
+pub use banners::{Banner, BannerRule, Spark};
+pub use distributions::{Allocation, Distribution, optimal_allocation};
 
 #[cfg(test)]
 mod tests {
+    use super::banners::arc_batch_outcomes;
+    use super::rates::NTE_COMMUNITY_FIRST_S_CDF;
     use super::*;
 
     fn always_rare(share: f64, guaranteed: bool, count: usize) -> Banner {

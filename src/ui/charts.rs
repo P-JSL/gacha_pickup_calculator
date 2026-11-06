@@ -1,20 +1,22 @@
+use super::*;
+
 /// Each chart has its own X-range. Character and secondary-banner curves
 /// therefore cannot be compressed into a shared 2000-pull wide axis.
 #[derive(Clone, Copy)]
-enum ChartSource<'a> {
+pub(crate) enum ChartSource<'a> {
     Exact(&'a Distribution),
     Refund(&'a FeedbackEstimate),
 }
 
 impl ChartSource<'_> {
-    fn last_pull(self) -> usize {
+    pub(crate) fn last_pull(self) -> usize {
         match self {
             Self::Exact(d) => d.pmf.len().saturating_sub(1),
             Self::Refund(f) => f.quantile(1.0),
         }
     }
 
-    fn probability(self, n: usize) -> f64 {
+    pub(crate) fn probability(self, n: usize) -> f64 {
         match self {
             Self::Exact(d) => d.at(n),
             Self::Refund(f) => f.probability(n).0,
@@ -22,18 +24,18 @@ impl ChartSource<'_> {
     }
 }
 
-struct ChartSeries<'a> {
-    label: &'a str,
-    source: ChartSource<'a>,
-    color: Color32,
+pub(crate) struct ChartSeries<'a> {
+    pub(crate) label: &'a str,
+    pub(crate) source: ChartSource<'a>,
+    pub(crate) color: Color32,
 }
 
-fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
+pub(crate) fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
     series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1)
 }
 
 /// Keep the hover label inside the plot for every pointer position.
-fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_width: f32, height: f32) -> egui::Rect {
+pub(crate) fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_width: f32, height: f32) -> egui::Rect {
     let inner = graph.shrink(4.0);
     let width = desired_width.min(inner.width()).max(0.0);
     let height = height.min(inner.height()).max(0.0);
@@ -46,7 +48,7 @@ fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_width: f32,
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
-fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences, language: Language) {
+pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences, language: Language) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -182,7 +184,7 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
     }
 }
 
-fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
+pub(crate) fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(eyebrow).size(9.5).color(PRIMARY).strong());
         ui.heading(RichText::new(title).size(18.0).strong());
@@ -192,7 +194,7 @@ fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
 }
 
 /// Generic card, with a fixed visual hierarchy and no stateful UI controls.
-fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
+pub(crate) fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
            content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(CARD).stroke(egui::Stroke::new(1.0_f32, BORDER))
@@ -218,7 +220,7 @@ fn section(ui: &mut egui::Ui, number: &str, heading: &str, description: &str,
         });
 }
 
-fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
+pub(crate) fn metric(ui: &mut egui::Ui, label: &str, value: String, note: &str, accent: Color32) {
     egui::Frame::group(ui.style()).fill(CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(11)).inner_margin(9)

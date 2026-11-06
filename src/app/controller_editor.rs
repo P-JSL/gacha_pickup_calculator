@@ -1,7 +1,9 @@
+use super::*;
+
 impl Calculator {
 
     /// UI-only preferences are independent of the gacha input/worker state.
-    fn desktop_settings(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn desktop_settings(&mut self, ui: &mut egui::Ui) {
         let language = self.language();
         page_intro(ui, "APPLICATION SETTINGS", t(language, "Application settings"),
             t(language, "Change the appearance and calculation behavior, not banner inputs."));
@@ -75,7 +77,7 @@ impl Calculator {
         ).color(MUTED).size(11.0));
     }
 
-    fn targets(&mut self, ui: &mut egui::Ui) -> bool {
+    pub(crate) fn targets(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
         section(ui, "01", "획득 목표", "목표 장수와 기존 보유 장수를 설정합니다.", |ui| {
             ui.columns(2, |cols| {
@@ -117,7 +119,7 @@ impl Calculator {
     }
 
     /// Independent banner pages share their input state with the dashboard.
-    fn single_banner_page(&mut self, ui: &mut egui::Ui, weapon: bool) -> bool {
+    pub(crate) fn single_banner_page(&mut self, ui: &mut egui::Ui, weapon: bool) -> bool {
         let mut dirty = false;
         let title = if weapon { self.setup.game.secondary_banner_name() } else { "캐릭터" };
         section(ui, "01", &format!("{title} 목표와 보유"), "선택한 배너만 수정합니다.", |ui| {
@@ -183,7 +185,7 @@ impl Calculator {
         dirty
     }
 
-    fn banner_controls(ui: &mut egui::Ui, name: &str,
+    pub(crate) fn banner_controls(ui: &mut egui::Ui, name: &str,
                        rule: &mut BannerRule, pity: &mut usize,
                        guaranteed: &mut bool, any_rare: &mut usize) -> bool {
         let mut dirty = false;
@@ -210,7 +212,7 @@ impl Calculator {
         dirty
     }
 
-    fn pity(&mut self, ui: &mut egui::Ui) -> bool {
+    pub(crate) fn pity(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
         section(ui, "02", "천장 및 확정 상태", "캐릭터와 무기 천장은 독립적으로 관리됩니다.", |ui| {
             let secondary = self.setup.game.secondary_banner_name();
@@ -257,7 +259,7 @@ impl Calculator {
         dirty
     }
 
-    fn resources(&mut self, ui: &mut egui::Ui) -> bool {
+    pub(crate) fn resources(&mut self, ui: &mut egui::Ui) -> bool {
         let mut changed = false;
         section(ui, "03", "보유 뽑기권 및 재화",
             "한정 픽업 배너의 전용 재화만 집계합니다. 일반 배너용 티켓은 합산하지 않습니다.", |ui| {

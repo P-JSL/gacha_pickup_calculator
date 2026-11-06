@@ -1,25 +1,27 @@
-struct Computed {
-    character: Distribution,
-    weapon: Distribution,
-    combined: Distribution,
-    feedback: Option<FeedbackEstimate>,
-    wuwa_strategies: Option<Vec<FeedbackEstimate>>,
-    exact_shared_required: Option<[usize; 6]>,
+use super::*;
+
+pub(crate) struct Computed {
+    pub(crate) character: Distribution,
+    pub(crate) weapon: Distribution,
+    pub(crate) combined: Distribution,
+    pub(crate) feedback: Option<FeedbackEstimate>,
+    pub(crate) wuwa_strategies: Option<Vec<FeedbackEstimate>>,
+    pub(crate) exact_shared_required: Option<[usize; 6]>,
 }
 
-struct CalculationRequest {
-    generation: u64,
-    setup: GameSetup,
-    mode: RateMode,
-    feedback_config: FeedbackConfig,
+pub(crate) struct CalculationRequest {
+    pub(crate) generation: u64,
+    pub(crate) setup: GameSetup,
+    pub(crate) mode: RateMode,
+    pub(crate) feedback_config: FeedbackConfig,
 }
 
-struct CalculationResponse {
-    generation: u64,
-    result: Result<Computed, String>,
+pub(crate) struct CalculationResponse {
+    pub(crate) generation: u64,
+    pub(crate) result: Result<Computed, String>,
 }
 
-fn compute(request: &CalculationRequest) -> Result<Computed, String> {
+pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     let character = request.setup.character.distribution(request.mode)?;
     let weapon = request.setup.weapon.distribution(request.mode)?;
     let combined = character.combine(&weapon);
@@ -40,12 +42,22 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
         (None, None)
     };
     let exact_shared_required = if feedback.is_none() {
-        Some(CONFIDENCE_LEVELS.map(|confidence| minimum_shared_pulls(
-            &character, &weapon,
-            request.setup.character_dedicated,
-            request.setup.weapon_dedicated,
-            confidence as f64 / 100.0,
-        )))
+        // Construct the exact residual-ticket distribution once, then reuse
+        // its monotone CDF for all six O(log n) quantile lookups.
+        let demand = if request.setup.character_dedicated == 0
+            && request.setup.weapon_dedicated == 0
+        {
+            // Most new sessions have no dedicated tickets. The already-built
+            // combined PMF is exactly the residual demand, so reuse it.
+            combined.clone()
+        } else {
+            remaining_shared_distribution(
+                &character, &weapon, request.setup.character_dedicated,
+                request.setup.weapon_dedicated,
+            )
+        };
+        Some(CONFIDENCE_LEVELS.map(|confidence|
+            demand.quantile(confidence as f64 / 100.0)))
     } else { None };
     Ok(Computed {
         character, weapon, combined, feedback, wuwa_strategies,

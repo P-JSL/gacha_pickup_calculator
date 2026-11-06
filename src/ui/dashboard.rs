@@ -298,7 +298,7 @@ impl Calculator {
     }
 
     /// The first screen repeats the input grouping and visual hierarchy of the supplied mockup.
-    fn workspace_quick_settings(&mut self, ui: &mut egui::Ui) -> bool {
+    pub(crate) fn workspace_quick_settings(&mut self, ui: &mut egui::Ui) -> bool {
         let language = self.language();
         let mut dirty = false;
         egui::Frame::group(ui.style())
