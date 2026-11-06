@@ -2,7 +2,7 @@
 
 검증 일자: 2026-11-06 (KST). 기준 저장소: `P-JSL/gacha_pickup_calculator`.
 
-> **main 개발판 업데이트 (v0.2.1 이후):** 공식 4.7 예고와 [Nanoka](https://hsr.nanoka.cc/lightcone/23065) 및 [Gachabase](https://hsr.gachabase.net/lightcones/23065/upon-the-first-echo-of-aha/beta?lang=ko)를 통해 신규 광추 `23065`와 `22009`를 교차 확인했습니다. 아하의 실제 게임 ID `1511`을 Nanoka/Gachabase 베타 데이터로 확인하여 임시 ID 대신 적용했으며 전용 광추 `23065`로 연결했습니다. 공식 4.8 공개 캐릭터 엘렌 조·아스트라 야오는 게임 내 ID, 배너 조건, 전용 광추가 확인되지 않아 `upcoming_ellen_joe`, `upcoming_astra_yao`라는 **프로그램 내부 임시 식별자**로 등록했습니다. 카탈로그/내장 이미지 679건, 명시적 자동 연결 141건(스타레일 66건), 스타레일 광추 172건입니다. 신규 항목 4건의 원본 이미지는 확보되지 않아 다른 대상의 아트 대신 식별용 플레이스홀더를 사용합니다. 아래 표는 기존 v0.2.1 당시 수치를 기록한 것입니다.
+> **main 개발판 업데이트 (v0.2.1 이후):** 공식 4.7 예고와 [Nanoka](https://hsr.nanoka.cc/lightcone/23065) 및 [Gachabase](https://hsr.gachabase.net/lightcones/23065/upon-the-first-echo-of-aha/beta?lang=ko)를 통해 신규 광추 `23065`와 `22009`를 교차 확인했습니다. 아하의 실제 게임 ID `1511`을 Nanoka/Gachabase 베타 데이터로 확인하여 임시 ID 대신 적용했으며 전용 광추 `23065`로 연결했습니다. 공식 4.8 공개 캐릭터 엘렌 조·아스트라 야오는 게임 내 ID, 배너 조건, 전용 광추가 확인되지 않아 `upcoming_ellen_joe`, `upcoming_astra_yao`라는 **프로그램 내부 임시 식별자**로 등록했습니다. 카탈로그/내장 이미지 679건, 명시적 자동 연결 141건(스타레일 66건), 스타레일 광추 172건입니다. 신규 항목 4건의 초기 상태는 식별용 플레이스홀더였습니다. 이번 보완에서 Gachabase의 베타 ID 1511(아하 캐릭터 Square Icon), 22009(4★ 광추 Large Icon), 23065(5★ 광추 Large Icon)를 **각각 해당 ID의 갤러리 이미지로** 확인해 저장소 내 PNG를 교체하는 검증 자동화를 추가했습니다. 두 4.8 콜라보 캐릭터는 검증된 그림이 없어 계속 플레이스홀더로 표시합니다. PNG 수집이 실제 완료되었는지는 별도 GitHub Actions 검증 결과를 확인해야 합니다. 아래 표는 기존 v0.2.1 당시 수치를 기록한 것입니다.
 
 ## 확인 결과
 

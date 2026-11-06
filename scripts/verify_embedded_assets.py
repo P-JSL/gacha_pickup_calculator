@@ -14,6 +14,8 @@ import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 
+from pinned_icon_sources import approved_pinned_url, validate_pinned_identity, PINNED_SOURCES
+
 ROOT = Path("Image")
 CATALOG = Path("src/catalog_data.tsv")
 PAIRS = Path("src/signature_pairs.tsv")
@@ -36,6 +38,8 @@ PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 def approved_url(url: str) -> bool:
     if len(url) > 512 or any(ord(c) < 32 or ord(c) == 127 for c in url):
         return False
+    if approved_pinned_url(url):
+        return True
     parsed = urllib.parse.urlsplit(url)
     return (
         parsed.scheme == "https"
@@ -75,9 +79,14 @@ def catalog_entries():
         catalog[id_key] = parts
         names.add(visible_key)
         if source:
-            if not approved_url(source) or (game, role, source) in urls:
-                raise ValueError(f"{CATALOG}:{lineno}: disallowed or shared remote source URL")
+            if (not approved_url(source)
+                    or not validate_pinned_identity(game, role, ident, source)
+                    or (game, role, source) in urls):
+                raise ValueError(f"{CATALOG}:{lineno}: disallowed, mismatched or shared source URL")
             urls.add((game, role, source))
+    for key, source in PINNED_SOURCES.items():
+        if key not in catalog or catalog[key][5] != source:
+            raise ValueError(f"Missing or mismatched reviewed icon source for {key}")
     if len(catalog) != 679:
         raise ValueError(f"Expected 679 catalog entries; got {len(catalog)}")
     return catalog

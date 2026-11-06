@@ -46,6 +46,13 @@ const ICON_REPOSITORIES: &[&str] = &[
     "https://raw.githubusercontent.com/JforPlay/sstoy/",
     "https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/",
 ];
+// Only these independently checked Gachabase asset URLs are approved.
+// Do not generalize to a host-wide allowlist or an arbitrary URL.
+const PINNED_GACHABASE_ICONS: &[&str] = &[
+    "https://i.gachabase.net/-LuzQkoz_xxThpfhIoggZyPwP5qGH2PNb7JagsfT7JE/q%3A50/f%3Awebp/plain/hsr/assets/2be49dbbe7cfe8f77187dcfea51d9863.png",
+    "https://i.gachabase.net/uBAzqOHCvKf2Lw_wZbXzjj80cTLw831sAmvOKy7ROS8/q%3A50/f%3Awebp/plain/hsr/assets/e4d45ac64a652c8e44f9a7c7da2d4e07.png",
+    "https://i.gachabase.net/i6VciWWsCxBhjhKd0bBK-E_qf9P-VDTdz-I-8-zUPeY/q%3A50/f%3Awebp/plain/hsr/assets/ff88fd079e093ae22ccf24269eb85a17.png",
+];
 const MAX_ICON_BYTES: u64 = 512 * 1024;
 const MAX_ICON_SIDE: u32 = 256;
 
@@ -53,6 +60,7 @@ fn approved_icon_url(url: &str) -> bool {
     if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
         return false;
     }
+    if PINNED_GACHABASE_ICONS.contains(&url) { return true; }
     let Some(relative) = ICON_REPOSITORIES.iter()
         .find_map(|prefix| url.strip_prefix(prefix)) else { return false };
     let extension_ok = [".png", ".jpg", ".jpeg"]
