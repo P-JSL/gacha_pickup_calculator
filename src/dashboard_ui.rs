@@ -222,14 +222,27 @@ impl Calculator {
                     format!("{expected:.1}"), t(language, "Average pulls to all targets").to_owned(), PINK);
                 let (value, note, color) = funding.map_or_else(
                     || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
-                    |g| (format!("+{} {}", g.additional_currency,
-                                 i18n::currency_name(language, self.setup.game)),
-                          format!("+{} {} · {} {}%",
-                                  g.additional_shared, t(language, "Pulls"),
-                                  t(language, "Target confidence"), g.confidence),
-                          if g.additional_shared == 0 { SUCCESS } else { GOLD }),
+                    |g| (
+                        format!("+{} {}", g.additional_shared, t(language, "Pull equivalents")),
+                        format!(
+                            "{} · {}: +{} {}",
+                            if self.setup.game.shares_featured_ticket() {
+                                i18n::ticket_name(language, self.setup.game, false).to_owned()
+                            } else {
+                                format!(
+                                    "{} / {}",
+                                    i18n::ticket_name(language, self.setup.game, false),
+                                    i18n::ticket_name(language, self.setup.game, true),
+                                )
+                            },
+                            t(language, "Premium Currency"),
+                            g.additional_currency,
+                            i18n::currency_name(language, self.setup.game),
+                        ),
+                        if g.additional_shared == 0 { SUCCESS } else { GOLD },
+                    ),
                 );
-                overview_metric(&mut columns[3], 3, t(language, "Additional Currency Needed"),
+                overview_metric(&mut columns[3], 3, t(language, "Additional featured tickets"),
                     value, note, color);
             });
             ui.add_space(9.0);
