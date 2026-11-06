@@ -132,11 +132,13 @@ pub fn entries() -> &'static [Entry] {
     static DATA: OnceLock<Vec<Entry>> = OnceLock::new();
     DATA.get_or_init(parse)
 }
+type CatalogIndex = HashMap<(Game, Kind), HashMap<&'static str, &'static Entry>>;
+type SignatureIndex = HashMap<Game, HashMap<&'static str, &'static str>>;
+
 pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
     // Build the index once. Repeated picker redraws and signature selections
     // should not scan the entire four-game catalog.
-    static INDEX: OnceLock<HashMap<(Game, Kind), HashMap<&'static str, &'static Entry>>> =
-        OnceLock::new();
+    static INDEX: OnceLock<CatalogIndex> = OnceLock::new();
     let lookup = INDEX.get_or_init(|| {
         let mut lookup: HashMap<(Game, Kind), HashMap<&str, &Entry>> = HashMap::new();
         for entry in entries() {
@@ -158,8 +160,7 @@ pub fn count(game: Game, kind: Kind) -> usize {
 /// Explicitly sourced banner pairing. Never guess a 5★ weapon from rarity,
 /// sorted position, shared element, or similar naming.
 pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
-    static PAIRS: OnceLock<HashMap<Game, HashMap<&'static str, &'static str>>> =
-        OnceLock::new();
+    static PAIRS: OnceLock<SignatureIndex> = OnceLock::new();
     let pairs = PAIRS.get_or_init(|| {
         let mut pairs: HashMap<Game, HashMap<&str, &str>> = HashMap::new();
         for line in include_str!("signature_pairs.tsv").lines() {
