@@ -71,7 +71,9 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     python3 scripts/ui_capture_tab.py ci-readme-shots/current-dashboard.png
   )
   echo "Current dashboard game tab found at x=$hsr_x, y=$hsr_y"
+  last_tab_capture=current-dashboard
   game 1 dashboard-wuwa-latest
+  rm -f ci-readme-shots/current-dashboard.png
   game 2 dashboard-stellasora-latest
   game 3 dashboard-nte-latest
 '
@@ -82,7 +84,6 @@ from PIL import Image
 from scripts.ui_capture_tab import selected_game_tab
 
 paths = sorted(Path("ci-readme-shots").glob("*.png"))
-paths = [p for p in paths if p.name != "current-dashboard.png"]
 required = {
     "dashboard-hsr-aha.png", "simulator-hsr-aha.png", "currency.png",
     "characters.png", "weapons.png", "preferences.png",
