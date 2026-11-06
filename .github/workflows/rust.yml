@@ -359,7 +359,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
+          # Immutable releases require all assets before publication.
+          # A failed assertion leaves a draft instead of publishing a partial release.
+          gh release create "$TAG" --draft \
             dist/gacha_pickup_calculator.exe \
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
@@ -378,4 +380,7 @@ jobs:
               exit 1
             }
           done
+          echo "::notice title=Draft complete::$TAG has all five expected assets; publishing now."
+          gh release edit "$TAG" --draft=false
+          gh release view "$TAG" --json isDraft --jq '.isDraft' | grep -Fx false >/dev/null
           echo "::notice title=Release published::$TAG has all five expected assets."
