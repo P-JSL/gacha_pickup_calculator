@@ -83,8 +83,10 @@ pub fn system_language() -> Language {
 }
 fn settings_path() -> Option<PathBuf> {
     #[cfg(windows)]
-    { return env::var_os("APPDATA").map(|p| PathBuf::from(p)
-        .join("GachaPickupCalculator").join("language.txt")); }
+    {
+        env::var_os("APPDATA").map(|p| PathBuf::from(p)
+            .join("GachaPickupCalculator").join("language.txt"))
+    }
     #[cfg(not(windows))]
     {
         env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)
