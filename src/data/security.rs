@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 pub const MAX_IMAGE_BYTES: u64 = 512 * 1024;
 pub const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
-const IMAGE_MANIFEST: &str = include_str!("../Image/SHA256SUMS.txt");
+const IMAGE_MANIFEST: &str = include_str!("../../Image/SHA256SUMS.txt");
 
 fn parse_sha256(value: &str) -> Option<[u8; 32]> {
     if value.len() != 64 || !value.is_ascii() { return None; }

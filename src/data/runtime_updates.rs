@@ -525,9 +525,9 @@ mod tests {
     use super::*;
     #[test]
     fn rejects_poisoned_or_partial_candidate_data() {
-        let catalog = include_str!("catalog_data.tsv");
-        let pairs = include_str!("signature_pairs.tsv");
-        let manifest = include_str!("../Image/SHA256SUMS.txt");
+        let catalog = include_str!("../catalog_data.tsv");
+        let pairs = include_str!("../signature_pairs.tsv");
+        let manifest = include_str!("../../Image/SHA256SUMS.txt");
         let rev = "a".repeat(40);
         assert!(parse_bundle(catalog, pairs, manifest, rev.clone(), PathBuf::new()).is_ok());
         assert!(parse_bundle(catalog, pairs, "", rev.clone(), PathBuf::new()).is_err());
