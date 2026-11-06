@@ -1,9 +1,9 @@
 name: Rust CI and Release
 
-# A new commit supersedes earlier image downloads and UI builds on the same PR.
+# Supersede older PR attempts, never interrupt an in-progress main release.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   push:
@@ -14,54 +14,146 @@ permissions:
   contents: read
 
 jobs:
+  classify:
+    name: Classify CI scope
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+      images: ${{ steps.scope.outputs.images }}
+      ui: ${{ steps.scope.outputs.ui }}
+      perf: ${{ steps.scope.outputs.perf }}
+      audit: ${{ steps.scope.outputs.audit }}
+      doc_api: ${{ steps.scope.outputs.doc_api }}
+      release: ${{ steps.scope.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 2
+      - name: Determine necessary checks (fail closed on unknown paths)
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          build=false; images=false; ui=false; perf=false; audit=false; doc_api=false; release=false
+          unknown=false
+          base="$BASE_SHA"
+          if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+            unknown=true
+          elif ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$base" || unknown=true
+          fi
+          if [[ "$unknown" != true ]]; then
+            git diff --name-only --diff-filter=ACDMRT -z "$base" "$GITHUB_SHA" > "$RUNNER_TEMP/changed-paths" || unknown=true
+          fi
+          if [[ "$unknown" == true ]]; then
+            echo "::warning::Cannot reliably determine changed files; running all applicable checks."
+            build=true; images=true; ui=true; perf=true; audit=true; doc_api=true
+          else
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                README.md|LICENSE|THIRD_PARTY_ASSETS.md|docs/*.md|RELEASE_NOTES_v*.md)
+                  continue ;;
+              esac
+              build=true
+              case "$path" in
+                Image/*|src/catalog_data.tsv|src/signature_pairs.tsv|src/unpaired_five_star_targets.tsv|scripts/verify_embedded_assets.py|scripts/build_offline_images.py|scripts/pinned_icon_sources.py)
+                  images=true; ui=true ;;
+                src/ui/*|src/app/*|src/main.rs|src/data/*|scripts/capture_readme_screenshots.sh)
+                  ui=true ;;
+                src/probability/*|src/domain/*|src/analysis/*|src/lib.rs)
+                  perf=true; audit=true; doc_api=true ;;
+                tests/performance_regression.rs)
+                  perf=true ;;
+                tests/*)
+                  ;;
+                Cargo.toml|Cargo.lock|.github/workflows/*)
+                  images=true; ui=true; perf=true; audit=true; doc_api=true ;;
+                *)
+                  images=true; ui=true; perf=true; audit=true; doc_api=true ;;
+              esac
+            done < "$RUNNER_TEMP/changed-paths"
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["package"]["version"])')
+            if ! gh release view "v$version" >/dev/null 2>&1; then
+              release=true; build=true; images=true; ui=true; perf=true; audit=true; doc_api=true
+            fi
+          fi
+          {
+            echo "build=$build"; echo "images=$images"; echo "ui=$ui"
+            echo "perf=$perf"; echo "audit=$audit"; echo "doc_api=$doc_api"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+          echo "CI scope: build=$build images=$images ui=$ui perf=$perf audit=$audit docs=$doc_api release=$release"
+
+  docs:
+    name: Validate documentation and release contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check local links, release version and module references
+        run: python3 scripts/verify_release_contract.py
+
   verify:
     name: Verify (${{ matrix.os }})
+    needs: classify
+    # The matrix must exist even for docs-only PRs: Rulesets may require the
+    # exact per-OS contexts, which disappear if the whole matrix is skipped.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Documentation-only fast path
+        if: needs.classify.outputs.build != 'true'
+        run: echo "No executable inputs changed; Rust compile steps are unnecessary."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: needs.classify.outputs.build == 'true'
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        if: needs.classify.outputs.build == 'true'
         with:
           components: rustfmt, clippy
       - name: Linux windowing prerequisites
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true'
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev
       - name: Format Rust sources before verification
+        if: needs.classify.outputs.build == 'true'
         run: cargo fmt --all
-      - name: Validate 1.0 release source contract
-        if: runner.os == 'Linux'
-        run: python3 scripts/verify_release_contract.py
       - name: Unit tests
+        if: needs.classify.outputs.build == 'true'
         run: cargo test --locked --all-targets
       - name: Clippy
+        if: needs.classify.outputs.build == 'true'
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Public API documentation build
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.doc_api == 'true'
         run: cargo doc --locked --no-deps --lib
       - name: Measured performance reference (release optimized; no machine-specific limits)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.perf == 'true'
         run: cargo test --locked --release --test performance_regression -- --ignored --nocapture
       - name: RustSec dependency vulnerability audit (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.audit == 'true'
         shell: bash
         run: |
           set -euo pipefail
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit
       - name: Build release
+        if: needs.classify.outputs.build == 'true'
         run: cargo build --locked --release
       - name: Optional trusted Authenticode signing (requires protected certificate secrets)
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.release == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           WIN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
           WIN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: ./scripts/sign_windows_release.ps1
       - name: Linux GUI startup smoke (virtual display)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true'
         shell: bash
         run: |
           sudo apt-get update
@@ -80,7 +172,7 @@ jobs:
       # runner below captures all nine real GUI screenshots after both OS builds.
       # Avoid running a second Xvfb/scrot session in this verification job.
       - name: Windows native dark UI screenshot smoke
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -119,7 +211,7 @@ jobs:
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
           }
       - name: Upload Windows UI screenshot
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-windows-native-ui-smoke
@@ -129,7 +221,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-linux-release-executable
@@ -137,7 +229,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Upload Windows app
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && needs.classify.outputs.release == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-pickup-calculator-windows-x64
@@ -146,6 +238,8 @@ jobs:
 
   images:
     name: Audit and scan checked-in offline images
+    needs: classify
+    if: needs.classify.outputs.images == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -168,7 +262,8 @@ jobs:
 
   ui_docs:
     name: Capture latest-character GUI for README
-    needs: [verify, images]
+    needs: [classify, verify]
+    if: needs.classify.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     # Screenshot capture is never allowed to hang and block release forever.
     timeout-minutes: 20
@@ -180,10 +275,9 @@ jobs:
         with:
           name: gacha-linux-release-executable
           path: target/release/
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-        with:
-          name: gacha-offline-images
-          path: target/release/Image/
+      # Use checked-in, previously validated images instead of a duplicate download.
+      - name: Use checked-in image assets for screenshots
+        run: cp -a Image target/release/Image
       - name: Actual Linux UI with packaged images
         shell: bash
         run: |
@@ -212,8 +306,8 @@ jobs:
           retention-days: 14
   release:
     name: Publish versioned release
-    needs: [verify, images, ui_docs]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [classify, docs, verify, images, ui_docs]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.classify.outputs.release == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -297,8 +391,8 @@ jobs:
                   "Gacha Pickup Calculator / Windows x64\n"
                   "Extract this entire ZIP, preserving the Image directory.\n"
                   "Run gacha_pickup_calculator.exe alongside the Image folder.\n"
-                  "All image files were decoded, re-encoded and malware-scanned in CI.\n"
-                  "No image network requests are performed while using the app.\n")
+                  "Bundled images were hash-verified and malware-scanned in CI.\n"
+                  "The app may fetch verified updated images over HTTPS.\n")
           with ZipFile(package) as zipped:
               assert zipped.testzip() is None
               assert executable.name in zipped.namelist()

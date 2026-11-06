@@ -10,8 +10,10 @@ The checked-in `Image/` directory contains 679 **pre-processed offline PNGs**,
 copied from this repository's internally built and malware-scanned GitHub Actions
 artifact (run `42149571938`). Every image is enumerated in
 [`Image/SHA256SUMS.txt`](Image/SHA256SUMS.txt). The package is a frozen source
-snapshot: neither the application nor the standard release CI downloads game
-art from external providers.
+snapshot: the standard release CI does not download art from third-party
+origin providers. At runtime the app **may fetch updated, repository-approved
+PNG files over HTTPS from a verified GitHub commit**, which is separate from
+re-collecting external source art. The previously packaged PNGs remain local.
 
 ## Provenance of originally collected assets
 
@@ -23,8 +25,8 @@ art from external providers.
 | Neverness to Everness | https://github.com/Waifus-Grace/NTE_Assets | No recognized license found in repository metadata | **Not established** |
 
 Source-asset URLs are retained only as provenance metadata inside
-[`src/catalog_data.tsv`](src/catalog_data.tsv). They are not used at runtime or
-in the ordinary CI build. If re-collecting art is required, a maintainer must
+[`src/catalog_data.tsv`](src/catalog_data.tsv). They are **not directly fetched** at runtime or by the ordinary release build;
+runtime updates are restricted to the project's verified GitHub snapshot. If re-collecting art is required, a maintainer must
 review copyright permissions, verify the upstream ownership and pin the
 expected content digests before authorizing an update.
 

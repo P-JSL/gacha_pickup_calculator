@@ -1,5 +1,11 @@
 name: CodeQL security analysis
 
+# Keep required check contexts present on documentation-only PRs. Job-level
+# skipping (not on.paths) prevents permanently pending branch-protection checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
@@ -15,26 +21,99 @@ permissions:
   actions: read
 
 jobs:
+  classify:
+    name: Classify CodeQL inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      rust: ${{ steps.changes.outputs.rust }}
+      python: ${{ steps.changes.outputs.python }}
+      actions: ${{ steps.changes.outputs.actions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 2
+      - name: Identify language-specific source changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust=false; python=false; actions=false; unknown=false
+          if [[ "$GITHUB_EVENT_NAME" == pull_request || "$GITHUB_EVENT_NAME" == push ]]; then
+            base="$BASE_SHA"
+            if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+              unknown=true
+            elif ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$base" || unknown=true
+            fi
+            if [[ "$unknown" != true ]]; then
+              git diff --name-only --diff-filter=ACDMRT -z "$base" "$GITHUB_SHA" > "$RUNNER_TEMP/codeql-paths" || unknown=true
+            fi
+            if [[ "$unknown" != true ]]; then
+              while IFS= read -r -d '' path; do
+                case "$path" in
+                  README.md|LICENSE|THIRD_PARTY_ASSETS.md|docs/*.md|RELEASE_NOTES_v*.md)
+                    ;;
+                  *.rs|Cargo.toml|Cargo.lock)
+                    rust=true ;;
+                  *.py|requirements-image.txt)
+                    python=true ;;
+                  .github/workflows/*.yml|.github/workflows/*.yaml)
+                    actions=true ;;
+                  Image/*|src/*.tsv)
+                    # Only immutable image/data bytes: no language source changed.
+                    ;;
+                  *)
+                    unknown=true; break ;;
+                esac
+              done < "$RUNNER_TEMP/codeql-paths"
+            fi
+          else
+            # Scheduled and manually dispatched scans always cover all languages.
+            unknown=true
+          fi
+          if [[ "$unknown" == true ]]; then
+            echo "::notice::Unknown diff or periodic run: scan all CodeQL languages."
+            rust=true; python=true; actions=true
+          fi
+          {
+            echo "rust=$rust"; echo "python=$python"; echo "actions=$actions"
+          } >> "$GITHUB_OUTPUT"
+          echo "CodeQL scope: rust=$rust python=$python actions=$actions"
+
   codeql:
     name: CodeQL (${{ matrix.language }})
+    needs: classify
+    # Keep all three per-language status check names even if only one language
+    # needs analysis; the workflow must not skip the matrix at job level.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         language: [rust, python, actions]
+    env:
+      RUN_CODEQL: ${{ (matrix.language == 'rust' && needs.classify.outputs.rust == 'true') || (matrix.language == 'python' && needs.classify.outputs.python == 'true') || (matrix.language == 'actions' && needs.classify.outputs.actions == 'true') }}
     steps:
+      - name: Documentation-only fast path
+        if: env.RUN_CODEQL != 'true'
+        run: echo "No relevant source for this language changed; scheduled/manual scans still run all languages."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: env.RUN_CODEQL == 'true'
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        if: env.RUN_CODEQL == 'true' && matrix.language == 'rust'
         with:
           components: clippy
       - name: Initialize CodeQL with limited build-independent scope
+        if: env.RUN_CODEQL == 'true'
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
       - name: Analyze and report security issues
+        if: env.RUN_CODEQL == 'true'
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           category: "/language:${{ matrix.language }}"
