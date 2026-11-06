@@ -19,19 +19,29 @@ use std::time::{Duration, Instant};
 use i18n::{Language, LanguagePreference, t};
 
 
-// Logical modules are included at the crate root to preserve existing private
-// visibility, egui lifecycles and external behavior during 1.0 stabilization.
-include!("ui/navigation.rs");
-include!("app/funding.rs");
-include!("app/compute.rs");
-include!("app/state.rs");
-include!("app/controller_session.rs");
-include!("app/controller_editor.rs");
-include!("app/controller_refunds.rs");
-include!("app/controller_analytics.rs");
-include!("app/controller_evidence.rs");
-include!("ui/charts.rs");
-include!("app/lifecycle.rs");
+// Explicit module boundaries, with only crate-private internal interfaces.
+// Keep the public library entrypoints and the eframe lifecycle unchanged.
+#[path = "ui/navigation.rs"] mod navigation;
+#[path = "ui/charts.rs"] mod charts;
+#[path = "ui/funding_view.rs"] mod funding_view;
+#[path = "app/funding.rs"] mod funding;
+#[path = "app/compute.rs"] mod compute;
+#[path = "app/state.rs"] mod state;
+#[path = "app/controller_session.rs"] mod controller_session;
+#[path = "app/controller_editor.rs"] mod controller_editor;
+#[path = "app/controller_refunds.rs"] mod controller_refunds;
+#[path = "app/controller_analytics.rs"] mod controller_analytics;
+#[path = "app/controller_evidence.rs"] mod controller_evidence;
+#[path = "app/lifecycle.rs"] mod lifecycle;
+
+use navigation::*;
+use charts::*;
+use funding_view::*;
+use funding::*;
+use compute::*;
+use state::*;
+use controller_evidence::sampled_cdf;
+use lifecycle::{configure_dark_desktop, install_korean_font};
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
