@@ -264,12 +264,112 @@ fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[FeedbackEstimate],
         });
 }
 
+const CONFIDENCE_LEVELS: [usize; 6] = [50, 75, 80, 90, 95, 99];
+
+/// Exact adaptive split: dedicated passes are restricted to their banner,
+/// while freely convertible passes can be used after either goal finishes.
+/// This search runs on the worker thread, not on every UI frame.
+fn minimum_shared_pulls(
+    character: &Distribution,
+    weapon: &Distribution,
+    dedicated_character: usize,
+    dedicated_weapon: usize,
+    confidence: f64,
+) -> usize {
+    let mut low = 0usize;
+    let mut high = character.pmf.len().saturating_sub(1)
+        .saturating_sub(dedicated_character)
+        .saturating_add(weapon.pmf.len().saturating_sub(1)
+            .saturating_sub(dedicated_weapon));
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let probability = optimal_allocation(
+            character, weapon, dedicated_character, dedicated_weapon, middle,
+        ).success_probability;
+        if probability >= confidence { high = middle; }
+        else { low = middle + 1; }
+    }
+    low
+}
+
+/// The funding shortfall is always based on the latest completed calculation.
+/// A single-banner requirement is informative, not an amount to add to the
+/// other banner: the shared pool and recycled refunds fund both.
+#[derive(Clone, Copy, Debug)]
+struct GoalFunding {
+    confidence: usize,
+    character_target: usize,
+    character_owned: usize,
+    character_missing: usize,
+    weapon_target: usize,
+    weapon_owned: usize,
+    weapon_missing: usize,
+    character_single_raw: usize,
+    character_single_shared: usize,
+    weapon_single_raw: usize,
+    weapon_single_shared: usize,
+    dedicated_character: usize,
+    dedicated_weapon: usize,
+    required_shared: usize,
+    available_shared: usize,
+    additional_shared: usize,
+    additional_currency: usize,
+    uses_refunds: bool,
+}
+
+impl GoalFunding {
+    fn calculate(
+        setup: &GameSetup,
+        results: &Computed,
+        character_target: usize,
+        weapon_target: usize,
+        confidence: usize,
+    ) -> Self {
+        let probability = confidence as f64 / 100.0;
+        let required_shared = results.feedback.as_ref()
+            .map_or_else(|| {
+                results.exact_shared_required
+                    .and_then(|thresholds| CONFIDENCE_LEVELS.iter()
+                        .position(|&p| p == confidence).map(|i| thresholds[i]))
+                    .unwrap_or_else(|| minimum_shared_pulls(
+                        &results.character, &results.weapon,
+                        setup.character_dedicated, setup.weapon_dedicated, probability))
+            }, |f| f.quantile(probability));
+        let character_single_raw = results.character.quantile(probability);
+        let weapon_single_raw = results.weapon.quantile(probability);
+        let available_shared = setup.available_flexible();
+        Self {
+            confidence,
+            character_target,
+            character_owned: setup.character_owned,
+            character_missing: character_target.saturating_sub(setup.character_owned),
+            weapon_target,
+            weapon_owned: setup.weapon_owned,
+            weapon_missing: weapon_target.saturating_sub(setup.weapon_owned),
+            character_single_raw,
+            character_single_shared: character_single_raw
+                .saturating_sub(setup.character_dedicated),
+            weapon_single_raw,
+            weapon_single_shared: weapon_single_raw
+                .saturating_sub(setup.weapon_dedicated),
+            dedicated_character: setup.character_dedicated,
+            dedicated_weapon: setup.weapon_dedicated,
+            required_shared,
+            available_shared,
+            additional_shared: required_shared.saturating_sub(available_shared),
+            additional_currency: setup.additional_currency_for(required_shared),
+            uses_refunds: results.feedback.is_some(),
+        }
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
     wuwa_strategies: Option<Vec<FeedbackEstimate>>,
+    exact_shared_required: Option<[usize; 6]>,
 }
 
 struct CalculationRequest {
@@ -304,7 +404,18 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     } else {
         (None, None)
     };
-    Ok(Computed { character, weapon, combined, feedback, wuwa_strategies })
+    let exact_shared_required = if feedback.is_none() {
+        Some(CONFIDENCE_LEVELS.map(|confidence| minimum_shared_pulls(
+            &character, &weapon,
+            request.setup.character_dedicated,
+            request.setup.weapon_dedicated,
+            confidence as f64 / 100.0,
+        )))
+    } else { None };
+    Ok(Computed {
+        character, weapon, combined, feedback, wuwa_strategies,
+        exact_shared_required,
+    })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -530,6 +641,17 @@ impl Calculator {
                 ui.close_menu();
             }
         }
+    }
+
+    /// Funding is hidden while inputs are stale: the current owned-copy counts
+    /// must never be combined with previous distributions.
+    fn current_goal_funding(&self) -> Option<GoalFunding> {
+        if self.input_needs_calculation || self.calculating { return None; }
+        let results = self.visible_stats()?;
+        Some(GoalFunding::calculate(
+            &self.setup, results, self.target_eid + 1,
+            self.target_refine, self.confidence,
+        ))
     }
 
     /// Last completed charts remain visible until the worker finishes for the same game.
