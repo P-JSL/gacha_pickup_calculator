@@ -6,7 +6,7 @@ game publishers or third parties.** A GitHub repo hosting an image does not itse
 establish permission to redistribute that copyrighted image. Users and downstream
 distributors are responsible for obtaining any rights required by applicable law.
 
-The checked-in `Image/` directory contains 675 **pre-processed offline PNGs**,
+The checked-in `Image/` directory contains 679 **pre-processed offline PNGs**,
 copied from this repository's internally built and malware-scanned GitHub Actions
 artifact (run `42149571938`). Every image is enumerated in
 [`Image/SHA256SUMS.txt`](Image/SHA256SUMS.txt). The package is a frozen source
