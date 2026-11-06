@@ -397,7 +397,7 @@ fn character_four_star_refund(rng: &mut SplitMix64, model: &FeedbackConfig) -> u
     }
 }
 
-fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind, game: Game,
+fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (BannerKind, Game),
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
                  (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
     let BannerRule::Standard { rarity, featured_share } = &rule.rule else { return; };
@@ -602,7 +602,7 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
                         && matches!(kind, BannerKind::Character) {
                         model.wuwa_waveband_max
                     } else { 0 };
-                    roll_standard(&mut rng, banner, kind, setup.game, mode, model, &mut wallet,
+                    roll_standard(&mut rng, banner, (kind, setup.game), mode, model, &mut wallet,
                         (owned, dedicated, max_wavebands));
                 }
                 BannerRule::FeaturedCounter { .. } => {
