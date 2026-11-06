@@ -22,7 +22,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -104,7 +104,7 @@ jobs:
           }
       - name: Upload Windows UI screenshot
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-windows-native-ui-smoke
           path: ci-artifacts/windows-ui.png
@@ -112,7 +112,7 @@ jobs:
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-linux-release-executable
           path: target/release/gacha_pickup_calculator
@@ -120,7 +120,7 @@ jobs:
           retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gacha-pickup-calculator-windows-x64
           path: target/release/gacha_pickup_calculator.exe
@@ -130,7 +130,7 @@ jobs:
     name: Build and scan offline image library
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -147,7 +147,7 @@ jobs:
           sudo systemctl stop clamav-freshclam 2>/dev/null || true
           sudo freshclam
           clamscan --recursive --infected dist/Image
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gacha-offline-images
           path: dist/Image/
@@ -160,12 +160,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: gacha-linux-release-executable
           path: target/release/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: gacha-offline-images
           path: target/release/Image/
@@ -177,7 +177,7 @@ jobs:
           sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
           bash scripts/capture_readme_screenshots.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gacha-readme-screenshots-v015
           path: ci-readme-shots/
@@ -216,7 +216,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
       - name: Check version and existing release
@@ -240,12 +240,12 @@ jobs:
             fi
             echo 'publish=true' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-offline-images
