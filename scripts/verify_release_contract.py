@@ -25,9 +25,9 @@ OLD_FLAT = {
     "src/tracker.rs", "src/catalog.rs", "src/security.rs",
     "src/runtime_updates.rs", "src/dashboard_ui.rs", "src/i18n.rs",
 }
-MACROS = re.compile(r'include(?:_bytes|_str)?!\\s*\\(\\s*"([^"]+)"\\s*\\)')
-MODULE = re.compile(r'#\\[path\\s*=\\s*"([^"]+)"\\]\\s*(?:pub\\s+)?mod\\s+[A-Za-z_][A-Za-z_0-9]*')
-DOC_LINK = re.compile(r'\\]\\(([^)]+)\\)')
+MACROS = re.compile(r'include(?:_bytes|_str)?!\s*\(\s*"([^"]+)"\s*\)')
+MODULE = re.compile(r'#\[path\s*=\s*"([^"]+)"\]\s*(?:pub\s+)?mod\s+[A-Za-z_][A-Za-z_0-9]*')
+DOC_LINK = re.compile(r'\]\(([^)]+)\)')
 
 
 def check() -> int:
