@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn image_hash_tampering_and_path_substitution_are_rejected() {
-        let sample = include_bytes!("../Image/HSR/c-1003.png");
+        let sample = include_bytes!("../../Image/HSR/c-1003.png");
         verify_image_bytes("HSR/c-1003.png", sample).unwrap();
         assert!(verify_image_bytes("HSR/c-1004.png", sample).is_err());
         let mut modified = sample.to_vec();

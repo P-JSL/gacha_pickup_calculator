@@ -32,7 +32,6 @@ include!("app/controller_analytics.rs");
 include!("app/controller_evidence.rs");
 include!("ui/charts.rs");
 include!("app/lifecycle.rs");
-include!("undefined");
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
