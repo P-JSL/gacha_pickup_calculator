@@ -267,11 +267,12 @@ pub(crate) fn active_image_dir() -> Option<PathBuf> {
     active().ok().flatten().map(|snapshot| snapshot.image_dir.clone())
 }
 
-type ImageResult = (String, Option<egui::ColorImage>);
+type ImageResult = (u64, String, Option<egui::ColorImage>);
 pub struct CatalogUi {
     textures: HashMap<String, Option<egui::TextureHandle>>,
     queued: HashSet<String>,
-    send_url: Sender<String>,
+    send_url: Sender<(u64, String)>,
+    generation: u64,
     recv_image: Receiver<ImageResult>,
 }
 
@@ -295,15 +296,15 @@ impl CatalogUi {
                         },
                         Err(_) => break,
                     };
-                    let pixels = Self::fetch_icon(&url);
-                    if send_image.send((url, pixels)).is_err() { break }
+                    let pixels = Self::fetch_icon(&url.1);
+                    if send_image.send((url.0, url.1, pixels)).is_err() { break }
                     repaint.request_repaint();
                 }
             });
         }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
-            send_url, recv_image,
+            send_url, recv_image, generation: 0,
         }
     }
 
@@ -360,13 +361,21 @@ impl CatalogUi {
     }
 
     pub fn pump(&mut self, ctx: &egui::Context) {
-        while let Ok((url, decoded)) = self.recv_image.try_recv() {
+        while let Ok((generation, url, decoded)) = self.recv_image.try_recv() {
+            if generation != self.generation { continue; }
             self.queued.remove(&url);
             let texture = decoded.map(|img| {
                 ctx.load_texture(format!("catalog:{}", url), img, egui::TextureOptions::LINEAR)
             });
             self.textures.insert(url, texture);
         }
+    }
+
+    /// Drop previous-version textures and suppress late image-worker responses.
+    pub fn invalidate_after_update(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.textures.clear();
+        self.queued.clear();
     }
 
     /// Failed icon requests can be retried without clearing successfully cached images.
@@ -385,7 +394,7 @@ impl CatalogUi {
         let key = format!("{game}/{role}-{}.png", entry.id);
         if !self.textures.contains_key(&key) && !self.queued.contains(&key) {
             self.queued.insert(key.clone());
-            if self.send_url.send(key.clone()).is_err() {
+            if self.send_url.send((self.generation, key.clone())).is_err() {
                 self.queued.remove(&key);
             }
         }
