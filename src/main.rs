@@ -515,7 +515,7 @@ impl Calculator {
                 self.catalog_ui.image(ui, item, 30.0);
             }
             let name = item.map(|x| x.name.as_str()).unwrap_or(t(self.language(), "No target"));
-            let width = ui.available_width().min(230.0).max(70.0);
+            let width = ui.available_width().clamp(70.0, 230.0);
             let shortened = truncated_selection(ui, name, width);
             if ui.add_sized(egui::vec2(width, 27.0),
                 egui::Button::new(format!("{shortened}  ▾")))
@@ -760,7 +760,7 @@ impl Calculator {
                             });
                             ui.add_space(8.0);
                             let hint = format!("⌕  {}", t(self.language(), "Search games or sections..."));
-                            let search_width = ui.available_width().min(340.0).max(60.0);
+                            let search_width = ui.available_width().clamp(60.0, 340.0);
                             let search = ui.add(
                                 egui::TextEdit::singleline(&mut self.search_query)
                                     .desired_width(search_width)
