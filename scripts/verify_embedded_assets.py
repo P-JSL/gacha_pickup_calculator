@@ -101,7 +101,7 @@ def audit_signature_pairs(catalog):
             raise ValueError(f"{PAIRS}:{lineno}: unsupported source or duplicate")
         seen.add((game, char_id))
         count += 1
-    if count != 125:
+    if count != 140:
         raise ValueError(f"Signature catalog count changed unexpectedly: {count}")
     return count
 
