@@ -161,7 +161,7 @@ jobs:
     needs: [verify, images]
     runs-on: ubuntu-24.04
     # Screenshot capture is never allowed to hang and block release forever.
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -180,7 +180,15 @@ jobs:
           set -euo pipefail
           echo "::notice title=GUI capture::Installing screenshot prerequisites with bounded timeouts."
           timeout --signal=TERM --kill-after=10s 180s sudo apt-get update
-          timeout --signal=TERM --kill-after=10s 180s sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=45 install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
+          # Azure's Ubuntu mirror can take >180s to deliver 10MB of CJK fonts.
+          # Retry on the public Ubuntu mirror instead of publishing a release
+          # with missing real GUI screenshots. Both attempts are time-bounded.
+          if ! timeout --signal=TERM --kill-after=10s 220s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=60 install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0; then
+            echo "::warning title=Slow apt mirror::Retrying capture dependencies via the public Ubuntu archive mirror."
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+            timeout --signal=TERM --kill-after=10s 120s sudo apt-get update
+            timeout --signal=TERM --kill-after=10s 420s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=60 install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
+          fi
           test -s /usr/share/fonts/truetype/nanum/NanumGothic.ttf
           chmod +x target/release/gacha_pickup_calculator
           echo "::notice title=GUI capture::Starting actual GUI screenshots with a 3-minute limit."
