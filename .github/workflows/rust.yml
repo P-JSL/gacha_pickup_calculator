@@ -171,7 +171,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=45 install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
           bash scripts/capture_readme_screenshots.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
