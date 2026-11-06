@@ -165,10 +165,12 @@ pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
     });
     lookup.get(&(game, kind))?.get(id).copied()
 }
+#[cfg(test)]
 pub fn first(game: Game, kind: Kind) -> String {
     entries().iter().find(|x| x.game == game && x.kind == kind && x.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
+#[cfg(test)]
 pub fn count(game: Game, kind: Kind) -> usize {
     entries().iter().filter(|x| x.game == game && x.kind == kind).count()
 }
