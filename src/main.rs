@@ -419,6 +419,7 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         ui.label(RichText::new(format!("+{} {}", missing_units, unit))
             .color(if missing_units == 0 { MINT } else { GOLD })
             .strong());
+        ui.small(t(language, "Solo ticket estimate excludes refunds"));
     };
     let shortage = |ui: &mut egui::Ui| {
         ui.label(RichText::new(t(language, "Additional featured tickets"))
@@ -464,13 +465,33 @@ fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
         shortage(ui);
     }
     ui.add_space(5.0);
-    ui.label(RichText::new(format!(
-        "{}: {}{} + {} {} ({}{}).",
-        t(language, "Owned featured tickets"),
-        setup.flexible, t(language, "Passes"),
-        setup.premium_currency, native,
-        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pull equivalents"),
-    )).color(MUTED).size(11.0));
+    if setup.game.shares_featured_ticket() {
+        ui.small(format!(
+            "{}: {} {} · {}: {}{}",
+            i18n::ticket_name(language, setup.game, false),
+            setup.flexible, t(language, "Passes"),
+            native, setup.premium_currency, t(language, "Units"),
+        ));
+    } else {
+        ui.small(format!(
+            "{}: {}{} · {}: {}{}",
+            i18n::ticket_name(language, setup.game, false),
+            setup.character_dedicated, t(language, "Passes"),
+            i18n::ticket_name(language, setup.game, true),
+            setup.weapon_ticket_inventory(),
+            if setup.game.weapon_ticket_units_per_pull() == 300 {
+                t(language, "Units")
+            } else {
+                t(language, "Passes")
+            },
+        ));
+    }
+    ui.small(format!(
+        "{}: {}{} ({}{}).",
+        native, setup.premium_currency, t(language, "Units"),
+        setup.premium_currency / setup.game.cost_per_pull(),
+        t(language, "Pull equivalents"),
+    ));
     ui.small(format!(
         "{}: {} / {}",
         t(language, "Featured ticket types"),
@@ -2739,6 +2760,49 @@ mod chart_tests {
         assert_eq!(new_gap.character_single_shared, 1);
         assert_eq!(new_gap.weapon_single_shared, 0);
         assert_eq!(new_gap.additional_shared, 1);
+    }
+
+    #[test]
+    fn equipment_ticket_equivalents_are_in_native_record_disc_units() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.set_targets(1, 1);
+        let gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            1, 1, 90);
+        assert_eq!(standalone_ticket_shortage(&gap, &setup, false), 1);
+        assert_eq!(standalone_ticket_shortage(&gap, &setup, true), 300);
+
+        setup.weapon_dedicated = 1;
+        let owned_equipment = GoalFunding::calculate(
+            &setup, &deterministic_goals(&setup), 1, 1, 90);
+        assert_eq!(standalone_ticket_shortage(&owned_equipment, &setup, true), 0);
+
+        setup.weapon_dedicated = 0;
+        setup.premium_currency = setup.game.cost_per_pull();
+        let funded = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            1, 1, 90);
+        // Each standalone banner can consume the same premium currency,
+        // but their combined goal still needs one additional ticket-equivalent.
+        assert_eq!(standalone_ticket_shortage(&funded, &setup, false), 0);
+        assert_eq!(standalone_ticket_shortage(&funded, &setup, true), 0);
+        assert_eq!(funded.additional_shared, 1);
+    }
+
+    #[test]
+    fn game_specific_ticket_units_and_shared_hsr_pass_name() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            setup.set_targets(1, 1);
+            let gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                1, 1, 90);
+            assert_eq!(standalone_ticket_shortage(&gap, &setup, false), 1);
+            assert_eq!(standalone_ticket_shortage(&gap, &setup, true),
+                game.weapon_ticket_units_per_pull());
+            if game == Game::StarRail {
+                assert_eq!(game.character_ticket_name(), game.weapon_ticket_name());
+            } else {
+                assert_ne!(game.character_ticket_name(), game.weapon_ticket_name());
+            }
+        }
     }
 
     #[test]
