@@ -60,62 +60,9 @@ jobs:
             exit 1
           fi
           echo "GUI stayed alive under virtual X11 display without crashing."
-      - name: Capture dark-mode chart screenshot (Linux GUI)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y scrot xdotool python3-pil fonts-noto-cjk
-          mkdir -p ci-artifacts
-          xvfb-run -a -s '-screen 0 1536x864x24' bash -c '
-            set -eu
-            LIBGL_ALWAYS_SOFTWARE=1 ./target/release/gacha_pickup_calculator >/tmp/gacha-chart.log 2>&1 &
-            app=$!
-            trap "kill $app 2>/dev/null || true" EXIT
-            sleep 9
-            xdotool mousemove 1470 27
-            kill -0 "$app" || { cat /tmp/gacha-chart.log; exit 1; }
-            scrot -q 90 ci-artifacts/initial.png
-            # Settings is the second entry in the persistent navigation rail.
-            # Capture its compact 2x2 editor layout before returning to charts.
-            xdotool mousemove 95 225 click 1
-            sleep 2
-            scrot -q 90 ci-artifacts/settings.png
-            xdotool mousemove 95 167 click 1
-            sleep 2
-            xdotool mousemove 1470 27
-            xdotool click --repeat 7 --delay 125 5
-            sleep 2
-            scrot -q 90 ci-artifacts/overview.png
-            # Verify the separate character/weapon cards further down the
-            # dashboard instead of repeatedly capturing the top inputs.
-            xdotool click --repeat 11 --delay 125 5
-            sleep 2
-            scrot -q 90 ci-artifacts/chart.png
-          '
-          python3 - <<'PY'
-          from PIL import Image
-          image = Image.open("ci-artifacts/chart.png").convert("RGB")
-          assert image.width >= 1200 and image.height >= 800, "Invalid screenshot"
-          core = image.crop((150, 60, 1150, 850)).resize((100, 79))
-          pixels = list(core.getdata())
-          dark = sum(max(p) < 155 for p in pixels) / len(pixels)
-          distinct = len(set(pixels))
-          print(f"GUI screenshot dark-pixel ratio: {dark:.1%}; distinct colors: {distinct}")
-          assert dark >= 0.55 and distinct >= 50, "GUI is not dark or screenshot is blank"
-          PY
-      - name: Upload Linux chart screenshot
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: gacha-chart-visual-smoke-linux
-          path: |
-            ci-artifacts/initial.png
-            ci-artifacts/settings.png
-            ci-artifacts/overview.png
-            ci-artifacts/chart.png
-          if-no-files-found: error
-          retention-days: 7
+      # Native Linux GUI startup was checked above. A fresh dedicated ui_docs
+      # runner below captures all nine real GUI screenshots after both OS builds.
+      # Avoid running a second Xvfb/scrot session in this verification job.
       - name: Windows native dark UI screenshot smoke
         if: runner.os == 'Windows'
         continue-on-error: true
