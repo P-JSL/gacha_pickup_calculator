@@ -143,6 +143,19 @@ def audit_pinned_game_sources(catalog):
     if len([k for k in hsr_rows if k[1] == "w"]) != 170:
         raise ValueError("HSR Light Cone coverage unexpectedly changed")
 
+    wuwa_checked = {}
+    for line in Path("src/source_snapshot_wuwa_weapons.tsv").read_text(
+            encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        ident, name = line.split("\t")
+        key = ("wuwa", "w", ident)
+        if key not in catalog or key in wuwa_checked or catalog[key][3] != name:
+            raise ValueError(f"WuWa secondary weapon ID/name mismatch: {ident} {name}")
+        wuwa_checked[key] = True
+    if len(wuwa_checked) != 90:
+        raise ValueError(f"WuWa independently cross-checked names changed: {len(wuwa_checked)}")
+
     sora_rows = {}
     for line in Path("src/source_snapshot_sora.tsv").read_text(
             encoding="utf-8").splitlines():
@@ -190,7 +203,7 @@ def audit_pinned_game_sources(catalog):
         raise ValueError(f"NTE exclusive-character matching differs from game table: "
                          f"missing={nte_exclusive - configured_nte}; "
                          f"unsupported={configured_nte - nte_exclusive}")
-    return len(hsr_rows), len(sora_rows), len(nte_rows), len(nte_exclusive)
+    return len(hsr_rows), len(wuwa_checked), len(sora_rows), len(nte_rows), len(nte_exclusive)
 
 
 def audit_pngs(catalog):
@@ -239,10 +252,11 @@ def audit_pngs(catalog):
 def main():
     catalog = catalog_entries()
     paired = audit_signature_pairs(catalog)
-    hsr_checked, sora_checked, nte_checked, nte_mapped = audit_pinned_game_sources(catalog)
+    hsr_checked, wuwa_checked, sora_checked, nte_checked, nte_mapped = audit_pinned_game_sources(catalog)
     images = audit_pngs(catalog)
     print(f"Offline catalog integrity OK: {images} PNGs and {paired} signatures; "
-          f"{hsr_checked} HSR IDs, {sora_checked} Sora game IDs, {nte_checked} NTE forks, "
+          f"{hsr_checked} HSR IDs, {wuwa_checked} independent WuWa weapons, "
+          f"{sora_checked} Sora game IDs, {nte_checked} NTE forks, "
           f"{nte_mapped} exclusive NTE mappings; no image network requests")
 
 
