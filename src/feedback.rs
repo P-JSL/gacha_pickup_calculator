@@ -46,6 +46,14 @@ pub struct FeedbackConfig {
     /// limited-character Wavebands before converting the rest to tickets.
     pub wuwa_waveband_max: usize,
     pub wuwa_waveband_cost: usize,
+    /// Approximate per-board-roll chance of an extra character die (NTE only).
+    pub nte_one_die_chance: f64,
+    /// Approximate per-board-roll chance of five extra character dice (NTE only).
+    pub nte_five_dice_chance: f64,
+    /// Stella Sora limited recruitment awards Gold Disc units, never character passes.
+    pub stella_record_discs_per_character_pull: usize,
+    /// Account-specific first-time boosted character draws; zero if unknown or claimed.
+    pub stella_first_ten_remaining: usize,
 }
 
 impl FeedbackConfig {
@@ -61,6 +69,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
@@ -72,6 +82,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
                 samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::Neverness => Self {
                 // Warp Pieces can buy dice / Tri-Keys. The 24-piece price and
@@ -85,6 +97,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0157, nte_five_dice_chance: 0.0038,
+                stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0,
             },
             Game::StellaSora => Self {
                 // Expert Permits: duplicate 5★ Trekker / Disc = 200,
@@ -100,6 +114,8 @@ impl FeedbackConfig {
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+                nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+                stella_record_discs_per_character_pull: 30, stella_first_ten_remaining: 0,
             },
         }
     }
@@ -115,7 +131,12 @@ impl FeedbackConfig {
             || !valid_probability(self.character_four_star_rate)
             || !valid_probability(self.weapon_four_star_rate)
             || !valid_probability(self.character_other_five_star_rate)
-            || !valid_probability(self.weapon_other_five_star_rate) {
+            || !valid_probability(self.weapon_other_five_star_rate)
+            || !valid_probability(self.nte_one_die_chance)
+            || !valid_probability(self.nte_five_dice_chance)
+            || self.nte_one_die_chance + self.nte_five_dice_chance > 1.0
+            || self.stella_record_discs_per_character_pull > 300
+            || self.stella_first_ten_remaining > 10 {
             return Err("환급 설정의 가격·확률·표본 수가 허용 범위를 벗어났습니다.".to_owned());
         }
         Ok(())
@@ -139,6 +160,8 @@ pub struct RefundScenario {
     pub earned_points: usize,
     pub wavebands_purchased: usize,
     pub corals_spent_on_wavebands: usize,
+    pub board_dice_earned: usize,
+    pub record_disc_units_earned: usize,
 }
 impl RefundScenario {
     fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
@@ -152,6 +175,8 @@ impl RefundScenario {
             earned_points: wallet.points - starting_points,
             wavebands_purchased: wallet.wavebands_bought,
             corals_spent_on_wavebands: wallet.waveband_points_spent,
+            board_dice_earned: wallet.board_dice_earned,
+            record_disc_units_earned: wallet.record_disc_units,
         };
         debug_assert_eq!(scenario.raw_pulls,
             scenario.dedicated_used + scenario.points_funded_pulls
@@ -183,6 +208,12 @@ pub struct FeedbackEstimate {
     pub total_returned_points_average: f64,
     pub average_wavebands_purchased: f64,
     pub average_waveband_corals_spent: f64,
+    pub average_character_raw: f64,
+    pub average_weapon_raw: f64,
+    pub average_character_return_points: f64,
+    pub average_weapon_return_points: f64,
+    pub average_board_dice_earned: f64,
+    pub average_record_disc_units_earned: f64,
 }
 
 impl FeedbackEstimate {
@@ -266,12 +297,19 @@ struct Wallet {
     raw_pulls: usize,
     waveband_points_spent: usize,
     wavebands_bought: usize,
+    board_dice_earned: usize,
+    record_disc_units: usize,
+    stella_first_ten_remaining: usize,
+    reward_multiplier: usize,
 }
 impl Wallet {
     fn new(model: &FeedbackConfig) -> Self {
         Self { points: model.initial_points, price: model.points_per_ticket,
             common_spent: 0, initial_flexible_required: 0, raw_pulls: 0,
-            waveband_points_spent: 0, wavebands_bought: 0 }
+            waveband_points_spent: 0, wavebands_bought: 0,
+            board_dice_earned: 0, record_disc_units: 0,
+            stella_first_ten_remaining: model.stella_first_ten_remaining,
+            reward_multiplier: 1 }
     }
     /// The ticket for the current pull is payable only with returns obtained *before* that pull.
     fn pay(&mut self, dedicated_remaining: &mut usize) {
@@ -282,7 +320,20 @@ impl Wallet {
             self.reconcile_funding();
         }
     }
-    fn refund(&mut self, reward: usize) { self.points += reward; }
+    fn refund(&mut self, reward: usize) {
+        self.points += reward * self.reward_multiplier;
+    }
+
+    /// Activate optional account-specific first-ten rewards and accrue record-only discs.
+    fn begin_character_pull(&mut self, model: &FeedbackConfig) {
+        self.record_disc_units += model.stella_record_discs_per_character_pull;
+        self.reward_multiplier = if self.stella_first_ten_remaining > 0 {
+            self.stella_first_ten_remaining -= 1;
+            3
+        } else {
+            1
+        };
+    }
     fn reconcile_funding(&mut self) {
         // Corals spent on a Waveband cannot also subsidize a ticket.
         let recycled = self.points.saturating_sub(self.waveband_points_spent) / self.price;
@@ -346,7 +397,7 @@ fn character_four_star_refund(rng: &mut SplitMix64, model: &FeedbackConfig) -> u
     }
 }
 
-fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
+fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (BannerKind, Game),
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
                  (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
     let BannerRule::Standard { rarity, featured_share } = &rule.rule else { return; };
@@ -364,6 +415,25 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     };
     while won < rule.target_copies {
         wallet.pay(dedicated);
+        if matches!(kind, BannerKind::Character) {
+            if game == Game::StellaSora {
+                wallet.begin_character_pull(model);
+            }
+            // A community estimate only: actual NTE tile odds depend on board position.
+            if game == Game::Neverness
+                && model.nte_one_die_chance + model.nte_five_dice_chance > 0.0 {
+                let tile = rng.uniform();
+                let returned: usize = if tile < model.nte_one_die_chance {
+                    1
+                } else if tile < model.nte_one_die_chance + model.nte_five_dice_chance {
+                    5
+                } else {
+                    0
+                };
+                *dedicated = dedicated.saturating_add(returned);
+                wallet.board_dice_earned += returned;
+            }
+        }
         let rare = rng.hits(rarity.chance(pity + 1, mode));
         if maybe_four_star(rng, model, kind, &mut four_pity, rare) {
             wallet.refund(match kind {
@@ -404,6 +474,9 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     let mut progress = rule.spark.as_ref().map_or(0, |s| s.progress);
     while won < rule.target_copies {
         wallet.pay(dedicated);
+        if matches!(kind, BannerKind::Character) {
+            wallet.begin_character_pull(model);
+        }
         let success = rng.hits(if pity + 1 >= *hard_featured { 1.0 } else { *featured_rate });
         // Sampling the nonfeatured rate conditional on a featured miss retains
         // the desired unconditional rarity rate. Nonfeatured Stella Sora
@@ -499,6 +572,12 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
     let mut total_returns = 0.0;
     let mut total_wavebands = 0.0;
     let mut total_waveband_cost = 0.0;
+    let mut total_character_raw = 0.0;
+    let mut total_weapon_raw = 0.0;
+    let mut total_character_points = 0.0;
+    let mut total_weapon_points = 0.0;
+    let mut total_board_dice = 0.0;
+    let mut total_record_discs = 0.0;
     for _ in 0..model.samples {
         let mut wallet = Wallet::new(model);
         let mut dedicated_character = setup.character_dedicated;
@@ -507,13 +586,23 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
             (BannerKind::Character, &setup.character, setup.character_owned, &mut dedicated_character),
             (BannerKind::Weapon, &setup.weapon, setup.weapon_owned, &mut dedicated_weapon),
         ] {
+            // Record-only credits can be combined with the player's partial
+            // Gold Disc balance. Never use these credits for character draws.
+            if matches!(kind, BannerKind::Weapon) && setup.game == Game::StellaSora {
+                let disc_units = wallet.record_disc_units
+                    .saturating_add(setup.weapon_ticket_remainder);
+                *dedicated = dedicated.saturating_add(
+                    disc_units / setup.game.weapon_ticket_units_per_pull());
+            }
+            let raw_before = wallet.raw_pulls;
+            let points_before = wallet.points;
             match &banner.rule {
                 BannerRule::Standard { .. } => {
                     let max_wavebands = if setup.game == Game::WutheringWaves
                         && matches!(kind, BannerKind::Character) {
                         model.wuwa_waveband_max
                     } else { 0 };
-                    roll_standard(&mut rng, banner, kind, mode, model, &mut wallet,
+                    roll_standard(&mut rng, banner, (kind, setup.game), mode, model, &mut wallet,
                         (owned, dedicated, max_wavebands));
                 }
                 BannerRule::FeaturedCounter { .. } => {
@@ -523,7 +612,22 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
                     roll_arc(&mut rng, banner, model, &mut wallet, owned, dedicated);
                 }
             }
+            let draws = (wallet.raw_pulls - raw_before) as f64;
+            let points = (wallet.points - points_before) as f64;
+            match kind {
+                BannerKind::Character => {
+                    total_character_raw += draws;
+                    total_character_points += points;
+                    wallet.reward_multiplier = 1;
+                }
+                BannerKind::Weapon => {
+                    total_weapon_raw += draws;
+                    total_weapon_points += points;
+                }
+            }
         }
+        total_board_dice += wallet.board_dice_earned as f64;
+        total_record_discs += wallet.record_disc_units as f64;
         budgets.push(wallet.initial_flexible_required);
         raw_pulls.push(wallet.raw_pulls);
         scenarios.push(RefundScenario::from_wallet(&wallet, model.initial_points));
@@ -541,7 +645,13 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         average_raw: total_raw / n, average_initial_flexible: total_flexible / n,
         total_returned_points_average: total_returns / n,
         average_wavebands_purchased: total_wavebands / n,
-        average_waveband_corals_spent: total_waveband_cost / n })
+        average_waveband_corals_spent: total_waveband_cost / n,
+        average_character_raw: total_character_raw / n,
+        average_weapon_raw: total_weapon_raw / n,
+        average_character_return_points: total_character_points / n,
+        average_weapon_return_points: total_weapon_points / n,
+        average_board_dice_earned: total_board_dice / n,
+        average_record_disc_units_earned: total_record_discs / n })
 }
 
 #[cfg(test)]
@@ -559,7 +669,9 @@ mod tests {
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
             weapon_four_star_rate: 0.0, character_other_five_star_rate: 0.0,
             weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10,
-            wuwa_waveband_max: 0, wuwa_waveband_cost: 360 };
+            wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
+            nte_one_die_chance: 0.0, nte_five_dice_chance: 0.0,
+            stella_record_discs_per_character_pull: 0, stella_first_ten_remaining: 0 };
         let mut w = Wallet::new(&conf);
         let mut d = 0;
         w.pay(&mut d);
@@ -843,6 +955,91 @@ mod tests {
         assert_eq!(wallet.initial_flexible_required, 1);
         assert_eq!(wallet.raw_pulls, 4);
         assert_eq!(RefundScenario::from_wallet(&wallet, 0).points_funded_pulls, 3);
+    }
+
+    #[test]
+    fn nte_board_dice_are_reusable_after_the_roll_not_before() {
+        let mut setup = GameSetup::new(Game::Neverness);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 3,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut cfg = FeedbackConfig::for_game(Game::Neverness);
+        cfg.samples = 10;
+        cfg.nte_one_die_chance = 1.0;
+        cfg.nte_five_dice_chance = 0.0;
+        cfg.featured_first = 0;
+        cfg.featured_duplicate = 0;
+        cfg.featured_maxed = 0;
+        let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let scenario = &result.scenarios[0];
+        assert_eq!(scenario.raw_pulls, 3);
+        assert_eq!(scenario.initial_flexible_required, 1);
+        assert_eq!(scenario.board_dice_earned, 3);
+        assert_eq!(result.average_board_dice_earned, 3.0);
+        cfg.nte_five_dice_chance = 0.1;
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stella_record_only_credit_cannot_pay_for_character_pulls() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 10,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.samples = 10;
+        cfg.featured_duplicate = 0;
+        cfg.featured_maxed = 0;
+        cfg.weapon_rare = 0;
+        cfg.weapon_first = 0;
+        cfg.off_banner_rare = 0;
+        cfg.character_four_star_rate = 0.0;
+        cfg.weapon_four_star_rate = 0.0;
+        cfg.four_star_reward = 0;
+        cfg.weapon_four_star_reward = 0;
+        let actual = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(actual.average_record_disc_units_earned, 300.0);
+        assert_eq!(actual.scenarios[0].initial_flexible_required, 10);
+        assert_eq!(actual.scenarios[0].dedicated_used, 1);
+        cfg.stella_record_discs_per_character_pull = 0;
+        let disabled = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(disabled.scenarios[0].initial_flexible_required, 11);
+    }
+
+    #[test]
+    fn first_ten_multiplier_requires_explicit_account_remaining_count() {
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.stella_first_ten_remaining = 2;
+        let mut wallet = Wallet::new(&cfg);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        wallet.begin_character_pull(&cfg);
+        wallet.refund(40);
+        assert_eq!(wallet.points, 280); // 3*40 + 3*40 + 40
+        assert_eq!(wallet.record_disc_units, 90);
+        cfg.stella_first_ten_remaining = 11;
+        assert!(cfg.validate().is_err());
     }
 
     #[test]

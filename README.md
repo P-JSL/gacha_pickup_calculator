@@ -2,8 +2,8 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표에 필요한 뽑기 횟수, 보유 재화, 환급 재투자를 분석하는 **Rust/egui 데스크톱 프로그램**입니다.
 
-**최신 문서: v0.2.3 (2026-11-06)**  
-[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.3) · [v0.2.3 변경사항](RELEASE_NOTES_v0.2.3.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
+**최신 문서: v0.2.4 (2026-11-06)**  
+[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.4) · [v0.2.4 변경사항](RELEASE_NOTES_v0.2.4.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
 
 > **정확도 범위:** 희귀도 및 픽업 확률은 선택된 배너 규칙에 대한 유한 상태 DP로 계산합니다. 소프트 천장·게임 내 숨겨진 처리 등 미공개 조건이 있으면 실제 서비스 확률과 다를 수 있습니다. 4성 중복, 상점 환급, 재화 재투자는 개별 계정의 소장 상태를 모두 알 수 없어 **Monte Carlo 추정치**입니다. 서로 다른 결과를 혼동하지 마십시오.
 
@@ -11,9 +11,11 @@
 
 > **v0.2.3 자동 갱신:** 실행 시 GitHub의 커밋 고정 버전별 캐릭터·전용 장비 카탈로그를 확인하고, 변경된 로컬 PNG만 SHA-256 검증 후 사용자 캐시에 반영합니다. 인터넷이 없으면 기존 데이터로 동작합니다. 프로그램의 새 릴리즈는 자동 **확인**하지만 실행 파일 자동 교체는 하지 않습니다. 게임 공식 발표에 맞춘 신규 데이터의 자동 발굴·등록은 아직 지원되지 않습니다. [구현 및 보안 범위](docs/AUTO_UPDATES_AND_RUST_DESIGN.md).
 
+> **v0.2.4 환급 보정:** 기본 확률 모드를 공개 확률 + 확정 천장으로 변경했습니다. 이환의 커뮤니티 모드는 [72칸 보드 연구의 누적 S급 획득 확률](https://arca.live/b/nevernesstoeverness/185272303)로 조건부 성공률을 보정하되 실제 보드의 전이 상태까지 재현하지는 않습니다. 이환 즉시 반환 주사위, 스텔라 소라 캐릭터→레코드 전용 디스크, 초회 남은 횟수 입력을 별개로 처리합니다. 환급률은 입력·배너·소유 상태에 의존하는 생성량 추정이며 모든 유저에게 고정 적용하는 값이 아닙니다. [세부 가정](docs/REFUND_CALIBRATION.md).
+
 ## 화면
 
-현재 버전 **v0.2.3의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.3/gacha-pickup-calculator-screenshots-v0.2.3.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
+현재 버전 **v0.2.4의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.4/gacha-pickup-calculator-screenshots-v0.2.4.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
 
 ## 주요 기능
 
@@ -56,12 +58,12 @@
 
 ## 설치 (Windows x64)
 
-1. [v0.2.3 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.3)에서 `gacha-pickup-calculator-windows-x64-v0.2.3.zip`을 받습니다.
+1. [v0.2.4 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.4)에서 `gacha-pickup-calculator-windows-x64-v0.2.4.zip`을 받습니다.
 2. ZIP 전체를 압축 해제합니다. **실행 파일과 `Image/` 폴더 구조를 그대로 유지**하십시오.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 별도 관리자 권한이나 외부 API 키는 필요하지 않습니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v0.2.3.zip
+gacha-pickup-calculator-windows-x64-v0.2.4.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/
@@ -84,9 +86,9 @@ gacha-pickup-calculator-windows-x64-v0.2.3.zip
 | 스텔라 소라 | 별의 파편 300 | 캐릭터 Cerulean Ticket / 레코드 Gold Disc 구분 | 탐험 전문가 증명서 100개/1회 |
 
 - **스타레일:** 캐릭터 5성 첫 장 0, 2~7번째 40, 8번째 이후 100 스타라이트. 4성 중복 8, 풀돌 이후 20. 5성 광추 40, 4성 광추 8.
-- **이환:** S급 캐릭터 첫 장 0, 2~7번째 40, 8번째 이후 80 Warp Pieces. A급 캐릭터 6/12(풀돌 전/후), A급 Arc 4. Arc S급 보상 및 일부 특수 교환은 미검증 가정이므로 직접 확인하여 설정해야 합니다.
+- **이환:** S급 캐릭터 첫 장 0, 2~7번째 40, 8번째 이후 80 Warp Pieces. A급 캐릭터 6/12(풀돌 전/후), A급 Arc 4. 추가 주사위 1개(1.57%)·5개(0.38%)는 보드 위치를 생략한 커뮤니티 추정값으로 별도 반영하며, 기본 캐릭터 S급 확률은 공식 모드가 우선입니다. Arc S급 보상 및 일부 특수 교환은 미검증 가정입니다.
 - **명조:** 환급 산호를 뽑기권만 교환하거나 한정 캐릭터 돌파 최대 1·2개를 먼저 구매하는 전략을 비교할 수 있습니다. 중복 산호 사용을 허용하지 않습니다.
-- **스텔라 소라:** 전문가 증명서 100개/1회, 중복 5성 여행가·레코드 200개, 중복 4성 여행가·레코드 40개를 기본 가정으로 사용합니다.
+- **스텔라 소라:** 전문가 증명서 100개/1회, 중복 5성 여행가·레코드 200개, 중복 4성 여행가·레코드 40개를 기본 가정으로 사용합니다. 한정 캐릭터 뽑기마다 레코드 전용 디스크 30개 적립(레코드 뽑기 1회의 10%)을 별도로 모델링합니다. 초회 3배 혜택은 남은 횟수를 사용자가 입력해야 하며 기본 0회입니다.
 
 상점 재고, 이벤트 배너, 베타 테스트 규칙, 신규 픽업 및 소프트 천장은 변경될 수 있습니다. 사용 중인 배너의 공지와 게임 내 설명을 우선 확인하십시오.
 
