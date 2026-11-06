@@ -15,6 +15,8 @@ pub struct FeedbackConfig {
     pub initial_points: usize,
     pub featured_first: usize,
     pub featured_duplicate: usize,
+    /// Reward when a featured character is already fully upgraded (8th copy onward).
+    pub featured_maxed: usize,
     pub off_banner_rare: usize,
     /// First copy of the featured 5★ weapon or record.
     pub weapon_first: usize,
@@ -22,6 +24,11 @@ pub struct FeedbackConfig {
     pub weapon_rare: usize,
     /// Average 4★ payout on the character banner; duplicates are assumed.
     pub four_star_reward: usize,
+    /// Reward for a fully upgraded 4-star character (or A-rank character).
+    pub four_star_maxed: usize,
+    /// Assumed share of 4-star character hits that are already fully upgraded.
+    /// Does not affect weapon / Arc outcomes; these retain their fixed payout.
+    pub four_star_maxed_share: f64,
     /// Average 4★ payout on the weapon / record banner.
     pub weapon_four_star_reward: usize,
     pub character_four_star_rate: f64,
@@ -46,9 +53,10 @@ impl FeedbackConfig {
         match game {
             Game::StarRail => Self {
                 enabled: true, points_per_ticket: 20, initial_points: 0,
-                featured_first: 0, featured_duplicate: 40,
+                featured_first: 0, featured_duplicate: 40, featured_maxed: 100,
                 off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
-                four_star_reward: 8, weapon_four_star_reward: 8, character_four_star_rate: 0.051,
+                four_star_reward: 8, four_star_maxed: 20, four_star_maxed_share: 0.0,
+                weapon_four_star_reward: 8, character_four_star_rate: 0.051,
                 weapon_four_star_rate: 0.066,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
@@ -56,9 +64,10 @@ impl FeedbackConfig {
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
-                featured_first: 15, featured_duplicate: 15,
+                featured_first: 15, featured_duplicate: 15, featured_maxed: 15,
                 off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
-                four_star_reward: 3, weapon_four_star_reward: 3, character_four_star_rate: 0.06,
+                four_star_reward: 3, four_star_maxed: 3, four_star_maxed_share: 0.0,
+                weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0,
@@ -68,9 +77,10 @@ impl FeedbackConfig {
                 // Warp Pieces can buy dice / Tri-Keys. The 24-piece price and
                 // missing board-tile rewards remain community assumptions.
                 enabled: true, points_per_ticket: 24, initial_points: 0,
-                featured_first: 0, featured_duplicate: 40,
+                featured_first: 0, featured_duplicate: 40, featured_maxed: 80,
                 off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
-                four_star_reward: 6, weapon_four_star_reward: 4,
+                four_star_reward: 6, four_star_maxed: 12, four_star_maxed_share: 0.0,
+                weapon_four_star_reward: 4,
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
                 four_star_hard: 10, character_four_star_pity: 0,
@@ -82,9 +92,10 @@ impl FeedbackConfig {
                 // First-time featured 5★ collections award no duplicate permits.
                 // The 4★ return assumes all 4★ results are already owned.
                 enabled: true, points_per_ticket: 100, initial_points: 0,
-                featured_first: 0, featured_duplicate: 200,
+                featured_first: 0, featured_duplicate: 200, featured_maxed: 200,
                 off_banner_rare: 200, weapon_first: 0, weapon_rare: 200,
-                four_star_reward: 40, weapon_four_star_reward: 40,
+                four_star_reward: 40, four_star_maxed: 40, four_star_maxed_share: 0.0,
+                weapon_four_star_reward: 40,
                 character_four_star_rate: 0.08, weapon_four_star_rate: 0.08,
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
@@ -100,6 +111,7 @@ impl FeedbackConfig {
             || self.weapon_four_star_pity >= self.four_star_hard
             || self.wuwa_waveband_max > 2 || self.wuwa_waveband_cost == 0
             || self.wuwa_waveband_cost > 100_000
+            || !valid_probability(self.four_star_maxed_share)
             || !valid_probability(self.character_four_star_rate)
             || !valid_probability(self.weapon_four_star_rate)
             || !valid_probability(self.character_other_five_star_rate)
@@ -320,9 +332,18 @@ fn award_featured(wallet: &mut Wallet, model: &FeedbackConfig, owned: usize,
         BannerKind::Weapon if owned + copies_this_run == 0 => model.weapon_first,
         BannerKind::Weapon => model.weapon_rare,
         BannerKind::Character if owned + copies_this_run == 0 => model.featured_first,
+        BannerKind::Character if owned + copies_this_run >= 7 => model.featured_maxed,
         BannerKind::Character => model.featured_duplicate,
     };
     wallet.refund(amount);
+}
+
+fn character_four_star_refund(rng: &mut SplitMix64, model: &FeedbackConfig) -> usize {
+    if rng.hits(model.four_star_maxed_share) {
+        model.four_star_maxed
+    } else {
+        model.four_star_reward
+    }
 }
 
 fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
@@ -346,7 +367,7 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
         let rare = rng.hits(rarity.chance(pity + 1, mode));
         if maybe_four_star(rng, model, kind, &mut four_pity, rare) {
             wallet.refund(match kind {
-                BannerKind::Character => model.four_star_reward,
+                BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
             });
         }
@@ -394,7 +415,7 @@ fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
         let off_rare = !success && rng.hits((off_rate / (1.0 - featured_rate).max(f64::EPSILON)).min(1.0));
         if maybe_four_star(rng, model, kind, &mut four_pity, success || off_rare) {
             wallet.refund(match kind {
-                BannerKind::Character => model.four_star_reward,
+                BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
             });
         }
@@ -532,8 +553,9 @@ mod tests {
     #[test]
     fn wallet_requires_ticket_before_earning_refund() {
         let conf = FeedbackConfig { enabled: true, points_per_ticket: 1, initial_points: 0,
-            featured_first: 1, featured_duplicate: 1, off_banner_rare: 0,
+            featured_first: 1, featured_duplicate: 1, featured_maxed: 1, off_banner_rare: 0,
             weapon_first: 1, weapon_rare: 1, four_star_reward: 0,
+            four_star_maxed: 0, four_star_maxed_share: 0.0,
             weapon_four_star_reward: 0, character_four_star_rate: 0.0,
             weapon_four_star_rate: 0.0, character_other_five_star_rate: 0.0,
             weapon_other_five_star_rate: 0.0, four_star_hard: 10, character_four_star_pity: 0, weapon_four_star_pity: 0, samples: 10,
@@ -777,6 +799,52 @@ mod tests {
         assert_eq!(wavebands.scenarios[0].raw_pulls, 2);
         assert_eq!(wavebands.scenarios[0].initial_flexible_required, 2);
     }
+    #[test]
+    fn fully_upgraded_character_rewards_use_correct_copy_boundary() {
+        for (game, regular, maxed) in [(Game::StarRail, 40, 100), (Game::Neverness, 40, 80)] {
+            let config = FeedbackConfig::for_game(game);
+            let mut wallet = Wallet::new(&config);
+            award_featured(&mut wallet, &config, 0, 0, BannerKind::Character);
+            assert_eq!(wallet.points, 0);
+            award_featured(&mut wallet, &config, 0, 1, BannerKind::Character);
+            assert_eq!(wallet.points, regular);
+            award_featured(&mut wallet, &config, 0, 6, BannerKind::Character);
+            assert_eq!(wallet.points, regular * 2);
+            award_featured(&mut wallet, &config, 0, 7, BannerKind::Character);
+            assert_eq!(wallet.points, regular * 2 + maxed);
+            award_featured(&mut wallet, &config, 7, 0, BannerKind::Character);
+            assert_eq!(wallet.points, regular * 2 + maxed * 2);
+        }
+    }
+
+    #[test]
+    fn maxed_four_star_share_is_optional_and_preserves_fixed_weapon_rewards() {
+        for (game, normal, maxed, weapon) in [(Game::StarRail, 8, 20, 8), (Game::Neverness, 6, 12, 4)] {
+            let mut config = FeedbackConfig::for_game(game);
+            let mut rng = SplitMix64(42);
+            assert_eq!(character_four_star_refund(&mut rng, &config), normal);
+            config.four_star_maxed_share = 1.0;
+            assert_eq!(character_four_star_refund(&mut rng, &config), maxed);
+            assert_eq!(config.weapon_four_star_reward, weapon);
+            config.four_star_maxed_share = 1.01;
+            assert!(config.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn compounding_after_full_upgrade_uses_maxed_refund_tickets() {
+        let config = FeedbackConfig::for_game(Game::Neverness);
+        let mut wallet = Wallet::new(&config);
+        let mut dedicated = 0;
+        wallet.pay(&mut dedicated);
+        award_featured(&mut wallet, &config, 7, 0, BannerKind::Character);
+        assert_eq!(wallet.initial_flexible_required, 1);
+        for _ in 0..3 { wallet.pay(&mut dedicated); }
+        assert_eq!(wallet.initial_flexible_required, 1);
+        assert_eq!(wallet.raw_pulls, 4);
+        assert_eq!(RefundScenario::from_wallet(&wallet, 0).points_funded_pulls, 3);
+    }
+
     #[test]
     fn off_banner_wuthering_rare_includes_30_extra_corals() {
         assert_eq!(FeedbackConfig::for_game(Game::WutheringWaves).off_banner_rare, 45);
