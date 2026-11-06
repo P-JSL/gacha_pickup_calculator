@@ -759,10 +759,12 @@ impl Calculator {
                                 self.language_choices(ui);
                             });
                             ui.add_space(8.0);
+                            let hint = format!("⌕  {}", t(self.language(), "Search games or sections..."));
+                            let search_width = ui.available_width().min(340.0).max(60.0);
                             let search = ui.add(
                                 egui::TextEdit::singleline(&mut self.search_query)
-                                    .desired_width(ui.available_width().min(340.0).max(60.0))
-                                    .hint_text(format!("⌕  {}", t(self.language(), "Search games or sections...")))
+                                    .desired_width(search_width)
+                                    .hint_text(hint)
                                     .margin(egui::Margin::symmetric(10, 8))
                             );
                             if search.lost_focus()
