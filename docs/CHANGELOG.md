@@ -1,6 +1,14 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-현재 릴리즈는 **v0.2.7**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+현재 릴리즈는 **v1.0.0**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v1.0.0 (2026-11-06)
+- 안정 API 계약: 4개 게임의 목표 수량·보유권·프리미엄 재화·배너 천장·공식/커뮤니티 확률 모델의 입력 및 결과 호환성 유지.
+- 코드를 `src/probability/`, `src/domain/`, `src/analysis/`, `src/data/`, `src/ui/`, `src/app/`으로 물리적으로 분리하고 모듈의 import와 테스트 데이터 경로를 일치시킴.
+- `tests/v1_contracts.rs`: 배너 모델 확률질량·100% 확정 천장, 보유 장수 단조성, 프리미엄 재화 잔액, 전용권 복원, 적응 예산 성공 확률 증가 및 유효하지 않은 확률 입력 검증.
+- 불필요한 확률 0 상태를 건너뛰는 희소 분포 합성, CI의 릴리즈 계약 검사와 Rust 공개 문서 빌드 추가.
+- 기존 미병합 이슈의 누락 기능인 캐릭터·장비별 **실제 전용권 기준 단독 부족분**을 메인·분석 공통 카드에 추가. 스텔라 레코드 잔여 골든 디스크 단위와 비합산 주의를 표시.
+- [세부 출시 준비 전수 점검](V1_RELEASE_READINESS.md) · [코드 책임별 구조](ARCHITECTURE.md) · [v1 릴리즈 노트](../RELEASE_NOTES_v1.0.0.md).
 
 ## v0.2.7 (2026-11-06)
 - 4차 순환 검토 및 최종 종합 재검토: 확률 엔진, 환급 시뮬레이션, 관측 CSV, 업데이트 캐시, 카탈로그, 이미지 파이프라인, 워크플로와 문서 링크 점검 ([상세 보고서](FOUR_PASS_AUDIT_v0.2.7.md)).

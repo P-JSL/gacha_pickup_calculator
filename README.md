@@ -2,8 +2,8 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표에 필요한 뽑기 횟수, 보유 재화, 환급 재투자를 분석하는 **Rust/egui 데스크톱 프로그램**입니다.
 
-**최신 문서: v0.2.7 (2026-11-06)**  
-[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.7) · [v0.2.7 변경사항](RELEASE_NOTES_v0.2.7.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
+**안정 릴리즈: v1.0.0 (2026-11-06)**  
+[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.0) · [v1.0.0 변경사항](RELEASE_NOTES_v1.0.0.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
 
 > **정확도 범위:** 희귀도 및 픽업 확률은 선택된 배너 규칙에 대한 유한 상태 DP로 계산합니다. 소프트 천장·게임 내 숨겨진 처리 등 미공개 조건이 있으면 실제 서비스 확률과 다를 수 있습니다. 4성 중복, 상점 환급, 재화 재투자는 개별 계정의 소장 상태를 모두 알 수 없어 **Monte Carlo 추정치**입니다. 서로 다른 결과를 혼동하지 마십시오.
 
@@ -17,9 +17,11 @@
 
 > **v0.2.7 안전성 검토:** [4회 순환 검토와 최종 점검](docs/FOUR_PASS_AUDIT_v0.2.7.md)에서 확률 경계, 신규 계정 천장 초기값, 환급 예외, 캐시·CSV 입력 정합성, CI 권한을 검토하고 수정했습니다. 공식/커뮤니티 확률 구분 및 사용자별 보유 재화 계산은 유지합니다.
 
+> **v1.0.0 안정화 기준:** 확률·환급·관측 분석·카탈로그·업데이트·UI 코드를 책임별 디렉터리로 분리하고 4개 게임에 대한 공개 API 회귀 테스트, 릴리즈 소스 구조 검사 및 GitHub Actions 배포 게이트를 추가했습니다. [설계](docs/ARCHITECTURE.md) · [세분화 검토 및 미해결 항목](docs/V1_RELEASE_READINESS.md). 공식 게임의 비공개 확률과 모든 제3자 원본 이미지의 법적 권한/외형 정확도는 보증하지 않습니다.
+
 ## 화면
 
-현재 버전 **v0.2.7의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.7/gacha-pickup-calculator-screenshots-v0.2.7.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
+현재 버전 **v1.0.0의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.0/gacha-pickup-calculator-screenshots-v1.0.0.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
 
 ## 주요 기능
 
@@ -28,7 +30,7 @@
 - **캐릭터 선택 시 전용 장비 자동 선택:** `src/signature_pairs.tsv`의 명시적 연결표 **141건** (스타레일 66, 명조 39, 이환 11, 스텔라 소라 25)을 기준으로 연결합니다. 연결이 없는 캐릭터를 선택하면 **이전 장비를 자동 해제**하고, 장비는 언제든 직접 변경할 수 있습니다.
 - **한정 픽업 5성 목표 모델:** 캐릭터 E0~E6과 게임별 최고 희귀도 보조 장비의 목표 장수, 기보유, 캐릭터·무기 천장/확정 여부를 별도로 계산
 - **환급 재투자 계산:** 이전 뽑기에서 받은 스타라이트·산호·Warp Pieces·전문가 증명서를 교환해 추가 뽑기를 하고, 추가 뽑기에서 생긴 환급도 재사용. 현재 뽑기 이후 환급을 이전 뽑기에 소급 사용하지 않음
-- **목표까지 추가 준비량:** 기보유 캐릭터·장비, 배너별 전용 뽑기권, 현재 게임 재화(1뽑 미만 잔액 포함), 환급 포인트를 반영해 목표 성공률에 필요한 전용 뽑기권 **환산 부족분**과 정확한 추가 프리미엄 재화를 함께 표시합니다. Dashboard 및 Analytics에서 동일한 결과를 사용하며 게임별 보유 상태는 독립 보존됩니다.
+- **목표까지 추가 준비량:** 기보유 캐릭터·장비, 배너별 전용 뽑기권, 현재 게임 재화(1뽑 미만 잔액 포함), 환급 포인트를 반영해 목표 성공률에 필요한 전용 뽑기권 **환산 부족분**과 정확한 추가 프리미엄 재화를 함께 표시합니다. Dashboard 및 Analytics에서 동일한 결과를 사용하며, 캐릭터/장비별 단독 전용권 부족량도 해당 게임의 실제 티켓 명칭으로 구분합니다. 단독 수량은 전체 보유 교환 재화를 각각 사용한 참고치여서 합산할 수 없습니다. 게임별 보유 상태는 독립 보존됩니다.
 - **차트 및 분석:** 캐릭터·무기·전체 성공 확률, 누적 확률 그래프, 목표 성공률별 필요 재화, 시뮬레이션 경로 및 입력 변경 후 선택적 갱신
 - **트래커:** 현지 CSV 관측 자료의 우측 검열 처리와 실측 위험률/모델 비교. 불완전하거나 서로 다른 배너를 섞은 데이터는 결과를 왜곡할 수 있습니다.
 - **UI 설정:** 다크 모드 UI, 언어 자동 감지(한국어·영어·일본어·중국어 간체/번체), 차트 표시/갱신 방식. 입력값 설정(Simulator)과 UI 설정(Settings)은 독립 메뉴
@@ -74,12 +76,12 @@
 
 ## 설치 (Windows x64)
 
-1. [v0.2.7 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.7)에서 `gacha-pickup-calculator-windows-x64-v0.2.7.zip`을 받습니다.
+1. [v1.0.0 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.0)에서 `gacha-pickup-calculator-windows-x64-v1.0.0.zip`을 받습니다.
 2. ZIP 전체를 압축 해제합니다. **실행 파일과 `Image/` 폴더 구조를 그대로 유지**하십시오.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 별도 관리자 권한이나 외부 API 키는 필요하지 않습니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v0.2.7.zip
+gacha-pickup-calculator-windows-x64-v1.0.0.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/

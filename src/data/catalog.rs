@@ -107,7 +107,7 @@ fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
 
 fn parse() -> Vec<Entry> {
     let mut out = Vec::new();
-    for line in include_str!("catalog_data.tsv").lines() {
+    for line in include_str!("../catalog_data.tsv").lines() {
         if line.starts_with('#') { continue; }
         let fields: Vec<&str> = line.split('\t').collect();
         if fields.len() != 6 { continue; }
@@ -181,7 +181,7 @@ pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry
     static PAIRS: OnceLock<SignatureIndex> = OnceLock::new();
     let pairs = PAIRS.get_or_init(|| {
         let mut pairs: HashMap<Game, HashMap<&str, &str>> = HashMap::new();
-        for line in include_str!("signature_pairs.tsv").lines() {
+        for line in include_str!("../signature_pairs.tsv").lines() {
             if line.starts_with('#') || line.is_empty() { continue; }
             let mut parts = line.split('\t');
             let (Some(g), Some(char_id), Some(weapon_id), Some(source)) =
@@ -537,7 +537,7 @@ mod tests {
     fn signature_pairs_resolve_only_to_real_five_star_catalog_entries() {
         let mut pairs = HashSet::new();
         let mut count = 0;
-        for line in include_str!("signature_pairs.tsv").lines() {
+        for line in include_str!("../signature_pairs.tsv").lines() {
             if line.starts_with('#') || line.trim().is_empty() { continue; }
             let parts: Vec<_> = line.split('\t').collect();
             assert_eq!(parts.len(), 4, "invalid signature mapping: {line}");
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn all_unpaired_five_star_targets_are_explicitly_classified() {
         let mut exceptions = HashSet::new();
-        for line in include_str!("unpaired_five_star_targets.tsv").lines() {
+        for line in include_str!("../unpaired_five_star_targets.tsv").lines() {
             if line.starts_with('#') || line.is_empty() { continue; }
             let fields: Vec<_> = line.split('\t').collect();
             assert_eq!(fields.len(), 4, "bad unpaired target: {line}");
