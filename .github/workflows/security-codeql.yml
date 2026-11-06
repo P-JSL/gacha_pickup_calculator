@@ -62,7 +62,8 @@ jobs:
   codeql:
     name: CodeQL (${{ matrix.language }})
     needs: classify
-    if: needs.classify.outputs.scan == 'true'
+    # Keep the per-language matrix status checks for protected branches.
+    # Documentation-only changes skip individual expensive steps, not the job.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -70,18 +71,24 @@ jobs:
       matrix:
         language: [rust, python, actions]
     steps:
+      - name: Documentation-only fast path
+        if: needs.classify.outputs.scan != 'true'
+        run: echo "No CodeQL inputs changed; scheduled and manual scans still run."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: needs.classify.outputs.scan == 'true'
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
-        if: matrix.language == 'rust'
+        if: needs.classify.outputs.scan == 'true' && matrix.language == 'rust'
         with:
           components: clippy
       - name: Initialize CodeQL with limited build-independent scope
+        if: needs.classify.outputs.scan == 'true'
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
       - name: Analyze and report security issues
+        if: needs.classify.outputs.scan == 'true'
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066
         with:
           category: "/language:${{ matrix.language }}"

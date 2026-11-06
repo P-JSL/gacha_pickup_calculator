@@ -100,50 +100,60 @@ jobs:
   verify:
     name: Verify (${{ matrix.os }})
     needs: classify
-    if: needs.classify.outputs.build == 'true'
+    # The matrix must exist even for docs-only PRs: Rulesets may require the
+    # exact per-OS contexts, which disappear if the whole matrix is skipped.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Documentation-only fast path
+        if: needs.classify.outputs.build != 'true'
+        run: echo "No executable inputs changed; Rust compile steps are unnecessary."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: needs.classify.outputs.build == 'true'
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        if: needs.classify.outputs.build == 'true'
         with:
           components: rustfmt, clippy
       - name: Linux windowing prerequisites
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true'
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev
       - name: Format Rust sources before verification
+        if: needs.classify.outputs.build == 'true'
         run: cargo fmt --all
       - name: Unit tests
+        if: needs.classify.outputs.build == 'true'
         run: cargo test --locked --all-targets
       - name: Clippy
+        if: needs.classify.outputs.build == 'true'
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Public API documentation build
-        if: runner.os == 'Linux' && needs.classify.outputs.doc_api == 'true'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.doc_api == 'true'
         run: cargo doc --locked --no-deps --lib
       - name: Measured performance reference (release optimized; no machine-specific limits)
-        if: runner.os == 'Linux' && needs.classify.outputs.perf == 'true'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.perf == 'true'
         run: cargo test --locked --release --test performance_regression -- --ignored --nocapture
       - name: RustSec dependency vulnerability audit (Linux)
-        if: runner.os == 'Linux' && needs.classify.outputs.audit == 'true'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.audit == 'true'
         shell: bash
         run: |
           set -euo pipefail
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit
       - name: Build release
+        if: needs.classify.outputs.build == 'true'
         run: cargo build --locked --release
       - name: Optional trusted Authenticode signing (requires protected certificate secrets)
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.release == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           WIN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
           WIN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: ./scripts/sign_windows_release.ps1
       - name: Linux GUI startup smoke (virtual display)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true'
         shell: bash
         run: |
           sudo apt-get update
@@ -162,7 +172,7 @@ jobs:
       # runner below captures all nine real GUI screenshots after both OS builds.
       # Avoid running a second Xvfb/scrot session in this verification job.
       - name: Windows native dark UI screenshot smoke
-        if: runner.os == 'Windows' && needs.classify.outputs.ui == 'true'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -201,7 +211,7 @@ jobs:
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
           }
       - name: Upload Windows UI screenshot
-        if: runner.os == 'Windows' && needs.classify.outputs.ui == 'true'
+        if: runner.os == 'Windows' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-windows-native-ui-smoke
@@ -211,7 +221,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
-        if: runner.os == 'Linux' && needs.classify.outputs.ui == 'true'
+        if: runner.os == 'Linux' && needs.classify.outputs.build == 'true' && needs.classify.outputs.ui == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-linux-release-executable

@@ -45,5 +45,5 @@
 - `.github/workflows/rust.yml`은 문서·릴리즈 계약 검사와 코드·이미지·GUI·배포 작업을 별도 Job으로 구분합니다.
 - Markdown/라이선스·과거 릴리즈 노트만 변경되면 문서 무결성 검사를 수행하고, Rust 빌드·PNG 바이러스 검사·실제 GUI 캡처·릴리즈 재발행은 생략합니다.
 - Rust 확률·관측 분석 변경은 Windows/Linux 컴파일·테스트·Clippy를 실행합니다. 이미지/카탈로그 또는 UI 변경 시 관련 검증을 추가하며, 새 버전 릴리즈가 필요할 때에는 모든 필수 게이트를 수행합니다.
-- 브랜치 보호의 필수 체크를 Pending으로 만들지 않도록 workflow-level `paths-ignore` 대신 Job-level 조건을 사용합니다. 판별이 불가능한 변경은 전체 검사로 처리합니다.
+- 브랜치 보호의 필수 체크를 Pending으로 만들지 않도록 workflow-level `paths-ignore`를 피하고, Windows/Ubuntu 및 CodeQL **매트릭스 Job 이름을 유지한 채 Job 내부의 무거운 단계만 조건부 실행**합니다. 판별이 불가능한 변경은 전체 검사로 처리합니다.
 - 최초 v1.0.1의 책임별 분리는 런타임 성능 배수를 증명하지 않습니다. [v1.0.3 실측 결과](PERFORMANCE_V1_0_3.md)에 기록된 FFT/분위수 개선은 알고리즘별 비교입니다.
