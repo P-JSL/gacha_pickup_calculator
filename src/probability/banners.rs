@@ -1,3 +1,6 @@
+use crate::{Distribution, RateMode, RateSchedule, SoftPity};
+use std::sync::OnceLock;
+
 #[derive(Clone, Debug)]
 pub enum BannerRule {
     /// A rare item resets rarity pity. Losing the featured chance guarantees the next.

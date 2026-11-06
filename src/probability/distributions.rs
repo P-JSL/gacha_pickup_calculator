@@ -1,3 +1,5 @@
+use crate::fft::convolve_dense;
+
 #[derive(Clone, Debug)]
 pub struct Distribution {
     pub pmf: Vec<f64>,
@@ -27,13 +29,17 @@ impl Distribution {
         // accumulation or by a tolerance intended for ordinary quantiles.
         if chance >= 1.0 { return self.pmf.len().saturating_sub(1); }
         if chance <= 0.0 { return 0; }
-        self.cdf.iter().position(|&p| p >= chance).unwrap_or(self.cdf.len().saturating_sub(1))
+        self.cdf.partition_point(|&p| p < chance).min(self.cdf.len().saturating_sub(1))
     }
 
     /// Exact convolution of independent *first-passage* (stopping-time) distributions.
     pub fn combine(&self, other: &Self) -> Self {
         if self.pmf.is_empty() || other.pmf.is_empty() {
             return Self::new(Vec::new());
+        }
+        // Use O(N log N) FFT only for large, dense, well-formed distributions.
+        if let Some(dense) = convolve_dense(&self.pmf, &other.pmf) {
+            return Self::new(dense);
         }
         let mut combined = vec![0.0; self.pmf.len() + other.pmf.len() - 1];
         for (i, &a) in self.pmf.iter().enumerate() {
