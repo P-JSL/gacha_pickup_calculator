@@ -9,7 +9,7 @@ use std::io::{Cursor, Read};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind { Character, Weapon }
 
 #[derive(Clone, Debug)]
@@ -133,10 +133,22 @@ pub fn entries() -> &'static [Entry] {
     DATA.get_or_init(parse)
 }
 pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
-    entries().iter().find(|x| x.game == game && x.kind == kind && x.id == id)
+    // Build the index once. Repeated picker redraws and signature selections
+    // should not scan the entire four-game catalog.
+    static INDEX: OnceLock<HashMap<(Game, Kind), HashMap<&'static str, &'static Entry>>> =
+        OnceLock::new();
+    let lookup = INDEX.get_or_init(|| {
+        let mut lookup: HashMap<(Game, Kind), HashMap<&str, &Entry>> = HashMap::new();
+        for entry in entries() {
+            lookup.entry((entry.game, entry.kind))
+                .or_default().insert(entry.id.as_str(), entry);
+        }
+        lookup
+    });
+    lookup.get(&(game, kind))?.get(id).copied()
 }
 pub fn first(game: Game, kind: Kind) -> String {
-    entries().iter().find(|x| x.game == game && x.kind == kind && x.rarity >= 5)
+    entries().iter().find(|x| x.game == game && x.kind == kind && x.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
 pub fn count(game: Game, kind: Kind) -> usize {
@@ -146,18 +158,25 @@ pub fn count(game: Game, kind: Kind) -> usize {
 /// Explicitly sourced banner pairing. Never guess a 5★ weapon from rarity,
 /// sorted position, shared element, or similar naming.
 pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
-    let weapon_id = include_str!("signature_pairs.tsv").lines()
-        .filter(|line| !line.starts_with('#'))
-        .filter_map(|line| {
+    static PAIRS: OnceLock<HashMap<Game, HashMap<&'static str, &'static str>>> =
+        OnceLock::new();
+    let pairs = PAIRS.get_or_init(|| {
+        let mut pairs: HashMap<Game, HashMap<&str, &str>> = HashMap::new();
+        for line in include_str!("signature_pairs.tsv").lines() {
+            if line.starts_with('#') || line.is_empty() { continue; }
             let mut parts = line.split('\t');
-            let g = parts.next()?;
-            let char_id = parts.next()?;
-            let weapon_id = parts.next()?;
-            let source = parts.next()?;
-            if parts.next().is_some() || source.is_empty() { return None; }
-            (g == game_code(game) && char_id == character_id).then_some(weapon_id)
-        })
-        .next()?;
+            let (Some(g), Some(char_id), Some(weapon_id), Some(source)) =
+                (parts.next(), parts.next(), parts.next(), parts.next()) else { continue; };
+            if parts.next().is_some() || source.is_empty() { continue; }
+            let game = Game::ALL.iter().copied()
+                .find(|game| game_code(*game) == g);
+            if let Some(game) = game {
+                pairs.entry(game).or_default().insert(char_id, weapon_id);
+            }
+        }
+        pairs
+    });
+    let weapon_id = *pairs.get(&game)?.get(character_id)?;
     by_id(game, Kind::Weapon, weapon_id).filter(|entry| entry.rarity >= 5)
 }
 
@@ -435,6 +454,9 @@ mod tests {
         }
         assert_eq!(by_id(Game::Neverness, Kind::Character, "1091").map(|e| e.name.as_str()), None);
         assert_eq!(by_id(Game::Neverness, Kind::Character, "1051").map(|e| e.name.as_str()), None);
+        let latest_female = by_id(Game::StarRail, Kind::Character, "8010").unwrap();
+        assert_eq!(latest_female.name, "개척자 (여성 · 환락 · 번개)");
+        assert!(!latest_female.is_featured_target());
     }
 
     #[test]
