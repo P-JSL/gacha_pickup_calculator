@@ -19,7 +19,7 @@ REQUIRED = {
     "src/app/controller_refunds.rs", "src/app/controller_analytics.rs",
     "src/app/controller_evidence.rs", "src/app/lifecycle.rs",
     "src/ui/navigation.rs", "src/ui/charts.rs", "src/ui/funding_view.rs", "src/ui/dashboard.rs",
-    "src/ui/i18n.rs", "tests/v1_contracts.rs",
+    "src/ui/i18n.rs", "tests/v1_contracts.rs", "tests/performance_regression.rs",
 }
 OLD_FLAT = {
     "src/games.rs", "src/feedback.rs", "src/observations.rs",

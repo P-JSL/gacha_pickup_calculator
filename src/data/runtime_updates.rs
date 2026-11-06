@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 const REPO_RAW: &str = "https://raw.githubusercontent.com/P-JSL/gacha_pickup_calculator/";
 const HEAD_REF: &str = "https://api.github.com/repos/P-JSL/gacha_pickup_calculator/git/ref/heads/main";
 const RELEASE_API: &str = "https://api.github.com/repos/P-JSL/gacha_pickup_calculator/releases/latest";
+const COMMIT_API: &str = "https://api.github.com/repos/P-JSL/gacha_pickup_calculator/commits/";
 pub(crate) const RELEASE_PAGE: &str = "https://github.com/P-JSL/gacha_pickup_calculator/releases/latest";
 const MAX_TEXT: usize = 1_048_576;
 const MAX_IMAGE: usize = 512 * 1024;
@@ -148,9 +149,14 @@ fn run_update(send: &Sender<UpdateEvent>) {
         notify(send, UpdateEvent::Latest(tag));
     }
     match fetch_head_sha().and_then(|revision| {
+        // A commit SHA alone does not authenticate the owner of its contents.
+        // Reject unsigned or unverified upstream commits before network staging.
+        // This supplements, but does not replace, offline signed metadata:
+        // a compromised GitHub account can still publish verified commits.
         if previous.as_deref() == Some(revision.as_str()) {
             return Ok(None);
         }
+        verify_remote_commit(&revision)?;
         fetch_and_stage(&revision).map(Some)
     }) {
         Ok(Some(bundle)) => notify(send, UpdateEvent::Updated(bundle)),
@@ -169,6 +175,7 @@ fn fetch_text(url: &str, max_bytes: usize) -> Result<String, String> {
 /// this trust boundary even if future callers accidentally expose the helper.
 fn approved_update_url(url: &str) -> bool {
     if url == HEAD_REF || url == RELEASE_API { return true; }
+    if url.strip_prefix(COMMIT_API).is_some_and(is_commit_sha) { return true; }
     let Some((revision, path)) = url.strip_prefix(REPO_RAW)
         .and_then(|remainder| remainder.split_once('/')) else { return false; };
     if !is_commit_sha(revision) { return false; }
@@ -245,6 +252,32 @@ fn fetch_head_sha() -> Result<String, String> {
     if !is_commit_sha(&sha) { return Err("Git 참조 형식 오류".to_owned()); }
     Ok(sha)
 }
+/// Require GitHub's verified commit signature and the repository's expected
+/// signing/author identity. This is an additional online GitHub trust check,
+/// not a standalone vendor signature or protection against an admin takeover.
+fn verified_github_commit(response: &str, expected_sha: &str) -> bool {
+    // Exact JSON fields from GitHub's REST commits API; extra data such as the
+    // commit message is JSON escaped and cannot introduce a raw field token.
+    // Reject responses missing any field instead of failing open.
+    let prefix = format!("{{\"sha\":\"{expected_sha}\"");
+    response.starts_with(&prefix)
+        && response.contains("\"verification\":{\"verified\":true,\"reason\":\"valid\"")
+        && response.contains("\"committer\":{\"name\":\"GitHub\",\"email\":\"noreply@github.com\"")
+        && response.contains("\"author\":{\"login\":\"P-JSL\"")
+}
+
+fn verify_remote_commit(revision: &str) -> Result<(), String> {
+    if !is_commit_sha(revision) {
+        return Err("허용되지 않은 Git 커밋 SHA입니다.".to_owned());
+    }
+    let url = format!("{COMMIT_API}{revision}");
+    let response = fetch_text(&url, 128 * 1024)?;
+    if !verified_github_commit(&response, revision) {
+        return Err("서명이 검증되지 않았거나 예상 게시자가 아닌 커밋입니다.".to_owned());
+    }
+    Ok(())
+}
+
 fn fetch_latest_tag() -> Result<String, String> {
     let response = fetch_text(RELEASE_API, 128 * 1024)?;
     json_field(&response, "tag_name").ok_or("릴리즈 태그 누락".to_owned())
@@ -567,6 +600,7 @@ mod tests {
     #[test]
     fn url_allowlist_rejects_unpinned_and_escaped_update_paths() {
         let rev = "a".repeat(40);
+        assert!(approved_update_url(&format!("{COMMIT_API}{rev}")));
         for resource in [
             "src/catalog_data.tsv", "src/signature_pairs.tsv",
             "Image/SHA256SUMS.txt", "Image/HSR/c-1511.png",
@@ -582,10 +616,25 @@ mod tests {
             format!("{REPO_RAW}{rev}/Image/Other/c-1511.png"),
             format!("{REPO_RAW}{rev}/src/lib.rs"),
             format!("{REPO_RAW}{rev}/Image/HSR/c-1511.svg"),
+            format!("{COMMIT_API}main"),
+            format!("{COMMIT_API}{rev}?page=1"),
             "https://evil.invalid/".to_owned(),
         ] {
             assert!(!approved_update_url(&url), "{url}");
         }
+    }
+
+    #[test]
+    fn commit_attestation_check_rejects_unsigned_untrusted_and_wrong_revisions() {
+        let sha = "a".repeat(40);
+        let good = format!(
+            "{{\"sha\":\"{sha}\",\"commit\":{{\"committer\":{{\"name\":\"GitHub\",\"email\":\"noreply@github.com\"}},\"verification\":{{\"verified\":true,\"reason\":\"valid\"}}}},\"author\":{{\"login\":\"P-JSL\"}}}}"
+        );
+        assert!(verified_github_commit(&good, &sha));
+        assert!(!verified_github_commit(&good.replace("\"verified\":true", "\"verified\":false"), &sha));
+        assert!(!verified_github_commit(&good.replace("\"login\":\"P-JSL\"", "\"login\":\"other\""), &sha));
+        assert!(!verified_github_commit(&good, &"b".repeat(40)));
+        assert!(!verified_github_commit("malformed", &sha));
     }
 
     #[test]

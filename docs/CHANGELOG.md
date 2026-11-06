@@ -1,6 +1,14 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-현재 릴리즈는 **v1.0.2**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+현재 릴리즈는 **v1.0.3**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v1.0.3 (2026-11-07)
+- 원격 게임 데이터 업데이트 시 GitHub REST가 검증한 서명, 예상 게시자, 고정 SHA를 모두 확인. 불일치하면 업데이트 적용을 거부하고 기존 데이터 보존(별도의 오프라인 키 기반 서명은 아님).
+- GitHub OIDC + Sigstore SLSA 출처 증명을 전체 릴리즈 자산에 발급하고 게시 전에 GitHub CLI로 검증. GitHub 릴리즈는 초안에 전체 파일을 업로드한 뒤 일괄 게시하여 immutable releases 설정을 지원.
+- 신뢰된 인증서가 GitHub Secret에 제공된 경우에만 Windows Authenticode 서명/검증. 인증서 미설정은 **미서명**으로 명확히 표기.
+- Rust/Python/GitHub Actions CodeQL security-extended 스캔 및 공개 라이브러리 unsafe 코드 금지.
+- FFT/직접 계산 및 O(log N) 분위수 연산의 release 빌드 실측 비교 테스트와 수치 계약 테스트 추가.
+- GitHub `main` 필수 PR·CI·서명 커밋·강제 push 금지 Ruleset 생성 도구(관리자 로컬 적용 필요) 추가. [상세 설정](SECURE_RELEASE_v1_0_3.md).
 
 ## v1.0.2 (2026-11-07)
 - 바이너리 전용 `app/`, `data/`, `ui/`의 무제한 `pub`를 `pub(crate)`로 제한하고 외부 라이브러리 공개 API는 유지. CI에서 visibility 규칙을 검증.

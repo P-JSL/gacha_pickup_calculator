@@ -774,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "gacha_pickup_calculator"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "eframe",
  "egui_plot",

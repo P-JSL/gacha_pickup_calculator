@@ -48,3 +48,13 @@ python3 scripts/build_offline_images.py
 - CSV 헤더 상한을 64열로 지정하고 중복 검사 O(h) 해시 인덱스를 적용했습니다. 카탈로그 전용 장비 연결 대상 탐색도 O(n+p) 기대 해시 조회로 바꿨습니다.
 - Git 추적 파일의 고위험 비밀키·환경설정 파일명 패턴을 CI에서 거부합니다. 이 검사는 내용 기반 비밀 탐지, 이미 커밋된 과거 기록 제거, 계정 침해 방지까지 보장하지 않습니다.
 - 잔여 위험과 필요한 관리자 설정은 [보안 경계 문서](SECURITY_BOUNDARY_V1_0_2.md)를 참조하십시오.
+
+## v1.0.3 공급망 및 코드 보안 강화
+
+- GitHub OIDC/Sigstore 서명 기반 릴리즈 provenance를 게시 전 생성·검증하고, Windows 서명은 실제 Authenticode 인증서가 있는 경우에만 시행합니다. SHA-256 및 서명은 다른 신뢰 모델이므로 혼동하지 않습니다.
+- 실행 파일을 자동 교체하지 않는 기존 업데이트 정책을 유지하면서, 원격 데이터의 GitHub 검증 커밋·예상 계정·SHA를 확인하는 추가 방어를 배치합니다. 저장소 관리자가 공격받으면 Github가 검증한 악성 커밋도 만들어질 수 있으므로 완전한 방어가 아닙니다.
+- 공개 Rust 확률 엔진에 `#![forbid(unsafe_code)]` 적용. Rust·Python·GitHub Actions의 CodeQL 보안 스캔 추가.
+- 대규모 밀집 분포와 분위수 계산 경로의 실측 benchmark를 Linux release 최적화 빌드로 실행하여 실제 성능 수치를 확보합니다.
+- `main` 브랜치 보호와 Immutable Releases는 GitHub 저장소 관리 권한으로 별도 설정해야 하며, 미적용 상태를 '적용 완료'로 표시하지 않습니다.
+
+공식 문서 및 운영 절차: [v1.0.3 보안 배포](SECURE_RELEASE_v1_0_3.md).
