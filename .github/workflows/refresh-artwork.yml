@@ -1,0 +1,58 @@
+name: Optional maintainer artwork refresh and review (no automatic updates)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-review-candidate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: Install bounded image decoder
+        run: python3 -m pip install --disable-pip-version-check -r requirements-image.txt
+      - name: Retrieve candidate icons from the audited allowlisted sources
+        run: python3 scripts/build_offline_images.py
+      - name: Scan candidate artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam
+          clamscan --recursive --infected dist/Image
+      - name: Print content differences for human license and visual review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          current = {}
+          candidate = {}
+          for path, target in [
+              (Path("Image/SHA256SUMS.txt"), current),
+              (Path("dist/Image/SHA256SUMS.txt"), candidate),
+          ]:
+              for row in path.read_text(encoding="utf-8").splitlines():
+                  digest, name = row.split("  ", 1)
+                  target[name] = digest
+          print("new:", sorted(set(candidate) - set(current)))
+          print("deleted:", sorted(set(current) - set(candidate)))
+          changed = sorted(k for k in set(current) & set(candidate)
+                           if current[k] != candidate[k])
+          print("changed bytes:", changed)
+          print("Review source ownership, license, character identity and visual")
+          print("appearance before accepting any new or changed image.")
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unapproved-artwork-candidate-for-human-review
+          path: dist/Image/
+          if-no-files-found: error
+          retention-days: 7
