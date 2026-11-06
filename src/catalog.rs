@@ -24,6 +24,15 @@ pub struct Entry {
 }
 impl Entry {
     pub fn has_verified_image(&self) -> bool { approved_icon_url(&self.icon_url) }
+
+    /// Story-granted protagonists do not have a featured gacha banner even when 5★.
+    pub fn is_featured_target(&self) -> bool {
+        self.rarity >= 5 && !matches!(
+            self.game,
+            Game::StarRail if self.id.starts_with("800")
+                || self.id == "8010"
+        ) && !(self.game == Game::WutheringWaves && self.name.starts_with("Rover:"))
+    }
 }
 
 // Image URLs are compiled into the catalog, but a compromised upstream asset or
@@ -131,6 +140,24 @@ pub fn first(game: Game, kind: Kind) -> String {
 }
 pub fn count(game: Game, kind: Kind) -> usize {
     entries().iter().filter(|x| x.game == game && x.kind == kind).count()
+}
+
+/// Explicitly sourced banner pairing. Never guess a 5★ weapon from rarity,
+/// sorted position, shared element, or similar naming.
+pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
+    let weapon_id = include_str!("signature_pairs.tsv").lines()
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| {
+            let mut parts = line.split('\t');
+            let g = parts.next()?;
+            let char_id = parts.next()?;
+            let weapon_id = parts.next()?;
+            let source = parts.next()?;
+            if parts.next().is_some() || source.is_empty() { return None; }
+            (g == game_code(game) && char_id == character_id).then_some(weapon_id)
+        })
+        .next()?;
+    by_id(game, Kind::Weapon, weapon_id).filter(|entry| entry.rarity >= 5)
 }
 
 type ImageResult = (String, Option<egui::ColorImage>);
@@ -304,7 +331,7 @@ pub fn picker(
                         ui.horizontal(|ui| {
                             art.image(ui, item, 31.0);
                             let display = format!("{}   ★{}", item.name, item.rarity);
-                            let enabled = item.rarity >= 5;
+                            let enabled = item.is_featured_target();
                             if ui.add_enabled(enabled, egui::Button::new(display)
                                 .selected(current_id == item.id)).clicked() {
                                 selected = Some(item.id.clone());
@@ -312,6 +339,10 @@ pub fn picker(
                             if !item.status.is_empty() {
                                 ui.label(egui::RichText::new(item.status)
                                     .color(egui::Color32::LIGHT_GREEN).size(10.0));
+                            }
+                            if !enabled {
+                                ui.label(egui::RichText::new("픽업 배너 없음")
+                                    .color(egui::Color32::GRAY).size(9.0));
                             }
                             if !item.has_verified_image() {
                                 ui.label(egui::RichText::new("이미지 미확보")
@@ -353,6 +384,54 @@ mod tests {
         assert!(CatalogUi::fetch_icon("HSR/asset.svg").is_none());
     }
     #[test]
+    fn signature_pairs_resolve_only_to_real_five_star_catalog_entries() {
+        let mut pairs = HashSet::new();
+        let mut count = 0;
+        for line in include_str!("signature_pairs.tsv").lines() {
+            if line.starts_with('#') || line.trim().is_empty() { continue; }
+            let parts: Vec<_> = line.split('\t').collect();
+            assert_eq!(parts.len(), 4, "invalid signature mapping: {line}");
+            assert!(parts[3].starts_with("https://"), "unverified source: {line}");
+            let game = match parts[0] {
+                "hsr" => Game::StarRail, "wuwa" => Game::WutheringWaves,
+                "nte" => Game::Neverness, "sora" => Game::StellaSora,
+                _ => panic!("unsupported game: {line}"),
+            };
+            let character = by_id(game, Kind::Character, parts[1])
+                .unwrap_or_else(|| panic!("unknown character: {line}"));
+            assert!(character.is_featured_target(), "non-banner character: {line}");
+            let weapon = by_id(game, Kind::Weapon, parts[2])
+                .unwrap_or_else(|| panic!("unknown weapon: {line}"));
+            assert_eq!(weapon.rarity, 5, "non-5-star weapon: {line}");
+            assert!(pairs.insert((parts[0], parts[1])), "duplicated mapping: {line}");
+            assert_eq!(signature_weapon(game, parts[1]).unwrap().id, parts[2]);
+            count += 1;
+        }
+        assert!(count >= 100, "verified signature coverage unexpectedly dropped: {count}");
+        assert_eq!(signature_weapon(Game::Neverness, "1056").map(|e| &e.id), None);
+        assert!(signature_weapon(Game::StarRail, "8001").is_none());
+    }
+
+    #[test]
+    fn portraits_and_names_do_not_cross_link_between_character_identities() {
+        let mut names = HashSet::new();
+        let mut source_urls = HashSet::new();
+        for e in entries() {
+            assert!(names.insert((game_code(e.game), e.kind as u8, e.name.as_str())),
+                "duplicate visible name for different IDs: {} {}", game_code(e.game), e.name);
+            if !e.icon_url.is_empty() {
+                assert!(source_urls.insert((game_code(e.game), e.kind as u8, e.icon_url.as_str())),
+                    "same upstream portrait assigned to multiple identities: {}", e.name);
+            }
+            assert!(!e.name.trim().is_empty());
+            assert!(!e.name.starts_with('{') && !e.name.chars().all(|ch| ch.is_ascii_digit()),
+                "placeholder name leaked into catalog: {}", e.name);
+        }
+        assert_eq!(by_id(Game::Neverness, Kind::Character, "1091").map(|e| e.name.as_str()), None);
+        assert_eq!(by_id(Game::Neverness, Kind::Character, "1051").map(|e| e.name.as_str()), None);
+    }
+
+    #[test]
     fn all_games_have_both_named_catalogs() {
         let mut unique = HashSet::new();
         for game in Game::ALL {
@@ -371,6 +450,7 @@ mod tests {
                 "duplicate catalog id: {}", item.id);
         }
         assert_eq!(count(Game::Neverness, Kind::Weapon), 51);
+        assert_eq!(count(Game::Neverness, Kind::Character), 26);
         assert!(count(Game::WutheringWaves, Kind::Character) >= 60);
     }
 }
