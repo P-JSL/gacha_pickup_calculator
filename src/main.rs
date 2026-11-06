@@ -1199,6 +1199,21 @@ impl Calculator {
                 ui.colored_label(GOLD,
                     "이환: Warp Pieces 24개=빨간 주사위 1개. S급 중복 40개, 풀돌 후 80개; A급 중복 6개, 풀돌 후 12개; A급 Arc 4개.");
                 ui.small("Annulith 160개=빨간 주사위 1개. Arc S급 환급·Tri-Key 교환 및 보드 추가 보상은 별도 검증이 필요한 설정값입니다.");
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("보드 주사위 1개 반환 확률(%)");
+                    let mut p = self.feedback_cfg.nte_one_die_chance * 100.0;
+                    if ui.add(egui::DragValue::new(&mut p).range(0.0..=100.0).speed(0.01)).changed() {
+                        self.feedback_cfg.nte_one_die_chance = p / 100.0;
+                        dirty = true;
+                    }
+                    ui.label("주사위 5개 반환 확률(%)");
+                    let mut p = self.feedback_cfg.nte_five_dice_chance * 100.0;
+                    if ui.add(egui::DragValue::new(&mut p).range(0.0..=100.0).speed(0.01)).changed() {
+                        self.feedback_cfg.nte_five_dice_chance = p / 100.0;
+                        dirty = true;
+                    }
+                });
+                ui.small("기본값 1.57% / 0.38%는 커뮤니티 추정입니다. 실제 보드 위치·주사위 상태에 따라 다를 수 있습니다.");
             }
             if self.setup.game == Game::StarRail {
                 ui.colored_label(GOLD,
@@ -1210,6 +1225,17 @@ impl Calculator {
                 ui.label(RichText::new(
                     "최대 돌파 초과 추가 보상은 미반영. 4성 중복 획득률은 계정별로 달라질 수 있습니다."
                 ).color(MUTED).size(11.0));
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("캐릭터 1회당 레코드 전용 디스크");
+                    dirty |= ui.add(egui::DragValue::new(
+                        &mut self.feedback_cfg.stella_record_discs_per_character_pull)
+                        .range(0..=300).suffix("개")).changed();
+                    ui.label("초회 3배 혜택 남은 횟수");
+                    dirty |= ui.add(egui::DragValue::new(
+                        &mut self.feedback_cfg.stella_first_ten_remaining)
+                        .range(0..=10).suffix("회")).changed();
+                });
+                ui.small("레코드 모집 1회=골든 디스크 300개. 30개/캐릭터 모집은 레코드 전용 10% 환급 가정이며 캐릭터권으로 전환하지 않습니다. 초회 3배 보너스는 계정별 남은 횟수를 알아야 하므로 기본 0회입니다.");
             } else {
                 ui.label(RichText::new("4성의 중복·보유 상태는 입력한 평균 보상 가정에 따라 계산합니다.")
                     .color(MUTED).size(11.0));
@@ -1593,6 +1619,33 @@ impl Calculator {
                     f.budgets.len(), f.average_raw, f.average_initial_flexible,
                     f.total_returned_points_average, self.setup.game.exchange_points_name()
                 ));
+                let ch = f.average_character_return_points
+                    / self.feedback_cfg.points_per_ticket.max(1) as f64
+                    + f.average_board_dice_earned;
+                let ch_rate = if f.average_character_raw > 0.0 {
+                    100.0 * ch / f.average_character_raw
+                } else { 0.0 };
+                let weapon_rate = if f.average_weapon_raw > 0.0 {
+                    100.0 * f.average_weapon_return_points
+                        / self.feedback_cfg.points_per_ticket.max(1) as f64
+                        / f.average_weapon_raw
+                } else { 0.0 };
+                ui.label(format!(
+                    "시뮬레이션 평균 환급 생성량: 캐릭터 {:.2}% · {} {:.2}% (뽑기권 환산, 마지막 미사용 잔여분 포함)",
+                    ch_rate, self.setup.game.secondary_banner_name(), weapon_rate
+                ));
+                if self.setup.game == Game::StellaSora {
+                    ui.small(format!(
+                        "별도 레코드 전용 적립: 평균 {:.1} 골든 디스크 (레코드 {:.2}회분). 캐릭터 환급률에 합산하지 않습니다.",
+                        f.average_record_disc_units_earned,
+                        f.average_record_disc_units_earned / 300.0
+                    ));
+                } else if self.setup.game == Game::Neverness {
+                    ui.small(format!(
+                        "보드 즉시 주사위 반환: 평균 {:.2}개. 보드 위치를 생략한 커뮤니티 추정이며 공식 확률이 아닙니다.",
+                        f.average_board_dice_earned
+                    ));
+                }
                 ui.small("환급 충당 표본은 해당 달성률 경계의 같은 실행 결과이며, 평균 환급이나 보장량이 아닙니다.");
                 ui.label(RichText::new("주의: 4성 보유량·중복 판정·일부 배너 내부 우선순위는 근사입니다. 100% 보장은 표본으로 주장하지 않습니다.")
                     .color(GOLD).size(11.0));
@@ -2161,7 +2214,7 @@ impl eframe::App for Calculator {
                                     settings_changed |= ui.radio_value(&mut self.mode,
                                         RateMode::PublishedOnly, "공개 기본 확률 + 확정 천장").changed();
                                     settings_changed |= ui.radio_value(&mut self.mode,
-                                        RateMode::CommunityEstimate, "소프트 천장 추정 모델").changed();
+                                        RateMode::CommunityEstimate, "커뮤니티 추정 모델 (소프트 천장·이환 보드)").changed();
                                 });
                                 // Two compact input rows on desktop; no settings
                                 // are removed, and narrow viewports stack safely.
