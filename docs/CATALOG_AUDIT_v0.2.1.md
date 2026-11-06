@@ -9,7 +9,7 @@
 | 붕괴: 스타레일 | 광추 170 | 50 | [StarRailRes 한국어 게임 데이터](https://github.com/Mar-7th/StarRailRes/tree/dbe8cdfcfb0bf657b9fe1cf92d5537f118ccb487/index_min/kr) (`source_snapshot_hsr.tsv`) |
 | 명조: 워더링 웨이브 | 무기 124 | 39 | [wuthering.th.gl 무기 데이터](https://wuthering.th.gl/db/weapons), [WutheringPity 2026-10-26 전체 목록](https://wutheringpity.com/wuthering-waves/wuwa-weapon-list/) |
 | 이환 | 아크 51 | 11 | [NTE_Assets 내부 ForkItemData](https://github.com/Waifus-Grace/NTE_Assets/blob/1816e237ffe9edf687dd6942d028e89cce121381/DataTable/Fork/DT_ForkItemData.json) (`source_snapshot_nte_arcs.tsv`) |
-| 스텔라 소라 | 레코드 104 | 16 | [sstoy ID·한국어 지역화 데이터](https://github.com/JforPlay/sstoy/tree/33268f4a89cd314fff385a6ffdd6ecbbdc995a8b/public/data), [공식 공지](https://stellasora.global/news) (`source_snapshot_sora.tsv`) |
+| 스텔라 소라 | 레코드 104 | 25 | [sstoy ID·한국어 지역화 데이터](https://github.com/JforPlay/sstoy/tree/33268f4a89cd314fff385a6ffdd6ecbbdc995a8b/public/data), [공식 공지](https://stellasora.global/news) (`source_snapshot_sora.tsv`) |
 
 **현재 카탈로그 총 675개**: 원래의 677개에서 스텔라 소라의 허구적 별칭 ID인 `firstlight_noya`, `guiding_star_disc` 2개를 제거했습니다. 실제 `Firstlight Noya`는 캐릭터 `162`(`세이나(기원)`), `My Guiding Star`는 레코드 `214066`(`앞길을 밝히는 샛별`)입니다. 같은 대상을 서로 다른 ID로 중복 선택하지 않습니다.
 
@@ -18,7 +18,7 @@
 - **스타레일**: 외부 데이터의 실제 캐릭터 ID 98건 + 광추 ID 170건을 고정 스냅샷으로 검증합니다. 4성 삼칠이 각 운명의 길 버전 2건과 5성 개척자 10건은 구분을 위해 이름만 주석화했습니다. `upcoming_aeon_aha`는 고정 원본에 **없으므로 미확인 발표/추가 데이터 항목**입니다. 그 존재 또는 배너 획득 가능성은 스냅샷으로 보장하지 않습니다. 전체 광추 ID·이름·희귀도는 이 게임 데이터와 일치했습니다.
 - **명조**: 124개 무기는 두 독립 팬 데이터베이스에서도 목록 수 124개로 일치하지만, 전체 이전 버전의 독립 ID 목록 `yuhkix/wuwa-ids`에서 겹치는 **90개 ID와 영문 이름이 전부 일치**합니다 (`source_snapshot_wuwa_weapons.tsv`). 새 버전에 추가된 나머지 34개는 이 구버전 자료에 없어 해당 수준의 ID 검증을 완료하지 않았습니다. 특히 미출시·유출 항목은 일반 픽업 장비로 단정하지 않습니다. 현재 39개의 캐릭터 전용 무기 연결은 기존 명시적 목록을 유지합니다.
 - **이환**: 내부 게임 파일의 `ItemIcon.AssetPathName`, `ItemQuality`와 전수 비교하여 아크 **51/51**이 원본 식별자와 희귀도가 일치합니다. 각 아크의 `ExclusiveCharacterIDArray`로 현재의 전용 연결 **11/11**을 확인했습니다. 참고: 게임 데이터에는 동일 현지화 이름을 가진 별도 `「제로」` ID `1051`, 동일 아이콘을 참조하는 캐릭터 `1056`도 존재합니다. 두 항목은 별도 초상화/픽업 구분을 완료하기 전까지 일반 선택으로 복원하지 않았습니다. 다른 형태의 캐릭터를 임의로 합치거나 허위 이미지로 교체하지 않습니다.
-- **스텔라 소라**: 실제 등록된 캐릭터 41건/레코드 104건의 ID, 한국어 명칭 및 `Available/Visible` 값은 `sstoy`의 원본과 일치합니다. 전용 레코드가 공식 행사 공지로 확인된 **16쌍**을 설정했습니다. 출시되지 않은 캐릭터/레코드의 존재 여부는 공개 출처의 갱신 시점에 종속됩니다.
+- **스텔라 소라**: 실제 등록된 캐릭터 41건/레코드 104건의 ID, 한국어 명칭 및 `Available/Visible` 값은 `sstoy`의 원본과 일치합니다. StellaDB의 [33개 캐릭터/레코드 배너 기록](https://github.com/AutumnVN/ss-data/blob/4a44bdef2fa94f8dc3db65b1d790d38783072bb8/gacha.json)을 같은 모집 기간·대응 배너 ID로 결합하여 중복 재출시를 제거한 **5성 캐릭터 25명 전원과 전용 레코드 25쌍**을 확인했습니다. [StellaDB 상세 레코드](https://stelladb.pages.dev/disc/214066)의 `Signature` 관계 및 [공식 모집 공지](https://stellasora.global/news)를 대조했고, 원본 41명/104개는 `sstoy`의 한국어 명칭 및 `Available/Visible`과 일치합니다. 기존 16쌍에는 충돌 0건이었으며 누락된 9쌍만 추가했습니다. 출시되지 않은 캐릭터/레코드의 존재 여부는 공개 출처의 갱신 시점에 종속됩니다.
 
 ### 자동 선택과 미확인 처리
 
