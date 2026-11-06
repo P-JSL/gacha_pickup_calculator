@@ -2,6 +2,8 @@
 
 검증 일자: 2026-11-06 (KST). 기준 저장소: `P-JSL/gacha_pickup_calculator`.
 
+> **main 개발판 업데이트 (v0.2.1 이후):** 공식 4.7 예고와 [Nanoka](https://hsr.nanoka.cc/lightcone/23065) 및 [Gachabase](https://hsr.gachabase.net/lightcones/23065/upon-the-first-echo-of-aha/beta?lang=ko)를 통해 신규 광추 `23065`와 `22009`를 교차 확인했습니다. `upcoming_aeon_aha`의 전용 장비를 `23065`로 연결했습니다. 공식 4.8 공개 캐릭터 엘렌 조·아스트라 야오는 게임 내 ID, 배너 조건, 전용 광추가 확인되지 않아 `upcoming_ellen_joe`, `upcoming_astra_yao`라는 **프로그램 내부 임시 식별자**로 등록했습니다. 카탈로그/내장 이미지 679건, 명시적 자동 연결 141건(스타레일 66건), 스타레일 광추 172건입니다. 신규 항목 4건의 원본 이미지는 확보되지 않아 다른 대상의 아트 대신 식별용 플레이스홀더를 사용합니다. 아래 표는 기존 v0.2.1 당시 수치를 기록한 것입니다.
+
 ## 확인 결과
 
 | 게임 | 보조 장비 카탈로그 | 자동 연결된 5★ 캐릭터–장비 | 교차검증 원본 |
