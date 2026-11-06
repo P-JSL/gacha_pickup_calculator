@@ -363,6 +363,101 @@ impl GoalFunding {
     }
 }
 
+/// Shared, compact funding summary displayed on Dashboard and Analytics.
+fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
+                       language: Language) {
+    let secondary = i18n::banner_name(language, setup.game);
+    let native = i18n::currency_name(language, setup.game);
+    let note = if gap.uses_refunds { t(language, "Refund-simulation estimate") }
+        else { t(language, "Exact probability model") };
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(format!(
+            "{} {}% · {}",
+            t(language, "Target confidence"), gap.confidence, note,
+        )).color(MUTED).size(11.0));
+    });
+    ui.add_space(5.0);
+
+    let individual = |ui: &mut egui::Ui, label: &str, target: usize,
+                      owned: usize, missing: usize, raw: usize,
+                      dedicated: usize, shared: usize| {
+        ui.label(RichText::new(label).color(PRIMARY).strong());
+        ui.label(format!(
+            "{} {}  ·  {} {}  ·  {} {}",
+            t(language, "Target copies"), target,
+            t(language, "Owned copies"), owned,
+            t(language, "Missing copies"), missing,
+        ));
+        ui.label(RichText::new(format!(
+            "{}: {}{}  ·  {}: {}{}",
+            t(language, "Solo requirement"), raw, t(language, "Pulls"),
+            t(language, "After dedicated passes"), shared, t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+        if dedicated > 0 {
+            ui.small(format!(
+                "{} {}{}",
+                t(language, "Owned dedicated passes"), dedicated, t(language, "Passes"),
+            ));
+        }
+    };
+    let shortage = |ui: &mut egui::Ui| {
+        ui.label(RichText::new(t(language, "Additional funding needed")).color(GOLD).strong());
+        ui.label(RichText::new(format!(
+            "+{} {}  ·  +{} {}",
+            gap.additional_shared, t(language, "Pulls"),
+            gap.additional_currency, native,
+        )).size(17.0).strong().color(
+            if gap.additional_shared == 0 { MINT } else { GOLD },
+        ));
+        ui.small(format!(
+            "{} {}{}  ·  {} {}{}",
+            t(language, "Required shared passes"), gap.required_shared, t(language, "Pulls"),
+            t(language, "Available shared passes"), gap.available_shared, t(language, "Pulls"),
+        ));
+    };
+    if ui.available_width() >= 780.0 {
+        ui.columns(3, |cols| {
+            individual(&mut cols[0], t(language, "Characters"),
+                gap.character_target, gap.character_owned, gap.character_missing,
+                gap.character_single_raw, gap.dedicated_character,
+                gap.character_single_shared);
+            individual(&mut cols[1], secondary,
+                gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
+                gap.weapon_single_raw, gap.dedicated_weapon,
+                gap.weapon_single_shared);
+            shortage(&mut cols[2]);
+        });
+    } else {
+        individual(ui, t(language, "Characters"),
+            gap.character_target, gap.character_owned, gap.character_missing,
+            gap.character_single_raw, gap.dedicated_character,
+            gap.character_single_shared);
+        ui.add_space(6.0);
+        individual(ui, secondary, gap.weapon_target, gap.weapon_owned,
+            gap.weapon_missing, gap.weapon_single_raw, gap.dedicated_weapon,
+            gap.weapon_single_shared);
+        ui.separator();
+        shortage(ui);
+    }
+    ui.add_space(5.0);
+    ui.label(RichText::new(format!(
+        "{} {}{} + {} {} ({}{}).",
+        t(language, "Already owned flexible passes"), setup.flexible,
+        t(language, "Passes"),
+        setup.premium_currency, native,
+        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+    )).color(MUTED).size(11.0));
+    ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
+        .color(MUTED).size(11.0));
+    if setup.game == Game::StellaSora {
+        ui.small(format!(
+            "{}: {}",
+            t(language, "Unconverted Gold Disc units"),
+            setup.weapon_ticket_remainder,
+        ));
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
@@ -1596,6 +1691,17 @@ impl Calculator {
                 ui.add_space(8.0);
             }
         };
+        ui.add_space(8.0);
+        section(ui, "07", "현재 보유량 대비 목표 달성 추가 비용",
+            "기보유 캐릭터·장비, 전용권과 공용 재화를 반영한 목표 달성 비용입니다.",
+            |ui| {
+                if let Some(gap) = self.current_goal_funding() {
+                    render_goal_funding(ui, &gap, &self.setup, self.language());
+                } else {
+                    ui.label(RichText::new(t(self.language(),
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
+            });
         ui.add_space(8.0);
         let secondary_name = i18n::banner_name(self.language(), self.setup.game);
         let secondary_heading = format!("{secondary_name} 목표 확률");
