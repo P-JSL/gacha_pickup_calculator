@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 
 mod dashboard_ui;
 mod catalog;
+mod i18n;
+use i18n::{Language, LanguagePreference, t};
 
 const BG: Color32 = Color32::from_rgb(5, 23, 34);
 const CARD: Color32 = Color32::from_rgb(17, 42, 63);
@@ -153,6 +155,24 @@ fn paint_navigation_art(ui: &egui::Ui) {
         painter.line_segment([p(x,y-6.0),p(x,y+6.0)],
             egui::Stroke::new(0.7_f32,cyan));
     }
+}
+
+fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
+    let font = egui::FontId::proportional(13.0);
+    let max_width = (button_width - 35.0).max(5.0);
+    let fits = |s: &str| ui.fonts(|fonts| {
+        fonts.layout_no_wrap(s.to_owned(), font.clone(), Color32::WHITE).size().x <= max_width
+    });
+    if fits(name) { return name.to_owned(); }
+    let chars: Vec<char> = name.chars().collect();
+    let (mut low, mut high) = (0usize, chars.len());
+    while low < high {
+        let middle = low + (high - low).div_ceil(2);
+        let prefix: String = chars[..middle].iter().collect();
+        if fits(&format!("{prefix}...")) { low = middle; }
+        else { high = middle - 1; }
+    }
+    format!("{}...", chars[..low].iter().collect::<String>())
 }
 
 fn sidebar_nav(ui: &mut egui::Ui, selected: &mut ViewMode,
@@ -361,6 +381,9 @@ struct Calculator {
     input_needs_calculation: bool,
     manual_calculation_requested: bool,
     ui_preferences: UiPreferences,
+    language_preference: LanguagePreference,
+    system_language: Language,
+    language_save_error: Option<String>,
     error: Option<String>,
     show_help: bool,
     view_mode: ViewMode,
@@ -411,6 +434,12 @@ impl Calculator {
                 repaint.request_repaint();
             }
         });
+        // Screenshot automation must re-calculate after each game switch.
+        // Production default remains OFF; the CI flag is never set by the app.
+        let mut ui_preferences = UiPreferences::default();
+        if std::env::var("GACHA_CI_AUTO_REFRESH").as_deref() == Ok("1") {
+            ui_preferences.auto_recalculate = true;
+        }
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::CommunityEstimate,
@@ -424,7 +453,10 @@ impl Calculator {
             stats_game: None,
             input_needs_calculation: false,
             manual_calculation_requested: false,
-            ui_preferences: UiPreferences::default(),
+            ui_preferences,
+            language_preference: i18n::load_preference(),
+            system_language: i18n::system_language(),
+            language_save_error: None,
             error: None,
             show_help: false,
             view_mode: ViewMode::Calculator,
@@ -451,6 +483,25 @@ impl Calculator {
         app
     }
 
+    fn language(&self) -> Language {
+        self.language_preference.effective(self.system_language)
+    }
+    fn set_language(&mut self, preference: LanguagePreference) {
+        if self.language_preference == preference { return; }
+        self.language_preference = preference;
+        self.language_save_error = i18n::save_preference(preference).err().map(|e| e.to_string());
+    }
+    fn language_choices(&mut self, ui: &mut egui::Ui) {
+        let active = self.language_preference;
+        let language = self.language();
+        for choice in LanguagePreference::ALL {
+            if ui.selectable_label(choice == active, choice.display(self.system_language, language)).clicked() {
+                self.set_language(choice);
+                ui.close_menu();
+            }
+        }
+    }
+
     /// Last completed charts remain visible until the worker finishes for the same game.
     /// A game change never displays distributions from a different game.
     fn visible_stats(&self) -> Option<&Computed> {
@@ -469,9 +520,12 @@ impl Calculator {
             if let Some(item) = item {
                 self.catalog_ui.image(ui, item, 30.0);
             }
-            let name = item.map(|x| x.name.as_str()).unwrap_or("대상 선택");
-            if ui.add(egui::Button::new(format!("{name}  ▾"))
-                .min_size(egui::vec2(108.0, 27.0))).clicked() {
+            let name = item.map(|x| x.name.as_str()).unwrap_or(t(self.language(), "No target"));
+            let width = ui.available_width().clamp(70.0, 230.0);
+            let shortened = truncated_selection(ui, name, width);
+            if ui.add_sized(egui::vec2(width, 27.0),
+                egui::Button::new(format!("{shortened}  ▾")))
+                .on_hover_text(name).clicked() {
                 self.picker_kind = Some(kind);
                 self.picker_filter.clear();
             }
@@ -677,7 +731,7 @@ impl Calculator {
                                     stroke,
                                 );
                             }
-                            if response.on_hover_text("화면 및 동작 설정").clicked() {
+                            if response.on_hover_text(t(self.language(), "Display & behavior settings")).clicked() {
                                 self.view_mode = ViewMode::Preferences;
                             }
 
@@ -687,17 +741,17 @@ impl Calculator {
                                 self.show_help = true;
                             }
                             ui.menu_button("♧", |ui| {
-                                ui.label("최근 시뮬레이션");
+                                ui.label(t(self.language(), "Recent simulations"));
                                 ui.label(format!("현재 세션 기록 {}건", self.history.len()));
-                                if ui.button("전체 기록 보기").clicked() {
+                                if ui.button(t(self.language(), "View all history")).clicked() {
                                     self.show_history = true;
                                     ui.close_menu();
                                 }
                             });
                             ui.menu_button("☆", |ui| {
-                                ui.label("게임 바로 선택");
+                                ui.label(t(self.language(), "Select game"));
                                 for game in Game::ALL {
-                                    if ui.button(game.label()).clicked() {
+                                    if ui.button(i18n::game_name(self.language(), game)).clicked() {
                                         if self.setup.game != game {
                                             self.change_game(game);
                                             dirty = true;
@@ -707,11 +761,16 @@ impl Calculator {
                                     }
                                 }
                             });
+                            ui.menu_button(format!("{} ▾", self.language().code()), |ui| {
+                                self.language_choices(ui);
+                            });
                             ui.add_space(8.0);
+                            let hint = format!("⌕  {}", t(self.language(), "Search games or sections..."));
+                            let search_width = ui.available_width().clamp(60.0, 340.0);
                             let search = ui.add(
                                 egui::TextEdit::singleline(&mut self.search_query)
-                                    .desired_width(385.0)
-                                    .hint_text("⌕  Search games or sections...")
+                                    .desired_width(search_width)
+                                    .hint_text(hint)
                                     .margin(egui::Margin::symmetric(10, 8))
                             );
                             if search.lost_focus()
@@ -726,6 +785,7 @@ impl Calculator {
     }
 
     fn sidebar(&mut self, ctx: &egui::Context) {
+        let language = self.language();
         egui::SidePanel::left("workspace_sidebar")
             .resizable(false)
             .exact_width(222.0)
@@ -741,26 +801,39 @@ impl Calculator {
                     (ViewMode::Weapons, "Weapons"),
                     (ViewMode::Analytics, "Analytics"),
                 ] {
-                    sidebar_nav(ui, &mut self.view_mode, view, label);
+                    sidebar_nav(ui, &mut self.view_mode, view, t(language, label));
                     ui.add_space(9.0);
                 }
                 ui.add_space(6.0);
                 ui.separator();
                 ui.add_space(13.0);
-                sidebar_nav(ui, &mut self.view_mode, ViewMode::Preferences, "Settings");
+                sidebar_nav(ui, &mut self.view_mode, ViewMode::Preferences, t(language, "Settings"));
             });
     }
 
     /// UI-only preferences are independent of the gacha input/worker state.
     fn desktop_settings(&mut self, ui: &mut egui::Ui) {
-        page_intro(ui, "APPLICATION SETTINGS", "화면 및 동작 설정",
-            "시뮬레이터의 목표·보유권이 아닌 프로그램의 표시 방식과 계산 갱신을 설정합니다.");
+        let language = self.language();
+        page_intro(ui, "APPLICATION SETTINGS", t(language, "Application settings"),
+            t(language, "Change the appearance and calculation behavior, not banner inputs."));
         ui.add_space(12.0);
-        section(ui, "01", "실시간 계산", "입력한 값이 바뀌어도 차트는 지우지 않고 백그라운드에서 갱신합니다.", |ui| {
+        section(ui, "00", t(language, "Language"), t(language, "System language"), |ui| {
+            let chosen = self.language_preference;
+            egui::ComboBox::from_id_salt("application_language")
+                .selected_text(chosen.display(self.system_language, self.language()))
+                .show_ui(ui, |ui| { self.language_choices(ui); });
+            ui.label(RichText::new(t(language, "Saved language preference"))
+                .color(MUTED).size(11.0));
+            if let Some(error) = &self.language_save_error {
+                ui.colored_label(Color32::LIGHT_RED, format!("Language setting could not be saved: {error}"));
+            }
+        });
+        ui.add_space(10.0);
+        section(ui, "01", t(language, "Auto calculation"), t(language, "Calculating in background. Previous results remain visible."), |ui| {
             ui.checkbox(&mut self.ui_preferences.auto_recalculate,
-                "입력 변경 시 자동으로 결과 갱신");
+                t(language, "Update results automatically when input changes"));
             ui.horizontal(|ui| {
-                ui.label("연속 입력 대기시간");
+                ui.label(t(language, "Input debounce"));
                 ui.add(egui::Slider::new(&mut self.ui_preferences.debounce_ms, 100..=1000)
                     .step_by(50.0).suffix(" ms"));
             });
@@ -768,24 +841,24 @@ impl Calculator {
                 ui.label(RichText::new(
                     "자동 계산을 꺼도 입력값은 즉시 모든 탭에 반영됩니다. Run Simulation 버튼으로 계산을 갱신하세요."
                 ).color(MUTED).size(11.0));
-                if self.input_needs_calculation && ui.button("현재 입력으로 계산 실행").clicked() {
+                if self.input_needs_calculation && ui.button(t(language, "Run calculation now")).clicked() {
                     self.manual_calculation_requested = true;
                 }
             }
         });
         ui.add_space(10.0);
-        section(ui, "02", "대시보드 표시", "UI 표시를 변경합니다. 확률 계산값 자체는 변경하지 않습니다.", |ui| {
-            ui.checkbox(&mut self.ui_preferences.show_result_panel, "오른쪽 결과 및 이력 패널 표시");
-            ui.checkbox(&mut self.ui_preferences.show_chart_fill, "확률 그래프 아래 반투명 영역 표시");
-            ui.checkbox(&mut self.ui_preferences.show_hover_guides, "그래프 마우스 위치 및 확률 툴팁 표시");
-            ui.checkbox(&mut self.ui_preferences.compact_spacing, "화면 내부 간격을 컴팩트하게 표시");
+        section(ui, "02", t(language, "Display options"), t(language, "Change the appearance and calculation behavior, not banner inputs."), |ui| {
+            ui.checkbox(&mut self.ui_preferences.show_result_panel, t(language, "Show right result/history panel"));
+            ui.checkbox(&mut self.ui_preferences.show_chart_fill, t(language, "Fill area under probability curves"));
+            ui.checkbox(&mut self.ui_preferences.show_hover_guides, t(language, "Show in-chart hover probability"));
+            ui.checkbox(&mut self.ui_preferences.compact_spacing, t(language, "Compact spacing"));
         });
         ui.add_space(12.0);
-        if ui.button("화면 설정 기본값 복원").clicked() {
+        if ui.button(t(language, "Restore defaults")).clicked() {
             self.ui_preferences = UiPreferences::default();
         }
         ui.label(RichText::new(
-            "화면 설정은 프로그램 실행 중에만 유지됩니다. 종료 시 기본값으로 돌아갑니다."
+            t(language, "Other display preferences reset at exit.")
         ).color(MUTED).size(11.0));
     }
 
@@ -1297,7 +1370,7 @@ impl Calculator {
             }
         };
         ui.add_space(8.0);
-        let secondary_name = self.setup.game.secondary_banner_name();
+        let secondary_name = i18n::banner_name(self.language(), self.setup.game);
         let secondary_heading = format!("{secondary_name} 목표 확률");
         let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
         ui.add_space(10.0);
@@ -1309,25 +1382,25 @@ impl Calculator {
                 section(&mut cols[0], "05-A", "캐릭터 목표 확률", single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                    }], self.ui_preferences);
+                    }], self.ui_preferences, self.language());
                 });
                 section(&mut cols[1], "05-B", &secondary_heading, single_description, |ui| {
                     draw_probability_chart(ui, &[ChartSeries {
                         label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                    }], self.ui_preferences);
+                    }], self.ui_preferences, self.language());
                 });
             });
         } else {
             section(ui, "05-A", "캐릭터 목표 확률", single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: "캐릭터", source: ChartSource::Exact(&stats.character), color: PRIMARY,
-                }], self.ui_preferences);
+                }], self.ui_preferences, self.language());
             });
             ui.add_space(8.0);
             section(ui, "05-B", &secondary_heading, single_description, |ui| {
                 draw_probability_chart(ui, &[ChartSeries {
                     label: secondary_name, source: ChartSource::Exact(&stats.weapon), color: MINT,
-                }], self.ui_preferences);
+                }], self.ui_preferences, self.language());
             });
         }
         ui.add_space(10.0);
@@ -1348,7 +1421,7 @@ impl Calculator {
                     });
                 }
             }
-            draw_probability_chart(ui, &curves, self.ui_preferences);
+            draw_probability_chart(ui, &curves, self.ui_preferences, self.language());
             if stats.feedback.is_some() && !comparable {
                 ui.colored_label(GOLD,
                     "전용권 사용 중에는 전체 뽑기 수와 최초 자유 재화의 기준이 달라 환급 곡선을 겹치지 않습니다.");
@@ -1734,10 +1807,21 @@ fn chart_domain_end(series: &[ChartSeries<'_>]) -> usize {
     series.iter().map(|s| s.source.last_pull()).max().unwrap_or(1).max(1)
 }
 
+/// Keep the hover label inside the plot for every pointer position.
+fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_width: f32, height: f32) -> egui::Rect {
+    let inner = graph.shrink(4.0);
+    let width = desired_width.min(inner.width()).max(0.0);
+    let height = height.min(inner.height()).max(0.0);
+    let x = (cursor.x + 12.0).clamp(inner.left(), (inner.right() - width).max(inner.left()));
+    let y = (cursor.y - height - 11.0)
+        .clamp(inner.top(), (inner.bottom() - height).max(inner.top()));
+    egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height))
+}
+
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
-fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences) {
+fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences, language: Language) {
     let end = chart_domain_end(series);
     let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -1840,23 +1924,26 @@ fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appeara
                 project(x, line.source.probability(x)), 3.5, line.color,
             );
         }
+        let pull_unit = match language {
+            Language::Korean => "뽑 이내", Language::English => "pulls or fewer",
+            Language::Japanese => "連以内", Language::ChineseSimplified => "抽以内",
+            Language::ChineseTraditional => "抽以內",
+        };
         let tooltip = format!(
-            "{x}뽑 이내 · {}",
+            "{x} {pull_unit} · {}",
             series.iter().map(|line| format!("{} {:.1}%", line.label,
                 line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
         );
-        // Keep the exact point probability visible inside the graph as well
-        // as in the native mouse tooltip, even on platforms where hover UI
-        // can be delayed or positioned outside a small desktop viewport.
-        let badge = egui::Rect::from_min_size(
-            egui::pos2(graph.left() + 5.0, graph.top() + 5.0),
-            egui::vec2((graph.width() - 10.0).max(12.0), 22.0));
+        // Native egui hover popups can escape the chart; never use on_hover_text here.
+        let tooltip_font = egui::FontId::proportional(10.5);
+        let text_width = ui.fonts(|fonts| fonts.layout_no_wrap(
+            tooltip.clone(), tooltip_font.clone(), Color32::WHITE).size().x);
+        let badge = chart_tooltip_rect(graph, pointer, text_width + 16.0, 22.0);
         painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
-        let overlay = painter.with_clip_rect(badge.shrink(3.0));
-        overlay.text(badge.left_center() + egui::vec2(5.0, 0.0),
+        let overlay = painter.with_clip_rect(badge.intersect(graph).shrink(3.0));
+        overlay.text(badge.left_center() + egui::vec2(7.0, 0.0),
             egui::Align2::LEFT_CENTER, &tooltip,
-            egui::FontId::proportional(10.5), Color32::WHITE);
-        response.clone().on_hover_text(tooltip);
+            tooltip_font, Color32::WHITE);
         }
     }
     // The compact dashboard uses one line per card. Keep legends only where
@@ -2077,7 +2164,7 @@ impl eframe::App for Calculator {
         }
         self.show_catalog_picker(ctx);
         if self.show_history {
-            egui::Window::new("Simulation History")
+            egui::Window::new(t(self.language(), "Simulation History"))
                 .open(&mut self.show_history)
                 .default_size(egui::vec2(470.0, 330.0))
                 .resizable(true).show(ctx, |ui| {
@@ -2101,7 +2188,7 @@ impl eframe::App for Calculator {
                 });
         }
         if self.show_help {
-            egui::Window::new("게임별 규칙 · 신뢰도 · 출처")
+            egui::Window::new(t(self.language(), "Rules, confidence and sources"))
                 .open(&mut self.show_help).resizable(true).show(ctx, |ui| {
                     ui.heading(self.setup.game.label());
                     ui.label(self.setup.game.special_notes());
@@ -2188,6 +2275,19 @@ mod chart_tests {
         let prefs = UiPreferences::default();
         assert!(!prefs.auto_recalculate);
         assert!(prefs.show_hover_guides);
+    }
+
+    #[test]
+    fn chart_tooltip_stays_within_plot_at_all_edges() {
+        let graph = egui::Rect::from_min_size(egui::pos2(40.0, 20.0), egui::vec2(170.0, 90.0));
+        for pos in [graph.left_top(), graph.right_top(), graph.left_bottom(),
+                    graph.right_bottom(), graph.center()] {
+            let rect = chart_tooltip_rect(graph, pos, 340.0, 22.0);
+            assert!(graph.contains(rect.left_top()));
+            assert!(graph.contains(rect.right_bottom()));
+            assert!(rect.width() <= graph.width());
+            assert!(rect.height() <= graph.height());
+        }
     }
 
     #[test]

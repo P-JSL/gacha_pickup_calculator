@@ -110,7 +110,7 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
 }
 
 /// Compact 3-column chart panel: header, right-aligned result badge, area graph.
-fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32, appearance: UiPreferences) {
+fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[ChartSeries<'_>], color: Color32, appearance: UiPreferences, language: Language) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
@@ -137,7 +137,7 @@ fn probability_card(ui: &mut egui::Ui, title: &str, badge: String, source: &[Cha
                         .show(ui, |ui| { ui.label(label); });
                 });
             });
-            draw_probability_chart(ui, source, appearance);
+            draw_probability_chart(ui, source, appearance, language);
         });
 }
 
@@ -172,6 +172,7 @@ fn setting_tile(ui: &mut egui::Ui, icon: &str, label: &str,
 impl Calculator {
     /// Reference-style overview. All visible values come from the active model, never from demo data.
     pub(super) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
+        let language = self.language();
         let mut dirty = false;
         if let Some(stats) = self.visible_stats() {
             let free_pulls = self.setup.available_flexible();
@@ -186,82 +187,85 @@ impl Calculator {
                 .unwrap_or(raw.success_probability);
             let expected = stats.feedback.as_ref().map(|f| f.average_raw)
                 .unwrap_or(stats.combined.mean);
-            let meta = if stats.feedback.is_some() { "환급 재투입 포함" } else { "정확 확률 DP" };
+            let meta = if stats.feedback.is_some() { t(language, "Including recycled refunds") } else { t(language, "Accurate probability DP") };
             if self.input_needs_calculation && !self.calculating {
-                ui.label(RichText::new("입력 수정됨 · Run Simulation을 누르면 결과가 갱신됩니다.")
+                ui.label(RichText::new(t(language, "Changes pending. Select Run Simulation to update."))
                     .color(YELLOW).size(10.0));
             } else if self.calculating {
-                ui.label(RichText::new("백그라운드 계산 중 · 이전 결과를 유지합니다.")
+                ui.label(RichText::new(t(language, "Calculating in background. Previous results remain visible."))
                     .color(YELLOW).size(10.0));
             }
             ui.columns(4, |columns| {
                 let (label, value, detail) = if self.setup.game.shares_featured_ticket() {
-                    ("별의 궤도 전용 티켓", format!("{}", self.setup.flexible),
-                        format!("캐릭터·광추 공용 / 성옥 전환 {}뽑",
-                            self.setup.premium_currency / self.setup.game.cost_per_pull()))
+                    (i18n::ticket_name(language, self.setup.game, false), format!("{}", self.setup.flexible),
+                        format!("{}: {} ({})", t(language, "Shared character/weapon ticket"),
+                            self.setup.premium_currency / self.setup.game.cost_per_pull(),
+                            i18n::currency_name(language, self.setup.game)))
                 } else {
-                    ("Character / Weapon Tickets",
+                    (t(language, "Character / Weapon Tickets"),
                         format!("{} / {}", self.setup.character_dedicated,
                             self.setup.weapon_dedicated),
                         if self.setup.game == Game::StellaSora {
-                            format!("하늘 티켓 / 골든 디스크 {}개",
+                            format!("{} / {}: {}",
+                                i18n::ticket_name(language, self.setup.game, false),
+                                i18n::ticket_name(language, self.setup.game, true),
                                 self.setup.weapon_ticket_inventory())
                         } else {
-                            format!("전용권 2종 · 공용 전환 {}뽑", free_pulls)
+                            format!("{}: {}", t(language, "Shared Currency"), free_pulls)
                         })
                 };
                 overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
-                overview_metric(&mut columns[1], 1, "Target Success Rate",
+                overview_metric(&mut columns[1], 1, t(language, "Target Success Rate"),
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
-                overview_metric(&mut columns[2], 2, "Expected Pulls",
-                    format!("{expected:.1}"), "목표까지의 평균 총 뽑기".to_owned(), PINK);
-                overview_metric(&mut columns[3], 3, "Remaining Currency",
+                overview_metric(&mut columns[2], 2, t(language, "Expected Pulls"),
+                    format!("{expected:.1}"), t(language, "Average pulls to all targets").to_owned(), PINK);
+                overview_metric(&mut columns[3], 3, t(language, "Remaining Currency"),
                     self.setup.premium_currency.to_string(),
-                    format!("{}뽑 환산 · {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                        self.setup.game.currency_name()), CYAN);
+                    format!("{} × {} {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
+                        self.setup.game.cost_per_pull(), i18n::currency_name(language, self.setup.game)), CYAN);
             });
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
             let char_rate = stats.character.at(character_budget) * 100.0;
             let weapon_rate = stats.weapon.at(weapon_budget) * 100.0;
-            let banner_name = self.setup.game.secondary_banner_name();
+            let banner_name = i18n::banner_name(language, self.setup.game);
             let chart_char = [ChartSeries {
-                label: "캐릭터", source: ChartSource::Exact(&stats.character), color: CYAN,
+                label: t(language, "Characters"), source: ChartSource::Exact(&stats.character), color: CYAN,
             }];
             let chart_weapon = [ChartSeries {
                 label: banner_name, source: ChartSource::Exact(&stats.weapon), color: YELLOW,
             }];
             let chart_total = [ChartSeries {
-                label: "전체 · 환급 전", source: ChartSource::Exact(&stats.combined), color: PINK,
+                label: t(language, "Overall"), source: ChartSource::Exact(&stats.combined), color: PINK,
             }];
             if ui.available_width() >= 900.0 {
                 ui.columns(3, |columns| {
-                    probability_card(&mut columns[0], "Character Probability",
-                        format!("E{} Success: {:.2}%", self.target_eid, char_rate), &chart_char, CYAN, self.ui_preferences);
-                    probability_card(&mut columns[1], &format!("{banner_name} Probability"),
-                        format!("S{} Success: {:.2}%", self.target_refine, weapon_rate), &chart_weapon, YELLOW, self.ui_preferences);
-                    probability_card(&mut columns[2], "Overall Result",
-                        format!("Total Success: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
+                    probability_card(&mut columns[0], t(language, "Character Probability"),
+                        format!("E{} {}: {:.2}%", self.target_eid, t(language, "Success"), char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
+                    probability_card(&mut columns[1], &format!("{banner_name} {}", t(language, "Probability")),
+                        format!("S{} {}: {:.2}%", self.target_refine, t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
+                    probability_card(&mut columns[2], t(language, "Overall Result"),
+                        format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
             } else {
-                probability_card(ui, "Character Probability",
-                    format!("단독 배분 시 {char_rate:.2}%"), &chart_char, CYAN, self.ui_preferences);
+                probability_card(ui, t(language, "Character Probability"),
+                    format!("{}: {char_rate:.2}%", t(language, "Success")), &chart_char, CYAN, self.ui_preferences, self.language());
                 ui.add_space(8.0);
-                probability_card(ui, &format!("{banner_name} Probability"),
-                    format!("단독 배분 시 {weapon_rate:.2}%"), &chart_weapon, YELLOW, self.ui_preferences);
+                probability_card(ui, &format!("{banner_name} {}", t(language, "Probability")),
+                    format!("{}: {weapon_rate:.2}%", t(language, "Success")), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                 ui.add_space(8.0);
-                probability_card(ui, "Overall Result",
-                    format!("현재 동시 달성 {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences);
+                probability_card(ui, t(language, "Overall Result"),
+                    format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
         } else if self.calculating {
-            dashboard_card(ui, "Probability Overview", |ui| {
-                ui.horizontal(|ui| { ui.spinner(); ui.label("게임별 확률과 환급을 계산하고 있습니다."); });
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
             });
         } else {
-            dashboard_card(ui, "Probability Overview", |ui| {
-                ui.colored_label(Color32::LIGHT_RED, self.error.as_deref().unwrap_or("계산 결과가 없습니다."));
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.colored_label(Color32::LIGHT_RED, self.error.as_deref().unwrap_or(t(language, "No calculation available")));
             });
         }
 
@@ -278,6 +282,7 @@ impl Calculator {
 
     /// The first screen repeats the input grouping and visual hierarchy of the supplied mockup.
     fn workspace_quick_settings(&mut self, ui: &mut egui::Ui) -> bool {
+        let language = self.language();
         let mut dirty = false;
         egui::Frame::group(ui.style())
             .fill(Color32::from_rgb(14, 39, 58))
@@ -288,9 +293,9 @@ impl Calculator {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("☷").color(CYAN).size(19.0));
-                    ui.label(RichText::new("Simulation Settings").size(16.0).strong());
+                    ui.label(RichText::new(t(language, "Simulation Settings")).size(16.0).strong());
                     ui.add_space(19.0);
-                    ui.label(RichText::new("Game").color(MUTED).size(12.0));
+                    ui.label(RichText::new(t(language, "Game")).color(MUTED).size(12.0));
                     for (game, title) in [
                         (Game::StarRail, "✦  HSR"),
                         (Game::WutheringWaves, "◈  Wuthering Waves"),
@@ -320,42 +325,45 @@ impl Calculator {
                 let game = self.setup.game;
                 if game.shares_featured_ticket() {
                     ui.columns(3, |cols| {
-                        setting_tile(&mut cols[0], "◇", game.character_ticket_name(), |ui| {
+                        setting_tile(&mut cols[0], "◇", i18n::ticket_name(language, game, false), |ui| {
                             dirty |= edit_ticket_inventory(ui, &mut self.setup, TicketRole::Shared);
                         });
                         setting_tile(&mut cols[1], "◆",
-                            &format!("Premium Currency · {}", game.currency_name()), |ui| {
+                            &format!("{} · {}", t(language, "Premium Currency"), i18n::currency_name(language, game)), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
                                     .range(0..=100_000_000).speed(1)).changed();
                             });
                         setting_tile(&mut cols[2], "◌",
-                            &format!("Refund Currency · {}", game.exchange_points_name()), |ui| {
+                            &format!("{} · {}", t(language, "Refund Currency"), i18n::refund_name(language, game)), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                                     .range(0..=1_000_000)).changed();
                             });
                     });
                 } else {
-                    ui.columns(4, |cols| {
+                    ui.columns(2, |cols| {
                         setting_tile(&mut cols[0], "♧",
-                            &format!("캐릭터 · {}", game.character_ticket_name()), |ui| {
+                            &format!("{} · {}", t(language, "Characters"), i18n::ticket_name(language, game, false)), |ui| {
                                 dirty |= edit_ticket_inventory(
                                     ui, &mut self.setup, TicketRole::Character
                                 );
                             });
                         setting_tile(&mut cols[1], "⚔",
-                            &format!("{} · {}", game.secondary_banner_name(),
-                                game.weapon_ticket_name()), |ui| {
+                            &format!("{} · {}", i18n::banner_name(language, game),
+                                i18n::ticket_name(language, game, true)), |ui| {
                                 dirty |= edit_ticket_inventory(
                                     ui, &mut self.setup, TicketRole::Weapon
                                 );
                             });
-                        setting_tile(&mut cols[2], "◆",
-                            &format!("공용 재화 · {}", game.currency_name()), |ui| {
+                    });
+                    ui.add_space(5.0);
+                    ui.columns(2, |cols| {
+                        setting_tile(&mut cols[0], "◆",
+                            &format!("{} · {}", t(language, "Shared Currency"), i18n::currency_name(language, game)), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.premium_currency)
                                     .range(0..=100_000_000).speed(1)).changed();
                             });
-                        setting_tile(&mut cols[3], "◌",
-                            &format!("환급 · {}", game.exchange_points_name()), |ui| {
+                        setting_tile(&mut cols[1], "◌",
+                            &format!("{} · {}", t(language, "Refund Currency"), i18n::refund_name(language, game)), |ui| {
                                 dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.initial_points)
                                     .range(0..=1_000_000)).changed();
                             });
@@ -368,49 +376,54 @@ impl Calculator {
                     }
                 }
                 ui.add_space(8.0);
-                ui.columns(4, |cols| {
-                    setting_tile(&mut cols[0], "◉", "Target Character", |ui| {
+                // Two rows prevent long selections and number inputs from
+                // overflowing their peers at normal Windows window sizes.
+                ui.columns(2, |cols| {
+                    setting_tile(&mut cols[0], "◉", t(language, "Target Character"), |ui| {
                         self.catalog_selector(ui, catalog::Kind::Character);
                         egui::ComboBox::from_id_salt("workspace_character_goal")
                             .width(ui.available_width().min(145.0))
-                            .selected_text(format!("E{} · {}장", self.target_eid, self.target_eid + 1))
+                            .selected_text(format!("E{} / {}", self.target_eid, self.target_eid + 1))
                             .show_ui(ui, |ui| {
                                 for level in 0..=6 {
                                     dirty |= ui.selectable_value(&mut self.target_eid, level,
-                                        format!("E{level} / {}장", level + 1)).changed();
+                                        format!("E{level} / {}", level + 1)).changed();
                                 }
                             });
                     });
                     setting_tile(&mut cols[1], "⚔",
-                        &format!("Target {}", self.setup.game.secondary_banner_name()), |ui| {
+                        &format!("{} · {}", t(language, "Target Weapon"), i18n::banner_name(language, self.setup.game)), |ui| {
                             self.catalog_selector(ui, catalog::Kind::Weapon);
                             egui::ComboBox::from_id_salt("workspace_weapon_goal")
                                 .width(ui.available_width().min(145.0))
                                 .selected_text(if self.target_refine == 0 {
-                                    "선택 안 함".to_owned()
+                                    t(language, "No target").to_owned()
                                 } else {
-                                    format!("S{} / {}장", self.target_refine, self.target_refine)
+                                    format!("S{} / {}", self.target_refine, self.target_refine)
                                 })
                                 .show_ui(ui, |ui| {
                                     for level in 0..=5 {
-                                        let label = if level == 0 { "필요 없음".to_owned() }
-                                            else { format!("S{level} / {level}장") };
+                                        let label = if level == 0 { t(language, "Not needed").to_owned() }
+                                            else { format!("S{level} / {level}") };
                                         dirty |= ui.selectable_value(
                                             &mut self.target_refine, level, label
                                         ).changed();
                                     }
                                 });
                         });
-                    setting_tile(&mut cols[2], "⚑", "Pity (Current)", |ui| {
+                });
+                ui.add_space(5.0);
+                ui.columns(2, |cols| {
+                    setting_tile(&mut cols[0], "⚑", t(language, "Pity (Current)"), |ui| {
                         let hard = match &self.setup.character.rule {
                             BannerRule::Standard { rarity, .. } => rarity.hard,
                             BannerRule::FeaturedCounter { hard_featured, .. } => *hard_featured,
                             BannerRule::NteArcBatch => 8,
                         };
                         dirty |= ui.add(egui::DragValue::new(&mut self.setup.character.pity)
-                            .range(0..=hard.saturating_sub(1)).suffix("회")).changed();
+                            .range(0..=hard.saturating_sub(1))).changed();
                     });
-                    setting_tile(&mut cols[3], "♧", "Rate-up Guarantee", |ui| {
+                    setting_tile(&mut cols[1], "♧", t(language, "Rate-up Guarantee"), |ui| {
                         if let BannerRule::Standard { featured_share, .. } = &self.setup.character.rule {
                             if *featured_share < 1.0 {
                                 ui.horizontal(|ui| {
@@ -429,45 +442,48 @@ impl Calculator {
                                     }
                                 });
                             } else {
-                                ui.label(RichText::new("Always On").color(SUCCESS));
+                                ui.label(RichText::new(t(language, "Always On")).color(SUCCESS));
                             }
                         } else {
-                            ui.label(RichText::new("게임별 별도 보장").color(MUTED).size(11.0));
+                            ui.label(RichText::new(t(language, "Use game-specific guarantee")).color(MUTED).size(11.0));
                         }
                     });
                 });
                 ui.add_space(5.0);
                 ui.separator();
                 ui.add_space(5.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("ⓘ  캐릭터·무기 목표와 환급 재투입을 계산합니다.\n     캐릭터/무기 단독 그래프는 자유권을 각각 전량 배정한 가정입니다.")
-                        .color(MUTED).size(10.0));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.add(
-                            egui::Button::new(RichText::new("▶   Run Simulation")
-                                .size(15.0).strong().color(BG))
-                                .fill(CYAN).corner_radius(11)
-                                .min_size(egui::vec2(206.0, 43.0))
-                        ).clicked() {
+                // Buttons have their own row. A long hint can no longer consume
+                // width from the primary action or paint outside the center panel.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.add(egui::Button::new(
+                            RichText::new(format!("▶  {}", t(language, "Run Simulation"))).size(14.0).strong().color(BG))
+                            .fill(CYAN).corner_radius(11)
+                            .min_size(egui::vec2(175.0, 40.0))).clicked() {
                             self.manual_calculation_requested = true;
                         }
-                        if ui.add(egui::Button::new("↻  Reset")
+                        if ui.add(egui::Button::new(format!("↻  {}", t(language, "Reset")))
                             .fill(DEEP_CARD).corner_radius(9)
-                            .min_size(egui::vec2(92.0, 40.0))).clicked() {
+                            .min_size(egui::vec2(86.0, 38.0))).clicked() {
                             self.change_game(self.setup.game);
                             self.manual_calculation_requested = true;
                         }
-                        if ui.button("상세 설정").clicked() {
+                        if ui.button(t(language, "Advanced settings")).clicked() {
                             self.view_mode = ViewMode::Settings;
                         }
                     });
                 });
+                ui.label(RichText::new(
+                    format!("ⓘ  {} {}", t(language, "Target settings and refund recycling are shared across tabs."),
+                        t(language, "Individual curves assume full allocation of flexible tickets.")))
+                    .color(MUTED).size(10.0));
             });
         dirty
     }
 
     /// User-facing summary and session history, attached to the right edge on wide screens.
     pub(super) fn workspace_results_panel(&mut self, ctx: &egui::Context) {
+        let language = self.language();
         egui::SidePanel::right("workspace_results")
             .resizable(false)
             .exact_width(313.0)
@@ -483,7 +499,7 @@ impl Calculator {
                         ui.set_width(ui.available_width());
                         ui.set_min_height(283.0);
                         ui.spacing_mut().item_spacing.y = 2.0;
-                        ui.label(RichText::new("▥  Result Summary").size(15.0).strong());
+                        ui.label(RichText::new(format!("▥  {}", t(language, "Result Summary"))).size(15.0).strong());
                         ui.add_space(6.0);
                         ui.separator();
                         ui.add_space(5.0);
@@ -501,10 +517,10 @@ impl Calculator {
                                     self.setup.weapon_dedicated.saturating_add(available)))
                         });
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("◌  Refund Loop").size(12.0));
+                            ui.label(RichText::new(format!("◌  {}", t(language, "Refund Loop"))).size(12.0));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let msg = if self.feedback_cfg.enabled {
-                                    "반복 재투입 적용"
+                                    t(language, "Refunds recycled")
                                 } else {
                                     "Off"
                                 };
@@ -515,13 +531,13 @@ impl Calculator {
                         ui.separator();
                         ui.add_space(6.0);
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("◇  Extra Pulls from Refund").size(11.5));
+                            ui.label(RichText::new(format!("◇  {}", t(language, "Extra Pulls from Refund"))).size(11.5));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let bonus = self.visible_stats()
                                     .and_then(|stats| stats.feedback.as_ref())
                                     .and_then(|f| f.successful_means(available));
                                 let value = bonus.map_or("—".to_owned(),
-                                    |means| format!("+{:.1}뽑", means.average_points_funded));
+                                    |means| format!("+{:.1}", means.average_points_funded));
                                 ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
                             });
                         });
@@ -532,14 +548,14 @@ impl Calculator {
                             .inner_margin(egui::Margin::symmetric(9, 6))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.label(RichText::new("★   Estimated Outcome")
+                                ui.label(RichText::new(format!("★   {}", t(language, "Estimated Outcome")))
                                     .size(13.0).strong());
                             });
                         ui.add_space(6.0);
                         for (title, value) in [
-                            ("Target Character", results.map(|(_,ch,_)|
+                            (t(language, "Target Character"), results.map(|(_,ch,_)|
                                 format!("E{} · {:.2}%", self.target_eid,ch*100.0))),
-                            (&format!("Target {}", self.setup.game.secondary_banner_name()), results.map(|(_,_,wp)|
+                            (&format!("{} · {}", t(language, "Target Weapon"), i18n::banner_name(language, self.setup.game)), results.map(|(_,_,wp)|
                                 format!("S{} · {:.2}%", self.target_refine,wp*100.0))),
                         ] {
                             ui.horizontal(|ui| {
@@ -547,7 +563,7 @@ impl Calculator {
                                 ui.label(RichText::new(title).size(11.0));
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        ui.label(RichText::new(value.as_deref().unwrap_or("계산 중"))
+                                        ui.label(RichText::new(value.as_deref().unwrap_or(t(language, "Calculating")))
                                             .size(11.0).color(SUCCESS).strong());
                                     });
                             });
@@ -562,7 +578,7 @@ impl Calculator {
                                 ui.set_width(ui.available_width());
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::new(format!(
-                                        "★ Overall (E{}S{})", self.target_eid,self.target_refine
+                                        "★ {} (E{}S{})", t(language, "Overall"), self.target_eid,self.target_refine
                                     )).size(11.0).strong());
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -585,7 +601,7 @@ impl Calculator {
                         ui.set_width(ui.available_width());
                         ui.set_min_height(344.0);
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("◷  Simulation History")
+                            ui.label(RichText::new(format!("◷  {}", t(language, "Simulation History")))
                                 .size(15.0).strong());
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -610,11 +626,11 @@ impl Calculator {
                                 ui.painter().circle_filled(rect.center(), 3.0, Color32::WHITE);
                                 if let Some(entry) = self.history.get(i) {
                                     ui.vertical(|ui| {
-                                        ui.label(RichText::new(entry.game.label())
+                                        ui.label(RichText::new(i18n::game_name(language, entry.game))
                                             .size(10.8).strong());
                                         ui.label(RichText::new(format!(
                                             "E{} · {} S{}", entry.eid,
-                                            entry.game.secondary_banner_name(),entry.refine
+                                            i18n::banner_name(language, entry.game),entry.refine
                                         )).color(MUTED).size(9.5));
                                     });
                                     ui.with_layout(
@@ -624,7 +640,7 @@ impl Calculator {
                                             )).color(SUCCESS).size(11.0).strong());
                                         });
                                 } else {
-                                    ui.label(RichText::new("No simulation yet")
+                                    ui.label(RichText::new(t(language, "No simulation yet"))
                                         .color(MUTED).size(10.0));
                                 }
                             });
@@ -632,7 +648,7 @@ impl Calculator {
                         }
                         ui.add_space(7.0);
                         if ui.add(
-                            egui::Button::new("▤  View All History   →")
+                            egui::Button::new(format!("▤  {}  →", t(language, "View All History")))
                                 .fill(Color32::from_rgb(31, 65, 89))
                                 .corner_radius(9)
                                 .min_size(egui::vec2(ui.available_width(), 34.0))
