@@ -125,7 +125,7 @@ impl GameSetup {
     pub fn new(game: Game) -> Self {
         let (character, weapon) = match game {
             Game::StarRail => (
-                regular(0.006, 90, SoftPity::Linear { starts_at: 74, increment: 0.06 }, 0.5, 3, true, 7),
+                regular(0.006, 90, SoftPity::Linear { starts_at: 74, increment: 0.06 }, 0.5, 0, false, 7),
                 regular(0.008, 80, SoftPity::Linear { starts_at: 66, increment: 0.07 }, 0.75, 0, false, 5),
             ),
             Game::WutheringWaves => (
@@ -219,6 +219,15 @@ mod currency_tests {
         nte.set_weapon_ticket_inventory(11);
         assert_eq!(nte.weapon_dedicated, 11);
         assert_eq!(nte.weapon_ticket_inventory(), 11);
+    }
+
+    #[test]
+    fn fresh_star_rail_account_starts_without_unearned_guarantee_or_pity() {
+        let profile = GameSetup::new(Game::StarRail);
+        assert_eq!(profile.character.pity, 0);
+        assert!(!profile.character.guaranteed);
+        assert_eq!(profile.weapon.pity, 0);
+        assert!(!profile.weapon.guaranteed);
     }
 
     #[test]

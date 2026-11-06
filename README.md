@@ -2,8 +2,8 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표에 필요한 뽑기 횟수, 보유 재화, 환급 재투자를 분석하는 **Rust/egui 데스크톱 프로그램**입니다.
 
-**최신 문서: v0.2.6 (2026-11-06)**  
-[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.6) · [v0.2.6 변경사항](RELEASE_NOTES_v0.2.6.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
+**최신 문서: v0.2.7 (2026-11-06)**  
+[Windows x64 배포 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.7) · [v0.2.7 변경사항](RELEASE_NOTES_v0.2.7.md) · [변경 이력](docs/CHANGELOG.md) · [보안 검토](docs/SECURITY_AUDIT.md)
 
 > **정확도 범위:** 희귀도 및 픽업 확률은 선택된 배너 규칙에 대한 유한 상태 DP로 계산합니다. 소프트 천장·게임 내 숨겨진 처리 등 미공개 조건이 있으면 실제 서비스 확률과 다를 수 있습니다. 4성 중복, 상점 환급, 재화 재투자는 개별 계정의 소장 상태를 모두 알 수 없어 **Monte Carlo 추정치**입니다. 서로 다른 결과를 혼동하지 마십시오.
 
@@ -15,9 +15,11 @@
 
 > **v0.2.6 전용 뽑기권 표기:** 목표 캐릭터·장비의 기보유 수량을 차감하고, 각 배너 전용권과 뽑기권으로 교환 가능한 게임 재화를 반영합니다. Dashboard·Analytics의 부족분은 **추가로 필요한 한정 전용권 환산 횟수**와 정확한 추가 게임 재화로 표시합니다. 스타레일은 캐릭터·광추에 같은 한정 티켓을 사용하며, 그 외 게임에서는 환산 횟수가 특정 배너 전용권의 확정 배분을 의미하지 않습니다. 캐릭터·장비 단독 필요량은 독립 참고치로 합산하지 않습니다. 메인 화면에서도 기보유 캐릭터·장비 장수를 직접 수정할 수 있습니다.
 
+> **v0.2.7 안전성 검토:** [4회 순환 검토와 최종 점검](docs/FOUR_PASS_AUDIT_v0.2.7.md)에서 확률 경계, 신규 계정 천장 초기값, 환급 예외, 캐시·CSV 입력 정합성, CI 권한을 검토하고 수정했습니다. 공식/커뮤니티 확률 구분 및 사용자별 보유 재화 계산은 유지합니다.
+
 ## 화면
 
-현재 버전 **v0.2.6의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.6/gacha-pickup-calculator-screenshots-v0.2.6.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
+현재 버전 **v0.2.7의 실제 GUI 캡처**는 [최신 릴리즈의 스크린샷 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v0.2.7/gacha-pickup-calculator-screenshots-v0.2.7.zip)에서 확인할 수 있습니다. CI가 실제 애플리케이션을 실행해 생성한 PNG 파일들이며, 이전 버전의 화면 이미지는 저장소에서 정리했습니다.
 
 ## 주요 기능
 
@@ -72,12 +74,12 @@
 
 ## 설치 (Windows x64)
 
-1. [v0.2.6 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.6)에서 `gacha-pickup-calculator-windows-x64-v0.2.6.zip`을 받습니다.
+1. [v0.2.7 릴리즈](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v0.2.7)에서 `gacha-pickup-calculator-windows-x64-v0.2.7.zip`을 받습니다.
 2. ZIP 전체를 압축 해제합니다. **실행 파일과 `Image/` 폴더 구조를 그대로 유지**하십시오.
 3. `gacha_pickup_calculator.exe`를 실행합니다. 별도 관리자 권한이나 외부 API 키는 필요하지 않습니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v0.2.6.zip
+gacha-pickup-calculator-windows-x64-v0.2.7.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/
