@@ -88,7 +88,7 @@ fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
         (Game::WutheringWaves, "1311") => (20260930, "신규 3.7"),
         (Game::Neverness, "upcoming_elyms") => (20261111, "공개 예정 1.5"),
         (Game::Neverness, "upcoming_exe") => (20261202, "공개 예정 1.5"),
-        (Game::StellaSora, "firstlight_noya") => (20261020, "신규 2.0"),
+        (Game::StellaSora, "162") => (20261020, "신규 2.0"),
         _ => (0, ""),
     }
 }
@@ -109,7 +109,7 @@ fn parse() -> Vec<Entry> {
         let kind = match fields[1] { "c" => Kind::Character, "w" => Kind::Weapon, _ => continue };
         let (release_order, status) = if kind == Kind::Character {
             recent_character(game, fields[2])
-        } else if game == Game::StellaSora && fields[2] == "guiding_star_disc" {
+        } else if game == Game::StellaSora && fields[2] == "214066" {
             (20261020, "신규 레코드 2.0")
         } else { (0, "") };
         out.push(Entry {
@@ -388,7 +388,7 @@ mod tests {
     fn upcoming_and_released_characters_are_prioritized() {
         assert_eq!(first(Game::StarRail, Kind::Character), "upcoming_aeon_aha");
         assert_eq!(first(Game::Neverness, Kind::Character), "upcoming_exe");
-        assert_eq!(first(Game::StellaSora, Kind::Character), "firstlight_noya");
+        assert_eq!(first(Game::StellaSora, Kind::Character), "162");
         assert_eq!(first(Game::WutheringWaves, Kind::Character), "1312");
     }
     #[test]
@@ -433,9 +433,14 @@ mod tests {
             assert_eq!(signature_weapon(game, parts[1]).unwrap().id, parts[2]);
             count += 1;
         }
-        assert!(count >= 100, "verified signature coverage unexpectedly dropped: {count}");
+        assert_eq!(count, 116, "signature mapping coverage changed unexpectedly");
         assert_eq!(signature_weapon(Game::Neverness, "1056").map(|e| &e.id), None);
         assert!(signature_weapon(Game::StarRail, "8001").is_none());
+        // IDs come from the official 2.0 data snapshot, not earlier aliases.
+        assert_eq!(signature_weapon(Game::StellaSora, "162").unwrap().id, "214066");
+        assert!(by_id(Game::StellaSora, Kind::Character, "firstlight_noya").is_none());
+        assert!(by_id(Game::StellaSora, Kind::Weapon, "guiding_star_disc").is_none());
+        assert_eq!(signature_weapon(Game::StellaSora, "139").unwrap().id, "214061");
     }
 
     #[test]
