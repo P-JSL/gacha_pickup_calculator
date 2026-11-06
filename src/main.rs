@@ -348,6 +348,28 @@ struct GameSession {
     weapon_id: String,
 }
 
+/// Apply a catalog choice to the shared game session. All tabs use these
+/// same selected IDs; never infer signature equipment from list order.
+fn apply_catalog_choice(
+    game: Game, kind: catalog::Kind, id: &str,
+    character: &mut String, weapon: &mut String,
+) -> bool {
+    let Some(entry) = catalog::by_id(game, kind, id) else { return false; };
+    if !entry.is_featured_target() { return false; }
+    match kind {
+        catalog::Kind::Character => {
+            *character = id.to_owned();
+            if let Some(signature) = catalog::signature_weapon(game, id) {
+                *weapon = signature.id.clone();
+            }
+            // No verified signature: preserve explicit manual equipment instead
+            // of pretending an arbitrary five-star equipment is exclusive.
+        }
+        catalog::Kind::Weapon => *weapon = id.to_owned(),
+    }
+    true
+}
+
 impl GameSession {
     fn defaults(game: Game) -> Self {
         let character_id = catalog::first(game, catalog::Kind::Character);
@@ -549,19 +571,10 @@ impl Calculator {
         let choice = catalog::picker(ctx, &mut self.catalog_ui, self.setup.game, kind,
             &mut open, &mut self.picker_filter, &current);
         if let Some(id) = choice {
-            match kind {
-                catalog::Kind::Character => {
-                    self.selected_character_id = id;
-                    // Change the secondary target only when an explicit signature
-                    // pairing exists; otherwise preserve the user's manual choice.
-                    if let Some(weapon) = catalog::signature_weapon(
-                        self.setup.game, &self.selected_character_id
-                    ) {
-                        self.selected_weapon_id = weapon.id.clone();
-                    }
-                }
-                catalog::Kind::Weapon => self.selected_weapon_id = id,
-            }
+            apply_catalog_choice(
+                self.setup.game, kind, &id,
+                &mut self.selected_character_id, &mut self.selected_weapon_id,
+            );
             self.picker_kind = None;
         } else if !open {
             self.picker_kind = None;
@@ -2295,6 +2308,62 @@ mod chart_tests {
         let prefs = UiPreferences::default();
         assert!(!prefs.auto_recalculate);
         assert!(prefs.show_hover_guides);
+    }
+
+    #[test]
+    fn selecting_stella_sora_character_updates_correct_disc_across_tabs() {
+        let mut character = "162".to_owned();
+        let mut disc = "214066".to_owned();
+        assert!(apply_catalog_choice(
+            Game::StellaSora, catalog::Kind::Character, "139",
+            &mut character, &mut disc,
+        ));
+        assert_eq!(character, "139");
+        assert_eq!(disc, "214061"); // Allie / Bedtime Story
+        assert!(apply_catalog_choice(
+            Game::StellaSora, catalog::Kind::Character, "162",
+            &mut character, &mut disc,
+        ));
+        assert_eq!(disc, "214066"); // Firstlight Noya / My Guiding Star
+        assert!(apply_catalog_choice(
+            Game::StellaSora, catalog::Kind::Weapon, "214005",
+            &mut character, &mut disc,
+        ));
+        assert_eq!(character, "162");
+        assert_eq!(disc, "214005"); // Manual disc override remains possible
+    }
+
+    #[test]
+    fn selecting_any_mapped_character_resolves_its_unique_five_star_equipment() {
+        for line in include_str!("signature_pairs.tsv").lines().filter(|l|
+            !l.is_empty() && !l.starts_with('#')
+        ) {
+            let p: Vec<_> = line.split('\t').collect();
+            let game = match p[0] {
+                "hsr" => Game::StarRail, "wuwa" => Game::WutheringWaves,
+                "nte" => Game::Neverness, "sora" => Game::StellaSora,
+                _ => panic!("unknown game in mapping"),
+            };
+            let mut character = catalog::first(game, catalog::Kind::Character);
+            let mut weapon = catalog::first(game, catalog::Kind::Weapon);
+            assert!(apply_catalog_choice(game, catalog::Kind::Character, p[1],
+                &mut character, &mut weapon), "{line}");
+            assert_eq!(character, p[1]);
+            assert_eq!(weapon, p[2], "wrong equipment for {line}");
+        }
+    }
+
+    #[test]
+    fn unmapped_character_preserves_manual_weapon_and_rejects_nonexistent_ids() {
+        let mut character = "1308".to_owned();
+        let mut weapon = "23024".to_owned();
+        assert!(apply_catalog_choice(Game::StarRail, catalog::Kind::Character,
+            "1321", &mut character, &mut weapon));
+        assert_eq!(character, "1321");
+        assert_eq!(weapon, "23024");
+        assert!(!apply_catalog_choice(Game::StarRail, catalog::Kind::Weapon,
+            "none", &mut character, &mut weapon));
+        assert_eq!(weapon, "23024");
     }
 
     #[test]
