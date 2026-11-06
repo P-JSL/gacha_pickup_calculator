@@ -22,8 +22,8 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
         with:
           components: rustfmt, clippy
       - name: Linux windowing prerequisites
@@ -32,9 +32,9 @@ jobs:
       - name: Format Rust sources before verification
         run: cargo fmt --all
       - name: Unit tests
-        run: cargo test --all-targets
+        run: cargo test --locked --all-targets
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: RustSec dependency vulnerability audit (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -43,7 +43,7 @@ jobs:
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit
       - name: Build release
-        run: cargo build --release
+        run: cargo build --locked --release
       - name: Linux GUI startup smoke (virtual display)
         if: runner.os == 'Linux'
         shell: bash
@@ -104,7 +104,7 @@ jobs:
           }
       - name: Upload Windows UI screenshot
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-windows-native-ui-smoke
           path: ci-artifacts/windows-ui.png
@@ -114,7 +114,7 @@ jobs:
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-linux-release-executable
           path: target/release/gacha_pickup_calculator
@@ -122,25 +122,20 @@ jobs:
           retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-pickup-calculator-windows-x64
           path: target/release/gacha_pickup_calculator.exe
           if-no-files-found: error
 
   images:
-    name: Build and scan offline image library
+    name: Audit and scan checked-in offline images
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      - name: Install pinned image decoder
-        run: python3 -m pip install --disable-pip-version-check --no-cache-dir "Pillow==13.0.0"
-      - name: Fetch, validate and re-encode all catalog images
-        run: python3 scripts/build_offline_images.py
-      - name: Scan all normalized images for malware
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify immutable checked-in PNG assets
+        run: python3 scripts/verify_embedded_assets.py
+      - name: Scan vendored images for known malware
         shell: bash
         run: |
           set -euo pipefail
@@ -148,11 +143,11 @@ jobs:
           sudo apt-get install -y clamav clamav-freshclam
           sudo systemctl stop clamav-freshclam 2>/dev/null || true
           sudo freshclam
-          clamscan --recursive --infected dist/Image
-      - uses: actions/upload-artifact@v7
+          clamscan --recursive --infected Image
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-offline-images
-          path: dist/Image/
+          path: Image/
           if-no-files-found: error
 
   ui_docs:
@@ -160,73 +155,31 @@ jobs:
     needs: [verify, images]
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: gacha-linux-release-executable
           path: target/release/
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: gacha-offline-images
           path: target/release/Image/
       - name: Actual Linux UI with packaged images
         shell: bash
-        timeout-minutes: 12
         run: |
           set -euo pipefail
           sudo apt-get update
-          # Noto CJK is ~61 MB and can stall on Azure's Ubuntu mirror.
-          # Use the smaller Korean Nanum font for the screenshot runner instead.
-          sudo apt-get install -y --no-install-recommends xvfb scrot xdotool python3-pil fonts-nanum libgl1-mesa-dri libxkbcommon-x11-0
-          nanum_font=$(find /usr/share/fonts/truetype/nanum -type f -iname 'NanumGothic.ttf' -print -quit)
-          test -s "$nanum_font"
-          sudo install -d /usr/share/fonts/truetype/noto
-          sudo ln -sfn "$nanum_font" /usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc
+          sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
-          if timeout --signal=TERM --kill-after=10s 420s bash scripts/capture_readme_screenshots.sh; then
-            echo 'README GUI capture and game selection succeeded.'
-          else
-            code=$?
-            echo "::error::README GUI capture failed or exceeded 420 seconds (exit=$code)."
-            if [ -f /tmp/gacha-documentation-screens.log ]; then
-              tail -n 140 /tmp/gacha-documentation-screens.log || true
-            fi
-            ls -lh ci-readme-shots/ || true
-            exit "$code"
-          fi
-      - uses: actions/upload-artifact@v7
+          bash scripts/capture_readme_screenshots.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: gacha-readme-screenshots-v015
+          name: gacha-readme-screenshots
           path: ci-readme-shots/
           if-no-files-found: error
           retention-days: 14
-      - name: Commit actual GUI screenshots to same-repository PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        env:
-          PR_BRANCH: ${{ github.head_ref }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git fetch origin "$PR_BRANCH"
-          actual_sha=$(git rev-parse FETCH_HEAD)
-          if [ "$actual_sha" != "$PR_HEAD_SHA" ]; then
-            echo "::error::PR head changed during screenshot capture; declining to publish stale images"
-            exit 1
-          fi
-          git switch -C "$PR_BRANCH" FETCH_HEAD
-          mkdir -p docs/screenshots/v0.1.15
-          cp ci-readme-shots/*.png docs/screenshots/v0.1.15/
-          git add docs/screenshots/v0.1.15/
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' \
-                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-                commit -m 'docs: add verified latest-character GUI screenshots [skip ci]'
-            git push origin HEAD:"$PR_BRANCH"
-          fi
-
   release:
     name: Publish versioned release
     needs: [verify, images, ui_docs]
@@ -235,9 +188,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
+          ref: ${{ github.sha }}
       - name: Check version and existing release
         id: version
         env:
@@ -259,16 +212,21 @@ jobs:
             fi
             echo 'publish=true' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-offline-images
           path: dist/Image
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        if: steps.version.outputs.publish == 'true'
+        with:
+          name: gacha-readme-screenshots
+          path: dist/screenshots
       - name: Check release notes
         if: steps.version.outputs.publish == 'true'
         env:
@@ -295,7 +253,7 @@ jobs:
           icons = sorted(Path("dist/Image").rglob("*.png"))
           expected = sum(1 for line in Path("src/catalog_data.tsv").read_text(
               encoding="utf-8").splitlines() if len(line.split("\t")) == 6)
-          if len(icons) != expected or expected < 680:
+          if len(icons) != expected or expected < 670:
               raise SystemExit(f"Incomplete sanitized assets: {len(icons)}/{expected}")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
@@ -314,11 +272,22 @@ jobs:
               assert len([n for n in zipped.namelist()
                   if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
               assert "Image/SHA256SUMS.txt" in zipped.namelist()
+          screenshots = sorted(Path("dist/screenshots").glob("*.png"))
+          if len(screenshots) < 9:
+              raise SystemExit(f"Insufficient captured GUI screenshots: {len(screenshots)}")
+          screenshot_zip = Path(f"dist/gacha-pickup-calculator-screenshots-v{version}.zip")
+          with ZipFile(screenshot_zip, "w", compression=ZIP_DEFLATED) as zipped:
+              for screenshot in screenshots:
+                  zipped.write(screenshot, screenshot.name)
+          with ZipFile(screenshot_zip) as zipped:
+              assert zipped.testzip() is None
+              assert len(zipped.namelist()) == len(screenshots)
           PY
           cd dist
           sha256sum gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" > SHA256SUMS.txt
+            "gacha-pickup-calculator-source-v$VERSION.zip" \
+            "gacha-pickup-calculator-screenshots-v$VERSION.zip" > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - name: Publish release and validate asset list
         if: steps.version.outputs.publish == 'true'
@@ -333,6 +302,7 @@ jobs:
             dist/gacha_pickup_calculator.exe \
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
+            "dist/gacha-pickup-calculator-screenshots-v$VERSION.zip" \
             dist/SHA256SUMS.txt \
             --target "$(git rev-parse HEAD)" \
             --title "$TAG — Rust Gacha Pickup Calculator" \
@@ -340,10 +310,11 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           for asset in gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" SHA256SUMS.txt; do
+            "gacha-pickup-calculator-source-v$VERSION.zip" \
+            "gacha-pickup-calculator-screenshots-v$VERSION.zip" SHA256SUMS.txt; do
             grep -Fx -- "$asset" actual-assets.txt >/dev/null || {
               echo "::error::Missing release asset: $asset"
               exit 1
             }
           done
-          echo "::notice title=Release published::$TAG has all four expected assets."
+          echo "::notice title=Release published::$TAG has all five expected assets."

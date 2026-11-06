@@ -1,14 +1,15 @@
 //! Game-specific target identity catalog (UI only). Probability models remain rarity-banner models.
 //! Snapshot sources are documented next to catalog_data.tsv; icons load lazily and asynchronously.
 use eframe::egui;
+use crate::security;
 use gacha_pickup_calculator::games::Game;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind { Character, Weapon }
 
 #[derive(Clone, Debug)]
@@ -45,6 +46,13 @@ const ICON_REPOSITORIES: &[&str] = &[
     "https://raw.githubusercontent.com/JforPlay/sstoy/",
     "https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/",
 ];
+// Only these independently checked Gachabase asset URLs are approved.
+// Do not generalize to a host-wide allowlist or an arbitrary URL.
+const PINNED_GACHABASE_ICONS: &[&str] = &[
+    "https://i.gachabase.net/-LuzQkoz_xxThpfhIoggZyPwP5qGH2PNb7JagsfT7JE/q%3A50/f%3Awebp/plain/hsr/assets/2be49dbbe7cfe8f77187dcfea51d9863.png",
+    "https://i.gachabase.net/uBAzqOHCvKf2Lw_wZbXzjj80cTLw831sAmvOKy7ROS8/q%3A50/f%3Awebp/plain/hsr/assets/e4d45ac64a652c8e44f9a7c7da2d4e07.png",
+    "https://i.gachabase.net/i6VciWWsCxBhjhKd0bBK-E_qf9P-VDTdz-I-8-zUPeY/q%3A50/f%3Awebp/plain/hsr/assets/ff88fd079e093ae22ccf24269eb85a17.png",
+];
 const MAX_ICON_BYTES: u64 = 512 * 1024;
 const MAX_ICON_SIDE: u32 = 256;
 
@@ -52,6 +60,7 @@ fn approved_icon_url(url: &str) -> bool {
     if url.len() > 512 || url.bytes().any(|byte| byte.is_ascii_control()) {
         return false;
     }
+    if PINNED_GACHABASE_ICONS.contains(&url) { return true; }
     let Some(relative) = ICON_REPOSITORIES.iter()
         .find_map(|prefix| url.strip_prefix(prefix)) else { return false };
     let extension_ok = [".png", ".jpg", ".jpeg"]
@@ -81,13 +90,15 @@ fn game_code(game: Game) -> &'static str {
 /// Other roster entries remain available below these; unverified leaks are excluded.
 fn recent_character(game: Game, id: &str) -> (u32, &'static str) {
     match (game, id) {
-        (Game::StarRail, "upcoming_aeon_aha") => (20261111, "4.7 공식 발표"),
+        (Game::StarRail, "1511") => (20261111, "4.7 공식 발표"),
+        (Game::StarRail, "upcoming_astra_yao") => (20261028, "4.8 공식 공개 · 배너 미확정"),
+        (Game::StarRail, "upcoming_ellen_joe") => (20261027, "4.8 공식 공개 · 배너 미확정"),
         (Game::StarRail, "1503") => (20261015, "최신 4.6"),
         (Game::WutheringWaves, "1312") => (20261022, "최신 3.7"),
         (Game::WutheringWaves, "1311") => (20260930, "신규 3.7"),
         (Game::Neverness, "upcoming_elyms") => (20261111, "공개 예정 1.5"),
         (Game::Neverness, "upcoming_exe") => (20261202, "공개 예정 1.5"),
-        (Game::StellaSora, "firstlight_noya") => (20261020, "신규 2.0"),
+        (Game::StellaSora, "162") => (20261020, "신규 2.0"),
         _ => (0, ""),
     }
 }
@@ -108,7 +119,11 @@ fn parse() -> Vec<Entry> {
         let kind = match fields[1] { "c" => Kind::Character, "w" => Kind::Weapon, _ => continue };
         let (release_order, status) = if kind == Kind::Character {
             recent_character(game, fields[2])
-        } else if game == Game::StellaSora && fields[2] == "guiding_star_disc" {
+        } else if game == Game::StarRail && fields[2] == "23065" {
+            (20261111, "4.7 아하 전용")
+        } else if game == Game::StarRail && fields[2] == "22009" {
+            (20261111, "4.7 무료 광추")
+        } else if game == Game::StellaSora && fields[2] == "214066" {
             (20261020, "신규 레코드 2.0")
         } else { (0, "") };
         out.push(Entry {
@@ -131,11 +146,25 @@ pub fn entries() -> &'static [Entry] {
     static DATA: OnceLock<Vec<Entry>> = OnceLock::new();
     DATA.get_or_init(parse)
 }
+type CatalogIndex = HashMap<(Game, Kind), HashMap<&'static str, &'static Entry>>;
+type SignatureIndex = HashMap<Game, HashMap<&'static str, &'static str>>;
+
 pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
-    entries().iter().find(|x| x.game == game && x.kind == kind && x.id == id)
+    // Build the index once. Repeated picker redraws and signature selections
+    // should not scan the entire four-game catalog.
+    static INDEX: OnceLock<CatalogIndex> = OnceLock::new();
+    let lookup = INDEX.get_or_init(|| {
+        let mut lookup: HashMap<(Game, Kind), HashMap<&str, &Entry>> = HashMap::new();
+        for entry in entries() {
+            lookup.entry((entry.game, entry.kind))
+                .or_default().insert(entry.id.as_str(), entry);
+        }
+        lookup
+    });
+    lookup.get(&(game, kind))?.get(id).copied()
 }
 pub fn first(game: Game, kind: Kind) -> String {
-    entries().iter().find(|x| x.game == game && x.kind == kind && x.rarity >= 5)
+    entries().iter().find(|x| x.game == game && x.kind == kind && x.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
 pub fn count(game: Game, kind: Kind) -> usize {
@@ -145,18 +174,24 @@ pub fn count(game: Game, kind: Kind) -> usize {
 /// Explicitly sourced banner pairing. Never guess a 5★ weapon from rarity,
 /// sorted position, shared element, or similar naming.
 pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
-    let weapon_id = include_str!("signature_pairs.tsv").lines()
-        .filter(|line| !line.starts_with('#'))
-        .filter_map(|line| {
+    static PAIRS: OnceLock<SignatureIndex> = OnceLock::new();
+    let pairs = PAIRS.get_or_init(|| {
+        let mut pairs: HashMap<Game, HashMap<&str, &str>> = HashMap::new();
+        for line in include_str!("signature_pairs.tsv").lines() {
+            if line.starts_with('#') || line.is_empty() { continue; }
             let mut parts = line.split('\t');
-            let g = parts.next()?;
-            let char_id = parts.next()?;
-            let weapon_id = parts.next()?;
-            let source = parts.next()?;
-            if parts.next().is_some() || source.is_empty() { return None; }
-            (g == game_code(game) && char_id == character_id).then_some(weapon_id)
-        })
-        .next()?;
+            let (Some(g), Some(char_id), Some(weapon_id), Some(source)) =
+                (parts.next(), parts.next(), parts.next(), parts.next()) else { continue; };
+            if parts.next().is_some() || source.is_empty() { continue; }
+            let game = Game::ALL.iter().copied()
+                .find(|game| game_code(*game) == g);
+            if let Some(game) = game {
+                pairs.entry(game).or_default().insert(char_id, weapon_id);
+            }
+        }
+        pairs
+    });
+    let weapon_id = *pairs.get(&game)?.get(character_id)?;
     by_id(game, Kind::Weapon, weapon_id).filter(|entry| entry.rarity >= 5)
 }
 
@@ -222,10 +257,15 @@ impl CatalogUi {
         }
         let canonical = candidate.canonicalize().ok()?;
         if !canonical.starts_with(root.canonicalize().ok()?) { return None; }
-        let bytes = fs::read(canonical).ok()?;
-        if bytes.len() as u64 > MAX_ICON_BYTES
-            || !approved_icon_bytes(&bytes)
-            || !bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+        // Read the already-checked path through a single bounded file handle.
+        // An attacker replacing the source between checks cannot supply a
+        // different portrait: its content must match the embedded SHA-256.
+        let handle = fs::File::open(&candidate).ok()?;
+        if !handle.metadata().ok()?.is_file() { return None; }
+        let mut bytes = Vec::new();
+        handle.take(MAX_ICON_BYTES + 1).read_to_end(&mut bytes).ok()?;
+        if !approved_icon_bytes(&bytes)
+            || security::verify_image_bytes(relative, &bytes).is_err()
         { return None; }
         let mut reader = image::ImageReader::new(Cursor::new(bytes))
             .with_guessed_format().ok()?;
@@ -317,6 +357,11 @@ pub fn picker(
             ui.label(egui::RichText::new(
                 "★5 목표 기준 확률입니다. ★4 목록은 표시되지만 확률 계산 대상은 아닙니다."
             ).color(egui::Color32::from_rgb(165, 190, 208)).size(11.0));
+            if game == Game::StarRail && kind == Kind::Character {
+                ui.label(egui::RichText::new(
+                    "4.8 공개 캐릭터는 실제 배너와 전용 광추가 미확정입니다. 현재 5성 픽업 규칙으로 가정 계산합니다."
+                ).color(egui::Color32::from_rgb(225, 197, 128)).size(11.0));
+            }
             ui.separator();
             let needle = filter.trim().to_lowercase();
             let items: Vec<&Entry> = entries().iter().filter(|entry| {
@@ -360,9 +405,9 @@ mod tests {
     use super::*;
     #[test]
     fn upcoming_and_released_characters_are_prioritized() {
-        assert_eq!(first(Game::StarRail, Kind::Character), "upcoming_aeon_aha");
+        assert_eq!(first(Game::StarRail, Kind::Character), "1511");
         assert_eq!(first(Game::Neverness, Kind::Character), "upcoming_exe");
-        assert_eq!(first(Game::StellaSora, Kind::Character), "firstlight_noya");
+        assert_eq!(first(Game::StellaSora, Kind::Character), "162");
         assert_eq!(first(Game::WutheringWaves, Kind::Character), "1312");
     }
     #[test]
@@ -407,9 +452,49 @@ mod tests {
             assert_eq!(signature_weapon(game, parts[1]).unwrap().id, parts[2]);
             count += 1;
         }
-        assert!(count >= 100, "verified signature coverage unexpectedly dropped: {count}");
+        assert_eq!(count, 141, "signature mapping coverage changed unexpectedly");
+        assert_eq!(signature_weapon(Game::StarRail, "1511").unwrap().id, "23065");
+        assert!(signature_weapon(Game::StarRail, "upcoming_ellen_joe").is_none());
+        assert!(signature_weapon(Game::StarRail, "upcoming_astra_yao").is_none());
+        assert_eq!(by_id(Game::StarRail, Kind::Weapon, "22009").unwrap().rarity, 4);
         assert_eq!(signature_weapon(Game::Neverness, "1056").map(|e| &e.id), None);
         assert!(signature_weapon(Game::StarRail, "8001").is_none());
+        // IDs come from the official 2.0 data snapshot, not earlier aliases.
+        assert_eq!(signature_weapon(Game::StellaSora, "162").unwrap().id, "214066");
+        assert!(by_id(Game::StellaSora, Kind::Character, "firstlight_noya").is_none());
+        assert!(by_id(Game::StellaSora, Kind::Weapon, "guiding_star_disc").is_none());
+        assert_eq!(signature_weapon(Game::StellaSora, "139").unwrap().id, "214061");
+    }
+
+    #[test]
+    fn all_unpaired_five_star_targets_are_explicitly_classified() {
+        let mut exceptions = HashSet::new();
+        for line in include_str!("unpaired_five_star_targets.tsv").lines() {
+            if line.starts_with('#') || line.is_empty() { continue; }
+            let fields: Vec<_> = line.split('\t').collect();
+            assert_eq!(fields.len(), 4, "bad unpaired target: {line}");
+            let game = match fields[0] {
+                "hsr" => Game::StarRail, "wuwa" => Game::WutheringWaves,
+                "nte" => Game::Neverness, "sora" => Game::StellaSora,
+                _ => panic!("unknown game in exception: {line}"),
+            };
+            let ch = by_id(game, Kind::Character, fields[1]).expect("unknown exception identity");
+            assert_eq!(ch.name, fields[3]);
+            assert_eq!(ch.rarity, 5);
+            assert!(signature_weapon(game, fields[1]).is_none(),
+                "exception has a mapped signature: {line}");
+            assert!(exceptions.insert((game, fields[1])), "duplicate exception: {line}");
+        }
+        assert_eq!(exceptions.len(), 30, "unmapped target coverage changed");
+        for entry in entries().iter().filter(|entry|
+            entry.kind == Kind::Character && entry.rarity == 5
+        ) {
+            if signature_weapon(entry.game, &entry.id).is_none() {
+                assert!(exceptions.contains(&(entry.game, entry.id.as_str())),
+                    "five-star character missing a signature and an explicit exception: {}",
+                    entry.id);
+            }
+        }
     }
 
     #[test]
@@ -429,6 +514,9 @@ mod tests {
         }
         assert_eq!(by_id(Game::Neverness, Kind::Character, "1091").map(|e| e.name.as_str()), None);
         assert_eq!(by_id(Game::Neverness, Kind::Character, "1051").map(|e| e.name.as_str()), None);
+        let latest_female = by_id(Game::StarRail, Kind::Character, "8010").unwrap();
+        assert_eq!(latest_female.name, "개척자 (여성 · 환락 · 번개)");
+        assert!(!latest_female.is_featured_target());
     }
 
     #[test]

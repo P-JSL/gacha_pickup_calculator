@@ -1,0 +1,33 @@
+# game\tcharacter_id\treason\tdisplay_name
+# Explicit exceptions for five-star characters without a source-confirmed signature.
+# Never infer a signature from game rarity, sorting, matching names, or sample icon.
+hsr	8001	story_protagonist	개척자 (남성 · 파멸 · 물리)
+hsr	8002	story_protagonist	개척자 (여성 · 파멸 · 물리)
+hsr	8003	story_protagonist	개척자 (남성 · 보존 · 화염)
+hsr	8004	story_protagonist	개척자 (여성 · 보존 · 화염)
+hsr	8005	story_protagonist	개척자 (남성 · 화합 · 허수)
+hsr	8006	story_protagonist	개척자 (여성 · 화합 · 허수)
+hsr	8007	story_protagonist	개척자 (남성 · 기억 · 얼음)
+hsr	8008	story_protagonist	개척자 (여성 · 기억 · 얼음)
+hsr	8009	story_protagonist	개척자 (남성 · 환락 · 번개)
+hsr	8010	story_protagonist	개척자 (여성 · 환락 · 번개)
+wuwa	1301	standard_nonlimited	Calcharo
+wuwa	1203	standard_nonlimited	Encore
+wuwa	1405	standard_nonlimited	Jianxin
+wuwa	1104	standard_nonlimited	Lingyang
+wuwa	1604	story_protagonist	Rover: Havoc
+wuwa	1502	story_protagonist	Rover: Spectro
+wuwa	1503	standard_nonlimited	Verina
+nte	1003	no_exclusive_arc_in_game_snapshot	사키리
+nte	1023	no_exclusive_arc_in_game_snapshot	백장
+nte	1025	no_exclusive_arc_in_game_snapshot	하토르
+nte	1039	no_exclusive_arc_in_game_snapshot	파디아
+nte	1054	no_exclusive_arc_in_game_snapshot	다포딜
+nte	1055	no_exclusive_arc_in_game_snapshot	구원
+nte	1073	no_exclusive_arc_in_game_snapshot	치즈
+wuwa	RoverAeroMale	story_protagonist	Rover: Aero
+wuwa	Roverelectromale	story_protagonist	Rover: Electro
+nte	upcoming_elyms	banner_or_signature_unconfirmed	Elyms
+nte	upcoming_exe	banner_or_signature_unconfirmed	Exe
+hsr	upcoming_ellen_joe	banner_or_signature_unconfirmed	엘렌 조 (4.8 공개)
+hsr	upcoming_astra_yao	banner_or_signature_unconfirmed	아스트라 야오 (4.8 공개)

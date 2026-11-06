@@ -18,6 +18,7 @@ import urllib.request
 import warnings
 
 from PIL import Image, ImageDraw, UnidentifiedImageError
+from pinned_icon_sources import approved_pinned_url, validate_pinned_identity
 
 CATALOG = Path("src/catalog_data.tsv")
 ROOT = Path("dist/Image")
@@ -41,6 +42,8 @@ warnings.simplefilter("error", Image.DecompressionBombWarning)
 def approved_source_url(url: str) -> bool:
     if not url or len(url) > 512 or any(ord(ch) < 32 or ord(ch) == 127 for ch in url):
         return False
+    if approved_pinned_url(url):
+        return True
     try:
         parsed = urllib.parse.urlsplit(url)
         return (
@@ -97,8 +100,8 @@ def entries():
                             for c in ident):
             raise ValueError("Unsafe image identifier")
         if url:
-            if not approved_source_url(url):
-                raise ValueError(f"Unapproved source URL for {game}/{ident}")
+            if not approved_source_url(url) or not validate_pinned_identity(game, role, ident, url):
+                raise ValueError(f"Unapproved or wrong-identity source for {game}/{ident}")
             identity = (game, role, url)
             if identity in urls:
                 raise ValueError(f"Reused image source for distinct identities: {identity}")
@@ -135,14 +138,16 @@ def fetch_and_normalize(item):
     )
     with OPENER.open(request, timeout=18) as response:
         kind = response.headers.get_content_type()
-        if kind not in ("image/png", "image/jpeg", "application/octet-stream"):
+        if kind not in ("image/png", "image/jpeg", "application/octet-stream") and not (
+                approved_pinned_url(url) and kind == "image/webp"):
             raise ValueError(f"Unsupported content type {kind}")
         raw = response.read(MAX_INPUT_BYTES + 1)
     if not raw or len(raw) > MAX_INPUT_BYTES:
         raise ValueError("Image response empty or too large")
     # Ignore misleading file names and MIME labels: decode only explicit formats.
     with Image.open(io.BytesIO(raw)) as im:
-        if im.format not in EXPECTED_FORMATS:
+        if im.format not in EXPECTED_FORMATS and not (
+                approved_pinned_url(url) and im.format == "WEBP"):
             raise ValueError(f"Rejected image format {im.format}")
         w, h = im.size
         if min(w, h) < 1 or max(w, h) > MAX_EDGE or w * h > MAX_PIXELS:

@@ -1,0 +1,34 @@
+name: Record initial reproducible Cargo.lock (one-time)
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/vendor-cargo-lock.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    if: github.repository == 'P-JSL/gacha_pickup_calculator'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+      - name: Generate and validate dependency lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e Cargo.lock
+          cargo generate-lockfile
+          cargo metadata --locked --format-version=1 --no-deps >/dev/null
+          test -s Cargo.lock
+      - name: Commit lockfile to the same branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add Cargo.lock
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'build(deps): freeze full Rust dependency graph [skip ci]'
+          git push origin HEAD:main
