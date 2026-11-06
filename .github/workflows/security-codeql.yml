@@ -1,5 +1,11 @@
 name: CodeQL security analysis
 
+# Keep required check contexts present on documentation-only PRs. Job-level
+# skipping (not on.paths) prevents permanently pending branch-protection checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
@@ -15,8 +21,48 @@ permissions:
   actions: read
 
 jobs:
+  classify:
+    name: Classify CodeQL inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      scan: ${{ steps.changes.outputs.scan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 2
+      - name: Skip only proven documentation-only changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan=true
+          if [[ "$GITHUB_EVENT_NAME" == pull_request || "$GITHUB_EVENT_NAME" == push ]]; then
+            base="$BASE_SHA"
+            if [[ -n "$base" && "$base" != "0000000000000000000000000000000000000000" ]]; then
+              if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+                git fetch --no-tags --depth=1 origin "$base" || true
+              fi
+              if git cat-file -e "${base}^{commit}" 2>/dev/null && \
+                 git diff --name-only --diff-filter=ACDMRT -z "$base" "$GITHUB_SHA" > "$RUNNER_TEMP/codeql-paths"; then
+                scan=false
+                while IFS= read -r -d '' path; do
+                  case "$path" in
+                    README.md|LICENSE|THIRD_PARTY_ASSETS.md|docs/*.md|RELEASE_NOTES_v*.md) ;;
+                    *) scan=true; break ;;
+                  esac
+                done < "$RUNNER_TEMP/codeql-paths"
+              fi
+            fi
+          fi
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+          echo "CodeQL scope: scan=$scan (scheduled and manual scans always run)"
+
   codeql:
     name: CodeQL (${{ matrix.language }})
+    needs: classify
+    if: needs.classify.outputs.scan == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -26,6 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        if: matrix.language == 'rust'
         with:
           components: clippy
       - name: Initialize CodeQL with limited build-independent scope
