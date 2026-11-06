@@ -43,6 +43,8 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
       python3 scripts/ui_capture_tab.py "ci-readme-shots/$last_tab_capture.png"
     )
     target_x=$((hsr_x + offset))
+    # Always click at the Y of the most recently captured dashboard.
+    # A screenshot of a different tab/scroll position is not a safe target.
     xdotool mousemove "$target_x" "$active_y" click 1
     sleep 11
     capture "$file"
@@ -60,11 +62,18 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   navigate 400; capture weapons
   navigate 548; capture preferences
   navigate 168
+  # Navigation can preserve a different scroll offset from the screenshot
+  # taken at launch. Never reuse that screenshot's Y for UI clicks.
+  xdotool mousemove 740 500 key ctrl+Home
+  sleep 2
+  scrot -q 92 ci-readme-shots/current-dashboard.png
   read -r hsr_x hsr_y < <(
-    python3 scripts/ui_capture_tab.py ci-readme-shots/dashboard-hsr-aha.png
+    python3 scripts/ui_capture_tab.py ci-readme-shots/current-dashboard.png
   )
-  echo "Initial game tab found at x=$hsr_x, y=$hsr_y"
+  echo "Current dashboard game tab found at x=$hsr_x, y=$hsr_y"
+  last_tab_capture=current-dashboard
   game 1 dashboard-wuwa-latest
+  rm -f ci-readme-shots/current-dashboard.png
   game 2 dashboard-stellasora-latest
   game 3 dashboard-nte-latest
 '
