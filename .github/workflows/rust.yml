@@ -22,7 +22,7 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -104,7 +104,7 @@ jobs:
           }
       - name: Upload Windows UI screenshot
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-windows-native-ui-smoke
           path: ci-artifacts/windows-ui.png
@@ -114,7 +114,7 @@ jobs:
           retention-days: 7
       - name: Upload Linux executable for real screenshot capture
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-linux-release-executable
           path: target/release/gacha_pickup_calculator
@@ -122,25 +122,20 @@ jobs:
           retention-days: 7
       - name: Upload Windows app
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-pickup-calculator-windows-x64
           path: target/release/gacha_pickup_calculator.exe
           if-no-files-found: error
 
   images:
-    name: Build and scan offline image library
+    name: Audit and scan checked-in offline images
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      - name: Install pinned image decoder
-        run: python3 -m pip install --disable-pip-version-check --no-cache-dir "Pillow==13.0.0"
-      - name: Fetch, validate and re-encode all catalog images
-        run: python3 scripts/build_offline_images.py
-      - name: Scan all normalized images for malware
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify immutable checked-in PNG assets
+        run: python3 scripts/verify_embedded_assets.py
+      - name: Scan vendored images for known malware
         shell: bash
         run: |
           set -euo pipefail
@@ -148,11 +143,11 @@ jobs:
           sudo apt-get install -y clamav clamav-freshclam
           sudo systemctl stop clamav-freshclam 2>/dev/null || true
           sudo freshclam
-          clamscan --recursive --infected dist/Image
-      - uses: actions/upload-artifact@v7
+          clamscan --recursive --infected Image
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-offline-images
-          path: dist/Image/
+          path: Image/
           if-no-files-found: error
 
   ui_docs:
@@ -162,12 +157,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: gacha-linux-release-executable
           path: target/release/
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: gacha-offline-images
           path: target/release/Image/
@@ -179,7 +174,7 @@ jobs:
           sudo apt-get install -y xvfb scrot xdotool python3-pil fonts-noto-cjk libgl1-mesa-dri libxkbcommon-x11-0
           chmod +x target/release/gacha_pickup_calculator
           bash scripts/capture_readme_screenshots.sh
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gacha-readme-screenshots
           path: ci-readme-shots/
@@ -193,7 +188,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
       - name: Check version and existing release
@@ -217,17 +212,17 @@ jobs:
             fi
             echo 'publish=true' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-pickup-calculator-windows-x64
           path: dist
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-offline-images
           path: dist/Image
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
           name: gacha-readme-screenshots
