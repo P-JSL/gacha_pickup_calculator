@@ -176,6 +176,7 @@ impl Calculator {
         let mut dirty = false;
         if let Some(stats) = self.visible_stats() {
             let free_pulls = self.setup.available_flexible();
+            let funding = self.current_goal_funding();
             let raw = optimal_allocation(
                 &stats.character,
                 &stats.weapon,
@@ -219,10 +220,26 @@ impl Calculator {
                     format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
                 overview_metric(&mut columns[2], 2, t(language, "Expected Pulls"),
                     format!("{expected:.1}"), t(language, "Average pulls to all targets").to_owned(), PINK);
-                overview_metric(&mut columns[3], 3, t(language, "Remaining Currency"),
-                    self.setup.premium_currency.to_string(),
-                    format!("{} × {} {}", self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                        self.setup.game.cost_per_pull(), i18n::currency_name(language, self.setup.game)), CYAN);
+                let (value, note, color) = funding.map_or_else(
+                    || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
+                    |g| (format!("+{} {}", g.additional_currency,
+                                 i18n::currency_name(language, self.setup.game)),
+                          format!("+{} {} · {} {}%",
+                                  g.additional_shared, t(language, "Pulls"),
+                                  t(language, "Target confidence"), g.confidence),
+                          if g.additional_shared == 0 { SUCCESS } else { GOLD }),
+                );
+                overview_metric(&mut columns[3], 3, t(language, "Additional Currency Needed"),
+                    value, note, color);
+            });
+            ui.add_space(9.0);
+            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
+                if let Some(gap) = funding {
+                    render_goal_funding(ui, &gap, &self.setup, language);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
             });
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);

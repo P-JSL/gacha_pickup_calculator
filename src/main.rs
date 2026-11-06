@@ -264,12 +264,208 @@ fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[FeedbackEstimate],
         });
 }
 
+const CONFIDENCE_LEVELS: [usize; 6] = [50, 75, 80, 90, 95, 99];
+
+/// Exact adaptive split: dedicated passes are restricted to their banner,
+/// while freely convertible passes can be used after either goal finishes.
+/// This search runs on the worker thread, not on every UI frame.
+fn minimum_shared_pulls(
+    character: &Distribution,
+    weapon: &Distribution,
+    dedicated_character: usize,
+    dedicated_weapon: usize,
+    confidence: f64,
+) -> usize {
+    let mut low = 0usize;
+    let mut high = character.pmf.len().saturating_sub(1)
+        .saturating_sub(dedicated_character)
+        .saturating_add(weapon.pmf.len().saturating_sub(1)
+            .saturating_sub(dedicated_weapon));
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let probability = optimal_allocation(
+            character, weapon, dedicated_character, dedicated_weapon, middle,
+        ).success_probability;
+        if probability >= confidence { high = middle; }
+        else { low = middle + 1; }
+    }
+    low
+}
+
+/// The funding shortfall is always based on the latest completed calculation.
+/// A single-banner requirement is informative, not an amount to add to the
+/// other banner: the shared pool and recycled refunds fund both.
+#[derive(Clone, Copy, Debug)]
+struct GoalFunding {
+    confidence: usize,
+    character_target: usize,
+    character_owned: usize,
+    character_missing: usize,
+    weapon_target: usize,
+    weapon_owned: usize,
+    weapon_missing: usize,
+    character_single_raw: usize,
+    character_single_shared: usize,
+    weapon_single_raw: usize,
+    weapon_single_shared: usize,
+    dedicated_character: usize,
+    dedicated_weapon: usize,
+    required_shared: usize,
+    available_shared: usize,
+    additional_shared: usize,
+    additional_currency: usize,
+    uses_refunds: bool,
+}
+
+impl GoalFunding {
+    fn calculate(
+        setup: &GameSetup,
+        results: &Computed,
+        character_target: usize,
+        weapon_target: usize,
+        confidence: usize,
+    ) -> Self {
+        let probability = confidence as f64 / 100.0;
+        let required_shared = results.feedback.as_ref()
+            .map_or_else(|| {
+                results.exact_shared_required
+                    .and_then(|thresholds| CONFIDENCE_LEVELS.iter()
+                        .position(|&p| p == confidence).map(|i| thresholds[i]))
+                    .unwrap_or_else(|| minimum_shared_pulls(
+                        &results.character, &results.weapon,
+                        setup.character_dedicated, setup.weapon_dedicated, probability))
+            }, |f| f.quantile(probability));
+        let character_single_raw = results.character.quantile(probability);
+        let weapon_single_raw = results.weapon.quantile(probability);
+        let available_shared = setup.available_flexible();
+        Self {
+            confidence,
+            character_target,
+            character_owned: setup.character_owned,
+            character_missing: character_target.saturating_sub(setup.character_owned),
+            weapon_target,
+            weapon_owned: setup.weapon_owned,
+            weapon_missing: weapon_target.saturating_sub(setup.weapon_owned),
+            character_single_raw,
+            character_single_shared: character_single_raw
+                .saturating_sub(setup.character_dedicated),
+            weapon_single_raw,
+            weapon_single_shared: weapon_single_raw
+                .saturating_sub(setup.weapon_dedicated),
+            dedicated_character: setup.character_dedicated,
+            dedicated_weapon: setup.weapon_dedicated,
+            required_shared,
+            available_shared,
+            additional_shared: required_shared.saturating_sub(available_shared),
+            additional_currency: setup.additional_currency_for(required_shared),
+            uses_refunds: results.feedback.is_some(),
+        }
+    }
+}
+
+/// Shared, compact funding summary displayed on Dashboard and Analytics.
+fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &GameSetup,
+                       language: Language) {
+    let secondary = i18n::banner_name(language, setup.game);
+    let native = i18n::currency_name(language, setup.game);
+    let note = if gap.uses_refunds { t(language, "Refund-simulation estimate") }
+        else { t(language, "Exact probability model") };
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(format!(
+            "{} {}% · {}",
+            t(language, "Target confidence"), gap.confidence, note,
+        )).color(MUTED).size(11.0));
+    });
+    ui.add_space(5.0);
+
+    let individual = |ui: &mut egui::Ui, label: &str,
+                      counts: (usize, usize, usize, usize, usize, usize)| {
+        let (target, owned, missing, raw, dedicated, shared) = counts;
+        ui.label(RichText::new(label).color(PRIMARY).strong());
+        ui.label(format!(
+            "{} {}  ·  {} {}  ·  {} {}",
+            t(language, "Target copies"), target,
+            t(language, "Owned copies"), owned,
+            t(language, "Missing copies"), missing,
+        ));
+        ui.label(RichText::new(format!(
+            "{}: {}{}  ·  {}: {}{}",
+            t(language, "Solo requirement"), raw, t(language, "Pulls"),
+            t(language, "After dedicated passes"), shared, t(language, "Pulls"),
+        )).color(MUTED).size(11.0));
+        if dedicated > 0 {
+            ui.small(format!(
+                "{} {}{}",
+                t(language, "Owned dedicated passes"), dedicated, t(language, "Passes"),
+            ));
+        }
+    };
+    let shortage = |ui: &mut egui::Ui| {
+        ui.label(RichText::new(t(language, "Additional funding needed")).color(GOLD).strong());
+        ui.label(RichText::new(format!(
+            "+{} {}  ·  +{} {}",
+            gap.additional_shared, t(language, "Pulls"),
+            gap.additional_currency, native,
+        )).size(17.0).strong().color(
+            if gap.additional_shared == 0 { MINT } else { GOLD },
+        ));
+        ui.small(format!(
+            "{} {}{}  ·  {} {}{}",
+            t(language, "Required shared passes"), gap.required_shared, t(language, "Pulls"),
+            t(language, "Available shared passes"), gap.available_shared, t(language, "Pulls"),
+        ));
+    };
+    if ui.available_width() >= 780.0 {
+        ui.columns(3, |cols| {
+            individual(&mut cols[0], t(language, "Characters"), (
+                gap.character_target, gap.character_owned, gap.character_missing,
+                gap.character_single_raw, gap.dedicated_character,
+                gap.character_single_shared));
+            individual(&mut cols[1], secondary, (
+                gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
+                gap.weapon_single_raw, gap.dedicated_weapon,
+                gap.weapon_single_shared));
+            shortage(&mut cols[2]);
+        });
+    } else {
+        individual(ui, t(language, "Characters"), (
+            gap.character_target, gap.character_owned, gap.character_missing,
+            gap.character_single_raw, gap.dedicated_character,
+            gap.character_single_shared));
+        ui.add_space(6.0);
+        individual(ui, secondary, (
+            gap.weapon_target, gap.weapon_owned, gap.weapon_missing,
+            gap.weapon_single_raw, gap.dedicated_weapon,
+            gap.weapon_single_shared));
+        ui.separator();
+        shortage(ui);
+    }
+    ui.add_space(5.0);
+    ui.label(RichText::new(format!(
+        "{} {}{} + {} {} ({}{}).",
+        t(language, "Already owned flexible passes"), setup.flexible,
+        t(language, "Passes"),
+        setup.premium_currency, native,
+        setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
+    )).color(MUTED).size(11.0));
+    ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
+        .color(MUTED).size(11.0));
+    if setup.game == Game::StellaSora {
+        ui.small(format!(
+            "{}: {}",
+            t(language, "Unconverted Gold Disc units"),
+            setup.weapon_ticket_remainder,
+        ));
+    }
+}
+
 struct Computed {
     character: Distribution,
     weapon: Distribution,
     combined: Distribution,
     feedback: Option<FeedbackEstimate>,
     wuwa_strategies: Option<Vec<FeedbackEstimate>>,
+    exact_shared_required: Option<[usize; 6]>,
 }
 
 struct CalculationRequest {
@@ -304,7 +500,18 @@ fn compute(request: &CalculationRequest) -> Result<Computed, String> {
     } else {
         (None, None)
     };
-    Ok(Computed { character, weapon, combined, feedback, wuwa_strategies })
+    let exact_shared_required = if feedback.is_none() {
+        Some(CONFIDENCE_LEVELS.map(|confidence| minimum_shared_pulls(
+            &character, &weapon,
+            request.setup.character_dedicated,
+            request.setup.weapon_dedicated,
+            confidence as f64 / 100.0,
+        )))
+    } else { None };
+    Ok(Computed {
+        character, weapon, combined, feedback, wuwa_strategies,
+        exact_shared_required,
+    })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -530,6 +737,17 @@ impl Calculator {
                 ui.close_menu();
             }
         }
+    }
+
+    /// Funding is hidden while inputs are stale: the current owned-copy counts
+    /// must never be combined with previous distributions.
+    fn current_goal_funding(&self) -> Option<GoalFunding> {
+        if self.input_needs_calculation || self.calculating { return None; }
+        let results = self.visible_stats()?;
+        Some(GoalFunding::calculate(
+            &self.setup, results, self.target_eid + 1,
+            self.target_refine, self.confidence,
+        ))
     }
 
     /// Last completed charts remain visible until the worker finishes for the same game.
@@ -1475,6 +1693,17 @@ impl Calculator {
             }
         };
         ui.add_space(8.0);
+        section(ui, "07", "현재 보유량 대비 목표 달성 추가 비용",
+            "기보유 캐릭터·장비, 전용권과 공용 재화를 반영한 목표 달성 비용입니다.",
+            |ui| {
+                if let Some(gap) = self.current_goal_funding() {
+                    render_goal_funding(ui, &gap, &self.setup, self.language());
+                } else {
+                    ui.label(RichText::new(t(self.language(),
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
+            });
+        ui.add_space(8.0);
         let secondary_name = i18n::banner_name(self.language(), self.setup.game);
         let secondary_heading = format!("{secondary_name} 목표 확률");
         let single_description = "이 배너에서 목표를 달성하기까지의 뽑기 수와 누적 성공 확률입니다.";
@@ -2393,6 +2622,149 @@ mod chart_tests {
         let prefs = UiPreferences::default();
         assert!(!prefs.auto_recalculate);
         assert!(prefs.show_hover_guides);
+    }
+
+    fn deterministic_distribution(pulls: usize) -> Distribution {
+        let mut pmf = vec![0.0; pulls + 1];
+        pmf[pulls] = 1.0;
+        Distribution::new(pmf)
+    }
+
+    fn deterministic_goals(setup: &GameSetup) -> Computed {
+        let character = deterministic_distribution(setup.character.target_copies);
+        let weapon = deterministic_distribution(setup.weapon.target_copies);
+        let combined = character.combine(&weapon);
+        let exact_shared_required = Some(CONFIDENCE_LEVELS.map(|confidence| {
+            minimum_shared_pulls(&character, &weapon,
+                setup.character_dedicated, setup.weapon_dedicated,
+                confidence as f64 / 100.0)
+        }));
+        Computed {
+            character, weapon, combined, feedback: None,
+            wuwa_strategies: None, exact_shared_required,
+        }
+    }
+
+    #[test]
+    fn changing_owned_copies_reduces_goal_budget_in_all_four_games() {
+        for game in Game::ALL {
+            let mut setup = GameSetup::new(game);
+            setup.set_targets(3, 2);
+            let initial = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(initial.character_missing, 3);
+            assert_eq!(initial.weapon_missing, 2);
+            assert_eq!(initial.required_shared, 5);
+
+            setup.character_owned = 2;
+            setup.weapon_owned = 1;
+            setup.set_targets(3, 2);
+            let partial = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(partial.character_missing, 1);
+            assert_eq!(partial.weapon_missing, 1);
+            assert_eq!(partial.required_shared, 2);
+
+            setup.character_owned = 3;
+            setup.weapon_owned = 2;
+            setup.set_targets(3, 2);
+            let completed = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+                3, 2, 90);
+            assert_eq!(completed.character_missing, 0);
+            assert_eq!(completed.weapon_missing, 0);
+            assert_eq!(completed.additional_shared, 0);
+            assert_eq!(completed.additional_currency, 0);
+        }
+    }
+
+    #[test]
+    fn dedicated_passes_and_partial_native_currency_reduce_only_the_right_budget() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.character_owned = 2;
+        setup.weapon_owned = 1;
+        setup.set_targets(3, 2);
+        setup.character_dedicated = 1;
+        setup.premium_currency = 159;
+        let stats = deterministic_goals(&setup);
+        let gap = GoalFunding::calculate(&setup, &stats, 3, 2, 90);
+        assert_eq!(gap.character_single_shared, 0);
+        assert_eq!(gap.weapon_single_shared, 1);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.available_shared, 0);
+        assert_eq!(gap.additional_shared, 1);
+        assert_eq!(gap.additional_currency, 1); // 159 already owned of the 160 required
+
+        setup.premium_currency = 160;
+        let filled = GoalFunding::calculate(&setup, &stats, 3, 2, 90);
+        assert_eq!(filled.available_shared, 1);
+        assert_eq!(filled.additional_shared, 0);
+        assert_eq!(filled.additional_currency, 0);
+
+        // A weapon pass must not be counted as a character pass.
+        setup.character_dedicated = 0;
+        setup.weapon_dedicated = 1;
+        setup.premium_currency = 0;
+        let new_gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            3, 2, 90);
+        assert_eq!(new_gap.character_single_shared, 1);
+        assert_eq!(new_gap.weapon_single_shared, 0);
+        assert_eq!(new_gap.additional_shared, 1);
+    }
+
+    #[test]
+    fn shared_star_rail_ticket_is_not_counted_twice() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character_owned = 1;
+        setup.set_targets(1, 1);
+        setup.flexible = 1; // Star Rail has one common limited ticket type.
+        let gap = GoalFunding::calculate(&setup, &deterministic_goals(&setup),
+            1, 1, 90);
+        assert_eq!(gap.character_missing, 0);
+        assert_eq!(gap.weapon_missing, 1);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.available_shared, 1);
+        assert_eq!(gap.additional_shared, 0);
+    }
+
+    #[test]
+    fn exact_budget_uses_joint_adaptive_success_not_added_solo_quantiles() {
+        let character = Distribution::new(vec![0.0, 0.5, 0.5]);
+        let weapon = deterministic_distribution(1);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 0, 0, 0.5), 2);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 0, 0, 0.9), 3);
+        assert_eq!(minimum_shared_pulls(&character, &weapon, 1, 0, 0.9), 2);
+    }
+
+    #[test]
+    fn feedback_budget_uses_recycled_pulls_instead_of_the_raw_sum() {
+        use gacha_pickup_calculator::{Banner, RateSchedule, SoftPity};
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 2,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 10;
+        config.featured_first = 20;
+        config.featured_duplicate = 20;
+        let feedback = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
+        let character = setup.character.distribution(RateMode::PublishedOnly).unwrap();
+        let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
+        let stats = Computed {
+            combined: character.combine(&weapon),
+            character, weapon, feedback: Some(feedback),
+            wuwa_strategies: None, exact_shared_required: None,
+        };
+        let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
+        assert_eq!(gap.character_single_raw, 2);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.additional_shared, 1);
+        assert!(gap.uses_refunds);
     }
 
     #[test]
