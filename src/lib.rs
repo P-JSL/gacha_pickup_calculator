@@ -155,6 +155,44 @@ impl Banner {
         }
     }
 
+    /// Validate a caller-provided banner without constructing its full DP
+    /// distribution. The Monte Carlo API uses this to reject invalid input
+    /// without doubling expensive exact-distribution calculations.
+    pub fn validate_inputs(&self) -> Result<(), String> {
+        if self.target_copies > 15 {
+            return Err("목표 획득 수가 허용 범위를 벗어났습니다 (최대 15).".into());
+        }
+        if self.target_copies == 0 { return Ok(()); }
+        match &self.rule {
+            BannerRule::Standard { rarity, featured_share } => {
+                if rarity.hard == 0 || rarity.hard > 500 || self.pity >= rarity.hard
+                    || !valid_probability(rarity.base)
+                    || !valid_probability(*featured_share) || *featured_share == 0.0
+                {
+                    return Err("캐릭터/무기 천장 또는 확률 입력값이 유효하지 않습니다.".into());
+                }
+            }
+            BannerRule::FeaturedCounter { featured_rate, hard_featured } => {
+                if *hard_featured == 0 || *hard_featured > 500 || self.pity >= *hard_featured
+                    || !valid_probability(*featured_rate)
+                {
+                    return Err("픽업 직접 확정 천장 또는 확률 입력값이 유효하지 않습니다.".into());
+                }
+                if self.spark.as_ref().is_some_and(|spark|
+                    spark.at == 0 || spark.progress > spark.at)
+                {
+                    return Err("스파크 진행도 또는 횟수가 잘못되었습니다.".into());
+                }
+            }
+            BannerRule::NteArcBatch => {
+                if self.pity >= 8 || self.any_rare_pity >= 6 {
+                    return Err("이환 Arc 천장은 8회(픽업), 6회(S등급) 미만의 10연 단위로 입력해야 합니다.".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn distribution(&self, mode: RateMode) -> Result<Distribution, String> {
         if self.target_copies > 15 {
             return Err("목표 획득 수가 허용 범위를 벗어났습니다 (최대 15).".into());
@@ -547,6 +585,24 @@ mod tests {
                 assert_eq!(dist.quantile(1.0), guaranteed_pulls);
                 assert!(dist.at(guaranteed_pulls) > 1.0 - 1e-10);
                 assert!(dist.at(guaranteed_pulls - 10) < 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn cheap_input_validation_agrees_with_distribution_validation() {
+        for game in games::Game::ALL {
+            let setup = games::GameSetup::new(game);
+            for banner in [&setup.character, &setup.weapon] {
+                assert!(banner.validate_inputs().is_ok());
+                assert!(banner.distribution(RateMode::PublishedOnly).is_ok());
+                let mut malformed = banner.clone();
+                malformed.pity = usize::MAX;
+                assert!(malformed.validate_inputs().is_err());
+                assert!(malformed.distribution(RateMode::PublishedOnly).is_err());
+                malformed.target_copies = 0;
+                assert!(malformed.validate_inputs().is_ok());
+                assert!(malformed.distribution(RateMode::PublishedOnly).is_ok());
             }
         }
     }
