@@ -397,7 +397,7 @@ fn character_four_star_refund(rng: &mut SplitMix64, model: &FeedbackConfig) -> u
     }
 }
 
-fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
+fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind, game: Game,
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
                  (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
     let BannerRule::Standard { rarity, featured_share } = &rule.rule else { return; };
@@ -416,9 +416,12 @@ fn roll_standard(rng: &mut SplitMix64, rule: &Banner, kind: BannerKind,
     while won < rule.target_copies {
         wallet.pay(dedicated);
         if matches!(kind, BannerKind::Character) {
-            wallet.begin_character_pull(model);
+            if game == Game::StellaSora {
+                wallet.begin_character_pull(model);
+            }
             // A community estimate only: actual NTE tile odds depend on board position.
-            if model.nte_one_die_chance + model.nte_five_dice_chance > 0.0 {
+            if game == Game::Neverness
+                && model.nte_one_die_chance + model.nte_five_dice_chance > 0.0 {
                 let tile = rng.uniform();
                 let returned: usize = if tile < model.nte_one_die_chance {
                     1
@@ -599,7 +602,7 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
                         && matches!(kind, BannerKind::Character) {
                         model.wuwa_waveband_max
                     } else { 0 };
-                    roll_standard(&mut rng, banner, kind, mode, model, &mut wallet,
+                    roll_standard(&mut rng, banner, kind, setup.game, mode, model, &mut wallet,
                         (owned, dedicated, max_wavebands));
                 }
                 BannerRule::FeaturedCounter { .. } => {
