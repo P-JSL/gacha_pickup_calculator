@@ -233,7 +233,7 @@ impl FeedbackEstimate {
 
     pub fn quantile(&self, confidence: f64) -> usize {
         let n = self.budgets.len();
-        if n == 0 { return 0; }
+        if n == 0 || confidence <= 0.0 { return 0; }
         let rank = (confidence.clamp(0.0, 1.0) * n as f64).ceil() as usize;
         self.budgets[rank.saturating_sub(1).min(n - 1)]
     }
@@ -321,12 +321,14 @@ impl Wallet {
         }
     }
     fn refund(&mut self, reward: usize) {
-        self.points += reward * self.reward_multiplier;
+        self.points = self.points.saturating_add(
+            reward.saturating_mul(self.reward_multiplier));
     }
 
     /// Activate optional account-specific first-ten rewards and accrue record-only discs.
     fn begin_character_pull(&mut self, model: &FeedbackConfig) {
-        self.record_disc_units += model.stella_record_discs_per_character_pull;
+        self.record_disc_units = self.record_disc_units
+            .saturating_add(model.stella_record_discs_per_character_pull);
         self.reward_multiplier = if self.stella_first_ten_remaining > 0 {
             self.stella_first_ten_remaining -= 1;
             3
@@ -529,7 +531,8 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
             if x < 0.0075 { featured += 1; four_pity = 0; }
             else if x < 0.03 { off += 1; four_pity = 0; }
             else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false) {
-                pending_four_star_points += model.weapon_four_star_reward;
+                pending_four_star_points = pending_four_star_points
+                    .saturating_add(model.weapon_four_star_reward);
             }
         }
         wallet.refund(pending_four_star_points);
@@ -541,7 +544,7 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
             award_featured(wallet, model, owned, won, BannerKind::Weapon);
             won += 1;
         }
-        wallet.refund(off * model.off_banner_rare);
+        wallet.refund(off.saturating_mul(model.off_banner_rare));
         if featured > 0 { featured_pity = 0; } else { featured_pity += 1; }
         if featured + off > 0 { any_pity = 0; } else { any_pity += 1; }
     }
@@ -659,6 +662,42 @@ mod tests {
     use super::*;
     use crate::games::{Game, GameSetup};
     use crate::{Banner, BannerRule, RateSchedule, SoftPity};
+
+    #[test]
+    fn extreme_refund_values_do_not_overflow_or_create_negative_balances() {
+        let cfg = FeedbackConfig::for_game(Game::StellaSora);
+        let mut wallet = Wallet::new(&cfg);
+        wallet.reward_multiplier = 3;
+        wallet.refund(usize::MAX);
+        assert_eq!(wallet.points, usize::MAX);
+        wallet.refund(5);
+        assert_eq!(wallet.points, usize::MAX);
+        wallet.record_disc_units = usize::MAX - 10;
+        wallet.begin_character_pull(&cfg);
+        assert_eq!(wallet.record_disc_units, usize::MAX);
+    }
+
+    #[test]
+    fn zero_confidence_does_not_require_positive_funding() {
+        let estimate = FeedbackEstimate {
+            budgets: vec![2, 3, 5],
+            raw_pulls: vec![],
+            scenarios: vec![],
+            average_raw: 0.0, average_initial_flexible: 0.0,
+            total_returned_points_average: 0.0,
+            average_wavebands_purchased: 0.0,
+            average_waveband_corals_spent: 0.0,
+            average_character_raw: 0.0, average_weapon_raw: 0.0,
+            average_character_return_points: 0.0,
+            average_weapon_return_points: 0.0,
+            average_board_dice_earned: 0.0,
+            average_record_disc_units_earned: 0.0,
+        };
+        assert_eq!(estimate.quantile(0.0), 0);
+        assert_eq!(estimate.quantile(-0.5), 0);
+        assert_eq!(estimate.quantile(0.5), 3);
+        assert_eq!(estimate.quantile(1.0), 5);
+    }
 
     #[test]
     fn wallet_requires_ticket_before_earning_refund() {
