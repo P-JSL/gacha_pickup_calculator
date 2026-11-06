@@ -33,3 +33,9 @@
 - `GoalFunding`은 egui를 사용하지 않으며, 렌더링은 `funding_view`가 담당합니다.
 - 계산 워커의 generation 검사, 게임별 세션, 캐릭터 전용 장비 자동 연동, 기존 공개 API를 변경하지 않습니다.
 - 확률 계산의 복잡도 및 정확도 조건은 [성능 설계](PERFORMANCE_V1_0_1.md)를 참고하십시오.
+
+## v1.0.2 외부/내부 공개 범위
+
+- `src/lib.rs`에서 재수출하는 `Banner`, `Distribution`, `optimal_allocation`과 공개된 `games`, `feedback`, `tracker`, `observations`는 기존 외부 사용자에게 제공하는 **계약**이므로 호환성을 유지합니다.
+- `src/app/`, `src/data/`, `src/ui/`는 실행 파일 전용 구현으로 Rust의 외부 import가 불가능해야 합니다. 내부 형식은 `pub(crate)` 이하를 사용하며 CI가 공개 범위를 검사합니다.
+- Rust `pub(crate)`는 호출 경계일 뿐 소스 코드 기밀성이나 악성 로컬 프로세스로부터의 보호를 의미하지 않습니다. 자세한 위협 모델은 [보안 경계](SECURITY_BOUNDARY_V1_0_2.md)를 참조합니다.

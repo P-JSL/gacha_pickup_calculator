@@ -5,6 +5,7 @@
 //! No network, account tokens, tracking URLs, or external subprocesses are used.
 
 use crate::{RateMode, RateSchedule};
+use std::collections::HashSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationQuality {
@@ -82,10 +83,19 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
         return Err("한 번에 최대 200,000개 행만 가져올 수 있습니다.".into());
     }
     let delimiter = if lines[0].1.contains('\t') { '\t' } else { ',' };
+    // Only a small, explicit schema is supported. Cap the number of fields
+    // before allocating user-controlled header strings; previously duplicate
+    // detection also required O(columns²) comparisons.
+    const MAX_COLUMNS: usize = 64;
     let columns: Vec<String> = lines[0].1.split(delimiter)
+        .take(MAX_COLUMNS + 1)
         .map(|s| s.trim().trim_matches('"').to_ascii_lowercase())
         .collect();
-    if columns.iter().enumerate().any(|(i, name)| columns[..i].contains(name)) {
+    if columns.len() > MAX_COLUMNS {
+        return Err("CSV 열은 최대 64개까지만 허용합니다.".into());
+    }
+    let mut seen = HashSet::with_capacity(columns.len());
+    if columns.iter().any(|name| !seen.insert(name.as_str())) {
         return Err("CSV 헤더에 중복된 열 이름이 있습니다.".into());
     }
     let find = |field: &str| -> Option<usize> {
@@ -315,6 +325,16 @@ impl ObservationDataset {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reject_excessive_columns_and_duplicate_case_insensitive_headers() {
+        let many = format!("pity,count,{}\n1,1\n",
+            (0..63).map(|i| format!("extra_{i}")).collect::<Vec<_>>().join(","));
+        assert!(parse_observation_csv(&many, 90).is_err());
+        assert!(parse_observation_csv("pity,count,COUNT\n1,1,2\n", 90).is_err());
+        assert!(parse_observation_csv("pity,count,extra\n1,2,3\n", 90).is_ok());
+    }
+
     use crate::{SoftPity};
 
     fn constant_model(hard: usize, rate: f64) -> RateSchedule {

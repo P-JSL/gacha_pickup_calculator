@@ -12,24 +12,24 @@ use crate::runtime_updates::VerifiedBundle;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Kind { Character, Weapon }
+pub(crate) enum Kind { Character, Weapon }
 
 #[derive(Clone, Debug)]
-pub struct Entry {
-    pub game: Game,
-    pub kind: Kind,
-    pub id: String,
-    pub name: String,
-    pub rarity: u8,
-    pub icon_url: String,
-    pub release_order: u32,
-    pub status: &'static str,
+pub(crate) struct Entry {
+    pub(crate) game: Game,
+    pub(crate) kind: Kind,
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) rarity: u8,
+    pub(crate) icon_url: String,
+    pub(crate) release_order: u32,
+    pub(crate) status: &'static str,
 }
 impl Entry {
-    pub fn has_verified_image(&self) -> bool { approved_icon_url(&self.icon_url) }
+    pub(crate) fn has_verified_image(&self) -> bool { approved_icon_url(&self.icon_url) }
 
     /// Story-granted protagonists do not have a featured gacha banner even when 5★.
-    pub fn is_featured_target(&self) -> bool {
+    pub(crate) fn is_featured_target(&self) -> bool {
         self.rarity >= 5 && !matches!(
             self.game,
             Game::StarRail if self.id.starts_with("800")
@@ -144,14 +144,14 @@ fn parse() -> Vec<Entry> {
     });
     out
 }
-pub fn entries() -> &'static [Entry] {
+pub(crate) fn entries() -> &'static [Entry] {
     static DATA: OnceLock<Vec<Entry>> = OnceLock::new();
     DATA.get_or_init(parse)
 }
 type CatalogIndex = HashMap<(Game, Kind), HashMap<&'static str, &'static Entry>>;
 type SignatureIndex = HashMap<Game, HashMap<&'static str, &'static str>>;
 
-pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
+pub(crate) fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
     // Build the index once. Repeated picker redraws and signature selections
     // should not scan the entire four-game catalog.
     static INDEX: OnceLock<CatalogIndex> = OnceLock::new();
@@ -166,18 +166,18 @@ pub fn by_id(game: Game, kind: Kind, id: &str) -> Option<&'static Entry> {
     lookup.get(&(game, kind))?.get(id).copied()
 }
 #[cfg(test)]
-pub fn first(game: Game, kind: Kind) -> String {
+pub(crate) fn first(game: Game, kind: Kind) -> String {
     entries().iter().find(|x| x.game == game && x.kind == kind && x.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
 #[cfg(test)]
-pub fn count(game: Game, kind: Kind) -> usize {
+pub(crate) fn count(game: Game, kind: Kind) -> usize {
     entries().iter().filter(|x| x.game == game && x.kind == kind).count()
 }
 
 /// Explicitly sourced banner pairing. Never guess a 5★ weapon from rarity,
 /// sorted position, shared element, or similar naming.
-pub fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
+pub(crate) fn signature_weapon(game: Game, character_id: &str) -> Option<&'static Entry> {
     static PAIRS: OnceLock<SignatureIndex> = OnceLock::new();
     let pairs = PAIRS.get_or_init(|| {
         let mut pairs: HashMap<Game, HashMap<&str, &str>> = HashMap::new();
@@ -221,7 +221,7 @@ fn active() -> Result<Option<Arc<ActiveCatalog>>, &'static str> {
     snapshot_from_lock(LIVE.get_or_init(|| RwLock::new(None)))
 }
 
-pub fn publish_verified(bundle: VerifiedBundle) -> Result<(), &'static str> {
+pub(crate) fn publish_verified(bundle: VerifiedBundle) -> Result<(), &'static str> {
     let mut ids = HashMap::with_capacity(bundle.entries.len());
     for (index, entry) in bundle.entries.iter().enumerate() {
         ids.insert((entry.game, entry.kind, entry.id.clone()), index);
@@ -234,12 +234,12 @@ pub fn publish_verified(bundle: VerifiedBundle) -> Result<(), &'static str> {
     *lock.write().map_err(|_| "Poisoned RwLock: 갱신을 중단했습니다.")? = Some(snapshot);
     Ok(())
 }
-pub fn live_entries() -> Arc<Vec<Entry>> {
+pub(crate) fn live_entries() -> Arc<Vec<Entry>> {
     static BASE: OnceLock<Arc<Vec<Entry>>> = OnceLock::new();
     if let Ok(Some(snapshot)) = active() { return Arc::clone(&snapshot.entries); }
     Arc::clone(BASE.get_or_init(|| Arc::new(entries().to_vec())))
 }
-pub fn live_by_id(game: Game, kind: Kind, id: &str) -> Option<Entry> {
+pub(crate) fn live_by_id(game: Game, kind: Kind, id: &str) -> Option<Entry> {
     match active() {
         Ok(Some(snapshot)) => snapshot.ids.get(&(game, kind, id.to_owned()))
             .and_then(|index| snapshot.entries.get(*index)).cloned(),
@@ -247,15 +247,15 @@ pub fn live_by_id(game: Game, kind: Kind, id: &str) -> Option<Entry> {
         Err(_) => None, // poisoned state: do not use potentially corrupt data
     }
 }
-pub fn live_first(game: Game, kind: Kind) -> String {
+pub(crate) fn live_first(game: Game, kind: Kind) -> String {
     live_entries().iter()
         .find(|e| e.game == game && e.kind == kind && e.is_featured_target())
         .map(|e| e.id.clone()).unwrap_or_default()
 }
-pub fn live_count(game: Game, kind: Kind) -> usize {
+pub(crate) fn live_count(game: Game, kind: Kind) -> usize {
     live_entries().iter().filter(|e| e.game == game && e.kind == kind).count()
 }
-pub fn live_signature_weapon(game: Game, character_id: &str) -> Option<Entry> {
+pub(crate) fn live_signature_weapon(game: Game, character_id: &str) -> Option<Entry> {
     match active() {
         Ok(Some(snapshot)) => {
             let weapon_id = snapshot.pairs.get(&(game, character_id.to_owned()))?;
@@ -274,7 +274,7 @@ pub(crate) fn active_image_dir() -> Option<PathBuf> {
 }
 
 type ImageResult = (u64, String, Option<egui::ColorImage>);
-pub struct CatalogUi {
+pub(crate) struct CatalogUi {
     textures: HashMap<String, Option<egui::TextureHandle>>,
     queued: HashSet<String>,
     send_url: Sender<(u64, String)>,
@@ -283,7 +283,7 @@ pub struct CatalogUi {
 }
 
 impl CatalogUi {
-    pub fn new(ctx: &egui::Context) -> Self {
+    pub(crate) fn new(ctx: &egui::Context) -> Self {
         let (send_url, recv_url) = mpsc::channel::<(u64, String)>();
         let (send_image, recv_image) = mpsc::channel::<ImageResult>();
         // Bounded image I/O: one slow icon must not block the rest of the visible catalog.
@@ -366,7 +366,7 @@ impl CatalogUi {
         None
     }
 
-    pub fn pump(&mut self, ctx: &egui::Context) {
+    pub(crate) fn pump(&mut self, ctx: &egui::Context) {
         while let Ok((generation, url, decoded)) = self.recv_image.try_recv() {
             if generation != self.generation { continue; }
             self.queued.remove(&url);
@@ -378,18 +378,18 @@ impl CatalogUi {
     }
 
     /// Drop previous-version textures and suppress late image-worker responses.
-    pub fn invalidate_after_update(&mut self) {
+    pub(crate) fn invalidate_after_update(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.textures.clear();
         self.queued.clear();
     }
 
     /// Failed icon requests can be retried without clearing successfully cached images.
-    pub fn retry_failed(&mut self) {
+    pub(crate) fn retry_failed(&mut self) {
         self.textures.retain(|_, texture| texture.is_some());
     }
 
-    pub fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
+    pub(crate) fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
         let game = match entry.game {
             Game::StarRail => "HSR",
             Game::WutheringWaves => "WutheringWaves",
@@ -420,7 +420,7 @@ impl CatalogUi {
 
 /// Select from the entire catalog. Items below five stars are displayed but not
 /// selectable in the current featured-five-star probability model.
-pub fn picker(
+pub(crate) fn picker(
     ctx: &egui::Context, art: &mut CatalogUi, game: Game, kind: Kind,
     open: &mut bool, filter: &mut String, current_id: &str,
 ) -> Option<String> {

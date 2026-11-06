@@ -17,18 +17,18 @@ use std::time::{Duration, Instant};
 const REPO_RAW: &str = "https://raw.githubusercontent.com/P-JSL/gacha_pickup_calculator/";
 const HEAD_REF: &str = "https://api.github.com/repos/P-JSL/gacha_pickup_calculator/git/ref/heads/main";
 const RELEASE_API: &str = "https://api.github.com/repos/P-JSL/gacha_pickup_calculator/releases/latest";
-pub const RELEASE_PAGE: &str = "https://github.com/P-JSL/gacha_pickup_calculator/releases/latest";
+pub(crate) const RELEASE_PAGE: &str = "https://github.com/P-JSL/gacha_pickup_calculator/releases/latest";
 const MAX_TEXT: usize = 1_048_576;
 const MAX_IMAGE: usize = 512 * 1024;
 const MAX_RECORDS: usize = 3000;
 
 #[derive(Clone, Debug)]
-pub struct VerifiedBundle {
-    pub entries: Vec<catalog::Entry>,
-    pub pairs: HashMap<(Game, String), String>,
-    pub hashes: HashMap<String, [u8; 32]>,
-    pub revision: String,
-    pub image_dir: PathBuf,
+pub(crate) struct VerifiedBundle {
+    pub(crate) entries: Vec<catalog::Entry>,
+    pub(crate) pairs: HashMap<(Game, String), String>,
+    pub(crate) hashes: HashMap<String, [u8; 32]>,
+    pub(crate) revision: String,
+    pub(crate) image_dir: PathBuf,
 }
 
 /// Separate a fully parsed, immutable state from network and disk I/O.
@@ -42,19 +42,19 @@ enum UpdateEvent {
     Finished,
 }
 
-pub struct UpdateManager {
+pub(crate) struct UpdateManager {
     send: Sender<UpdateEvent>,
     recv: Receiver<UpdateEvent>,
     running: bool,
     checked: bool,
-    pub message: String,
-    pub release: Option<String>,
-    pub revision: Option<String>,
+    pub(crate) message: String,
+    pub(crate) release: Option<String>,
+    pub(crate) revision: Option<String>,
     started: Option<Instant>,
 }
 
 impl UpdateManager {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let (send, recv) = mpsc::channel();
         Self {
             send, recv, running: false, checked: false,
@@ -63,7 +63,7 @@ impl UpdateManager {
         }
     }
 
-    pub fn start(&mut self, ctx: &egui::Context) {
+    pub(crate) fn start(&mut self, ctx: &egui::Context) {
         if self.running { return; }
         self.checked = true;
         self.running = true;
@@ -79,7 +79,7 @@ impl UpdateManager {
     }
 
     /// Called on the UI thread. A poisoning error never bypasses a damaged lock.
-    pub fn poll(&mut self, ctx: &egui::Context) -> bool {
+    pub(crate) fn poll(&mut self, ctx: &egui::Context) -> bool {
         if !self.checked {
             self.start(ctx);
         }
@@ -123,7 +123,7 @@ impl UpdateManager {
         changed
     }
 
-    pub fn is_running(&self) -> bool { self.running }
+    pub(crate) fn is_running(&self) -> bool { self.running }
 }
 
 fn notify(send: &Sender<UpdateEvent>, event: UpdateEvent) {
@@ -164,8 +164,33 @@ fn fetch_text(url: &str, max_bytes: usize) -> Result<String, String> {
         .map_err(|_| "서버 응답이 UTF-8 텍스트가 아닙니다.".to_owned())
 }
 
+/// Only fetch version metadata or allowlisted assets pinned to a full commit SHA.
+/// No user-supplied path, query, encoded traversal or unapproved URL can cross
+/// this trust boundary even if future callers accidentally expose the helper.
+fn approved_update_url(url: &str) -> bool {
+    if url == HEAD_REF || url == RELEASE_API { return true; }
+    let Some((revision, path)) = url.strip_prefix(REPO_RAW)
+        .and_then(|remainder| remainder.split_once('/')) else { return false; };
+    if !is_commit_sha(revision) { return false; }
+    match path {
+        "src/catalog_data.tsv" | "src/signature_pairs.tsv" | "Image/SHA256SUMS.txt" => true,
+        _ => {
+            let Some(relative) = path.strip_prefix("Image/") else { return false; };
+            let mut parts = relative.split('/');
+            let (Some(game), Some(file), None) = (parts.next(), parts.next(), parts.next())
+                else { return false; };
+            if !["HSR", "WutheringWaves", "Neverness", "StellaSora"].contains(&game) {
+                return false;
+            }
+            let Some((role, filename)) = file.split_once('-') else { return false; };
+            if role != "c" && role != "w" { return false; }
+            filename.strip_suffix(".png").is_some_and(valid_id)
+        }
+    }
+}
+
 fn fetch_https(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
-    if url != HEAD_REF && url != RELEASE_API && !url.starts_with(REPO_RAW) {
+    if !approved_update_url(url) {
         return Err("승인되지 않은 업데이트 출처입니다.".to_owned());
     }
     // No shell, no redirects, strict HTTPS, bounded response and timeout.
@@ -178,7 +203,9 @@ fn fetch_https(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
         command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     let mut child = command
-        .args(["--fail", "--silent", "--show-error",
+        // Must be the FIRST argument: prevent ~/.curlrc from enabling redirects,
+        // insecure TLS, alternate output paths, or unintended transfer options.
+        .args(["--disable", "--fail", "--silent", "--show-error",
             "--proto", "=https", "--max-redirs", "0",
             "--connect-timeout", "6", "--max-time", "22",
             "--user-agent", "GachaPickupCalculator/verified-updates",
@@ -231,7 +258,7 @@ fn newer_version(tag: &str, installed: &str) -> bool {
     matches!((parse(tag), parse(installed)), (Some(a), Some(b)) if a > b)
 }
 
-pub fn cache_root() -> PathBuf {
+pub(crate) fn cache_root() -> PathBuf {
     #[cfg(windows)]
     if let Some(path) = std::env::var_os("LOCALAPPDATA") {
         return PathBuf::from(path).join("GachaPickupCalculator").join("Updates");
@@ -263,6 +290,12 @@ fn read_bounded_cache(path: &Path, max_bytes: usize) -> Result<String, String> {
     let opened = file.metadata().map_err(|e| format!("캐시 메타데이터 실패: {e}"))?;
     if !opened.is_file() || opened.len() > max_bytes as u64 {
         return Err("캐시 파일 크기가 읽기 도중 변경되었습니다.".to_owned());
+    }
+    #[cfg(unix)] {
+        use std::os::unix::fs::MetadataExt;
+        if meta.dev() != opened.dev() || meta.ino() != opened.ino() {
+            return Err("캐시 파일이 검사와 열기 사이 교체되었습니다.".to_owned());
+        }
     }
     let mut bytes = Vec::with_capacity(opened.len() as usize);
     file.take(max_bytes as u64 + 1).read_to_end(&mut bytes)
@@ -335,7 +368,13 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut partial = None;
     for attempt in 0..32_u32 {
         let candidate = path.with_extension(format!("tmp-{}-{attempt}", std::process::id()));
-        match OpenOptions::new().write(true).create_new(true).open(&candidate) {
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        match options.open(&candidate) {
             Ok(file) => { partial = Some((candidate, file)); break; }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(format!("임시 캐시 생성 실패: {error}")),
@@ -394,7 +433,7 @@ fn parse_hex(sha: &str) -> Option<[u8; 32]> {
 
 /// Parse-don't-validate: only this constructor can produce an updateable bundle.
 /// Unknown weapon identities never get an inferred signature pairing.
-pub fn parse_bundle(
+pub(crate) fn parse_bundle(
     catalog_tsv: &str, pairs_tsv: &str, manifest: &str,
     revision: String, image_dir: PathBuf,
 ) -> Result<VerifiedBundle, String> {
@@ -437,6 +476,9 @@ pub fn parse_bundle(
         return Err("기본 카탈로그보다 적은 업데이트는 적용하지 않습니다.".to_owned());
     }
     let mut lookup: HashMap<(Game, catalog::Kind, String), u8> = HashMap::new();
+    let featured_characters: HashSet<(Game, &str)> = entries.iter()
+        .filter(|entry| entry.kind == catalog::Kind::Character && entry.is_featured_target())
+        .map(|entry| (entry.game, entry.id.as_str())).collect();
     let mut image_keys = HashSet::new();
     for entry in &entries {
         lookup.insert((entry.game, entry.kind, entry.id.clone()), entry.rarity);
@@ -450,10 +492,8 @@ pub fn parse_bundle(
             return Err("전용 장비 연결 출처 또는 TSV 형식 오류".to_owned());
         }
         let game = parse_game(f[0]).ok_or("연결 게임 ID 오류")?;
-        let featured_character = entries.iter().any(|entry|
-            entry.game == game && entry.kind == catalog::Kind::Character
-                && entry.id == f[1] && entry.is_featured_target()
-        );
+        // O(1) expected membership replaces the old O(entries × pairs) scan.
+        let featured_character = featured_characters.contains(&(game, f[1]));
         if !featured_character
             || lookup.get(&(game, catalog::Kind::Character, f[1].to_owned())) != Some(&5)
             || lookup.get(&(game, catalog::Kind::Weapon, f[2].to_owned())) != Some(&5) {
@@ -523,6 +563,31 @@ fn verify_incremental_images(bundle: &VerifiedBundle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn url_allowlist_rejects_unpinned_and_escaped_update_paths() {
+        let rev = "a".repeat(40);
+        for resource in [
+            "src/catalog_data.tsv", "src/signature_pairs.tsv",
+            "Image/SHA256SUMS.txt", "Image/HSR/c-1511.png",
+            "Image/StellaSora/w-214066.png",
+        ] {
+            assert!(approved_update_url(&source_url(&rev, resource)), "{resource}");
+        }
+        for url in [
+            format!("{REPO_RAW}main/src/catalog_data.tsv"),
+            format!("{REPO_RAW}{rev}/Image/HSR/../c-1511.png"),
+            format!("{REPO_RAW}{rev}/Image/HSR/%2e%2e.png"),
+            format!("{REPO_RAW}{rev}/Image/HSR/c-1511.png?x=1"),
+            format!("{REPO_RAW}{rev}/Image/Other/c-1511.png"),
+            format!("{REPO_RAW}{rev}/src/lib.rs"),
+            format!("{REPO_RAW}{rev}/Image/HSR/c-1511.svg"),
+            "https://evil.invalid/".to_owned(),
+        ] {
+            assert!(!approved_update_url(&url), "{url}");
+        }
+    }
+
     #[test]
     fn rejects_poisoned_or_partial_candidate_data() {
         let catalog = include_str!("../catalog_data.tsv");

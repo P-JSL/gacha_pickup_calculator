@@ -12,8 +12,8 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::OnceLock;
 
-pub const MAX_IMAGE_BYTES: u64 = 512 * 1024;
-pub const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
+pub(crate) const MAX_IMAGE_BYTES: u64 = 512 * 1024;
+pub(crate) const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
 const IMAGE_MANIFEST: &str = include_str!("../../Image/SHA256SUMS.txt");
 
@@ -63,7 +63,7 @@ pub(crate) fn baseline_digest(relative: &str) -> Option<[u8; 32]> {
 }
 
 /// An image is trusted only if its bytes match the compile-time manifest.
-pub fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'static str> {
+pub(crate) fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'static str> {
     if bytes.len() as u64 > MAX_IMAGE_BYTES || !bytes.starts_with(PNG_MAGIC) {
         return Err("Image is not an approved bounded PNG.");
     }
@@ -82,7 +82,7 @@ pub fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'static s
 /// Open once, validate the actual file handle, read a bounded amount of data,
 /// and optionally require a caller-provided trusted SHA-256 fingerprint.
 /// A digest proves identity to that fingerprint, not the truth of CSV claims.
-pub fn read_csv_secure(path: &Path, expected_sha256: Option<&str>) -> Result<String, String> {
+pub(crate) fn read_csv_secure(path: &Path, expected_sha256: Option<&str>) -> Result<String, String> {
     let before = fs::symlink_metadata(path)
         .map_err(|e| format!("파일 확인 실패: {e}"))?;
     if !before.file_type().is_file() {
