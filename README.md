@@ -137,6 +137,6 @@ python3 scripts/verify_release_contract.py
 
 ## 문서·라이선스
 
-[변경 이력](docs/CHANGELOG.md) · [v1.0.3 릴리즈 노트](RELEASE_NOTES_v1.0.3.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
+[변경 이력](docs/CHANGELOG.md) · [CI 변경 범위·검증 정책](docs/CI_CHANGE_SCOPES.md) · [v1.0.3 릴리즈 노트](RELEASE_NOTES_v1.0.3.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
 
 애플리케이션 코드에는 [MIT 라이선스](LICENSE)가 적용됩니다. **타사 게임 이미지와 제3자 리소스의 재배포 권리는 이 라이선스로 자동 부여되지 않습니다.** 배포·재사용 시 원저작권자의 조건을 별도로 확인하십시오.
