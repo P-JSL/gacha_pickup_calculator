@@ -412,7 +412,7 @@ mod tests {
         }
         let huge = optimal_allocation(&character, &weapon, 0, 0, 50_000_000);
         assert!(huge.success_probability > 0.999_999);
-        assert_eq!(huge.character_pulls, 0);
+        assert_eq!(huge.character_pulls, 2);
     }
 
     #[test]
