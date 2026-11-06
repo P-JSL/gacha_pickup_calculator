@@ -1,6 +1,6 @@
 # game\trole\tid\tname\trarity\timage_url
 # generated from named fan data snapshots (non-official); filters UI only, no probability rules
-hsr	c	1001	Mar. 7th	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1001.png
+hsr	c	1001	Mar. 7th (보존)	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1001.png
 hsr	c	1002	단항	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1002.png
 hsr	c	1003	히메코	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1003.png
 hsr	c	1004	웰트	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1004.png
@@ -44,7 +44,7 @@ hsr	c	1220	비소	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master
 hsr	c	1221	운리	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1221.png
 hsr	c	1222	영사	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1222.png
 hsr	c	1223	맥택	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1223.png
-hsr	c	1224	Mar. 7th	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1224.png
+hsr	c	1224	Mar. 7th (수렵)	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1224.png
 hsr	c	1225	망귀인	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1225.png
 hsr	c	1301	갤러거	4	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1301.png
 hsr	c	1302	아젠티	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1302.png
@@ -88,16 +88,16 @@ hsr	c	1509	길가메시	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/
 hsr	c	1510	히메코•노바	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1510.png
 hsr	c	1512	로빈•서머레토	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1512.png
 hsr	c	1513	어벤츄린•웨이브	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/1513.png
-hsr	c	8001	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8001.png
-hsr	c	8002	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8002.png
-hsr	c	8003	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8003.png
-hsr	c	8004	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8004.png
-hsr	c	8005	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8005.png
-hsr	c	8006	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8006.png
-hsr	c	8007	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8007.png
-hsr	c	8008	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8008.png
-hsr	c	8009	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8009.png
-hsr	c	8010	{NICKNAME}	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8010.png
+hsr	c	8001	개척자 (8001)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8001.png
+hsr	c	8002	개척자 (8002)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8002.png
+hsr	c	8003	개척자 (8003)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8003.png
+hsr	c	8004	개척자 (8004)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8004.png
+hsr	c	8005	개척자 (8005)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8005.png
+hsr	c	8006	개척자 (8006)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8006.png
+hsr	c	8007	개척자 (8007)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8007.png
+hsr	c	8008	개척자 (8008)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8008.png
+hsr	c	8009	개척자 (8009)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8009.png
+hsr	c	8010	개척자 (8010)	5	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/character/8010.png
 hsr	w	20000	화살촉	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20000.png
 hsr	w	20001	풍작	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20001.png
 hsr	w	20002	천경	3	https://raw.githubusercontent.com/Mar-7th/StarRailRes/master/icon/light_cone/20002.png
@@ -609,11 +609,9 @@ nte	c	1036	잔홍	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/ma
 nte	c	1039	파디아	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_027.png
 nte	c	1042	레이븐	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_heiyu.png
 nte	c	1046	「제로」	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_046.png
-nte	c	1051	「제로」	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_009.png
 nte	c	1052	호토리	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_013.png
 nte	c	1054	다포딜	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_005.png
 nte	c	1055	구원	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_104.png
-nte	c	1056	라크리모사	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_004.png
 nte	c	1057	아카네 린	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_mingyin.png
 nte	c	1070	우미츠키	4	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_haiyue.png
 nte	c	1071	카오스	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_kaesi1.png
@@ -621,8 +619,6 @@ nte	c	1072	링코	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/ma
 nte	c	1073	치즈	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_073.png
 nte	c	1075	일로이	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_yiluoyi.png
 nte	c	1076	신쿠	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_zhenhong.png
-nte	c	1091	라크리모사	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/200/player_lingke.png
-nte	c	1999	1999	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/AvatarImage/player_1999.png
 nte	w	arc-1	광란의 「전자음악」	3	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/Fork/fork_fudianling_256.png
 nte	w	arc-2	영원한 왈츠	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/Fork/fork_Arachne_256.png
 nte	w	arc-3	폭발 현장	5	https://raw.githubusercontent.com/Waifus-Grace/NTE_Assets/main/UI_Icon/Fork/fork_BitGame_256.png
