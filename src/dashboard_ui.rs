@@ -245,15 +245,6 @@ impl Calculator {
                 overview_metric(&mut columns[3], 3, t(language, "Additional featured tickets"),
                     value, note, color);
             });
-            ui.add_space(9.0);
-            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
-                if let Some(gap) = funding {
-                    render_goal_funding(ui, &gap, &self.setup, language);
-                } else {
-                    ui.label(RichText::new(t(language,
-                        "Recalculate to update funding estimate")).color(GOLD));
-                }
-            });
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
@@ -301,6 +292,19 @@ impl Calculator {
 
         ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
+        // Preserve the game tab position used for keyboard and screenshot
+        // navigation; the detailed breakdown belongs below the compact editor.
+        if self.visible_stats().is_some() {
+            ui.add_space(10.0);
+            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
+                if let Some(gap) = self.current_goal_funding() {
+                    render_goal_funding(ui, &gap, &self.setup, language);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
+            });
+        }
         if let Some(stats) = self.visible_stats() {
             if let Some(strategies) = &stats.wuwa_strategies {
                 ui.add_space(10.0);
