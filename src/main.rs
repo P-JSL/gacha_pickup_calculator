@@ -199,7 +199,7 @@ mod chart_tests {
         let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
         let stats = Computed {
             combined: character.combine(&weapon),
-            character, weapon, feedback: Some(feedback),
+            character, weapon, feedback: Some(Arc::new(feedback)),
             wuwa_strategies: None, exact_shared_required: None,
         };
         let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
