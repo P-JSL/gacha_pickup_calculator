@@ -119,6 +119,32 @@ mod parallel_result_tests {
     use super::*;
 
     #[test]
+    fn refund_enabled_worker_retains_an_exact_shared_ticket_baseline() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 1);
+        setup.character_dedicated = 3;
+        setup.weapon_dedicated = 2;
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 128;
+        let request = CalculationRequest {
+            generation: 3, setup, mode: RateMode::PublishedOnly,
+            feedback_config: config,
+            active_generation: Arc::new(AtomicU64::new(3)),
+        };
+        let stats = compute_with_cpu_budget(&request, 1).unwrap();
+        assert!(stats.feedback.is_some());
+        let thresholds = stats.exact_shared_required.unwrap();
+        for (i, target) in CONFIDENCE_LEVELS.iter().enumerate() {
+            assert_eq!(thresholds[i],
+                stats.raw_shared.quantile(*target as f64 / 100.0));
+        }
+        assert_eq!(stats.raw_shared.at(0),
+            optimal_allocation(&stats.character, &stats.weapon,
+                request.setup.character_dedicated,
+                request.setup.weapon_dedicated, 0).success_probability);
+    }
+
+    #[test]
     fn chosen_wuwa_strategy_shares_trial_storage_without_cloning() {
         let mut setup = GameSetup::new(Game::WutheringWaves);
         setup.set_targets(1, 1);
