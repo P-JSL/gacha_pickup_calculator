@@ -100,8 +100,20 @@ impl Calculator {
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
                                 ui.horizontal(|ui| {
+                                    let title = if self.visible_stats()
+                                        .and_then(|stats| stats.feedback.as_ref()).is_some()
+                                    {
+                                        match language {
+                                            Language::Korean => "전체 목표 · 환급 포함",
+                                            Language::English => "Overall · refunds included",
+                                            Language::Japanese => "全体目標・還元込み",
+                                            Language::ChineseSimplified => "总目标·包含返还",
+                                            Language::ChineseTraditional => "總目標·包含返還",
+                                        }
+                                    } else { t(language, "Overall") };
                                     ui.label(RichText::new(format!(
-                                        "★ {} (E{}S{})", t(language, "Overall"), self.target_eid,self.setup.game.weapon_upgrade_level(self.target_refine)
+                                        "★ {} (E{}S{})", title, self.target_eid,
+                                        self.setup.game.weapon_upgrade_level(self.target_refine)
                                     )).size(11.0).strong());
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center), |ui| {

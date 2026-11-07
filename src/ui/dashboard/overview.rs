@@ -26,8 +26,8 @@ impl Calculator {
                     t(language, "Accurate probability DP").to_owned()
                 },
                 |gap| if gap.uses_refunds {
-                    format!("환급 전 {:.2}% → 재투입 후 {:.2}%",
-                        gap.raw_probability * 100.0, gap.current_probability * 100.0)
+                    format!("환급 포함 {:.2}% · 환급 전(참고) {:.2}%",
+                        gap.current_probability * 100.0, gap.raw_probability * 100.0)
                 } else { t(language, "Accurate probability DP").to_owned() },
             );
             let mean_note = stats.feedback.as_ref().map_or_else(
@@ -123,6 +123,17 @@ impl Calculator {
             let char_rate = stats.character.at(character_budget) * 100.0;
             let weapon_rate = stats.weapon.at(weapon_budget) * 100.0;
             let banner_name = i18n::banner_name(language, self.setup.game);
+            // Make the refund-recycled value the visible primary result,
+            // including in the compact chart where hover labels were clipped.
+            let overall_success_label = if stats.feedback.is_some() {
+                match language {
+                    Language::Korean => "환급 포함 전체 성공",
+                    Language::English => "Overall success with refunds",
+                    Language::Japanese => "還元込み全体成功",
+                    Language::ChineseSimplified => "含返还的整体成功率",
+                    Language::ChineseTraditional => "含返還的整體成功率",
+                }
+            } else { t(language, "Total Success") };
             let chart_char = [ChartSeries {
                 label: t(language, "Characters"), source: ChartSource::Exact(&stats.character), color: CYAN,
             }];
@@ -147,7 +158,7 @@ impl Calculator {
                     probability_card(&mut columns[1], &format!("{banner_name} {}", t(language, "Probability")),
                         format!("S{} {}: {:.2}%", self.setup.game.weapon_upgrade_level(self.target_refine), t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                     probability_card(&mut columns[2], t(language, "Overall Result"),
-                        format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
+                        format!("{overall_success_label}: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
             } else {
                 probability_card(ui, t(language, "Character Probability"),
@@ -157,7 +168,7 @@ impl Calculator {
                     format!("{}: {weapon_rate:.2}%", t(language, "Success")), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                 ui.add_space(8.0);
                 probability_card(ui, t(language, "Overall Result"),
-                    format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
+                    format!("{overall_success_label}: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
         }
