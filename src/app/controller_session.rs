@@ -11,11 +11,16 @@ impl Calculator {
         // rejects out-of-generation responses to avoid showing outdated probabilities.
         let (worker, work_rx) = mpsc::channel::<CalculationRequest>();
         let (result_tx, results) = mpsc::channel::<CalculationResponse>();
+        let active_generation = Arc::new(AtomicU64::new(0));
         let repaint = cc.egui_ctx.clone();
         std::thread::spawn(move || {
             while let Ok(mut request) = work_rx.recv() {
                 while let Ok(newer) = work_rx.try_recv() {
                     request = newer;
+                }
+                // Skip queued work invalidated while the previous run was active.
+                if request.active_generation.load(Ordering::Relaxed) != request.generation {
+                    continue;
                 }
                 let result = compute(&request);
                 if result_tx.send(CalculationResponse {
@@ -54,6 +59,7 @@ impl Calculator {
             worker,
             results,
             generation: 0,
+            active_generation,
             calculating: false,
             ci_capture,
             ci_ui_ready_reported: false,
@@ -214,6 +220,7 @@ impl Calculator {
     pub(crate) fn invalidate_calculation(&mut self) {
         self.input_needs_calculation = true;
         self.generation = self.generation.wrapping_add(1);
+        self.active_generation.store(self.generation, Ordering::Relaxed);
         self.calculating = false;
         self.ci_ready_pending = None;
     }
@@ -222,6 +229,7 @@ impl Calculator {
     pub(crate) fn recalculate(&mut self) {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
         self.generation = self.generation.wrapping_add(1);
+        self.active_generation.store(self.generation, Ordering::Relaxed);
         self.calculating = true;
         self.ci_ready_pending = None;
         // Keep the last completed image on screen during background calculation.
@@ -232,6 +240,7 @@ impl Calculator {
             setup: self.setup.clone(),
             mode: self.mode,
             feedback_config: self.feedback_cfg.clone(),
+            active_generation: Arc::clone(&self.active_generation),
         };
         if self.worker.send(request).is_err() {
             self.calculating = false;

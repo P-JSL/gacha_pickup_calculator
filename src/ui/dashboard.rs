@@ -578,8 +578,7 @@ impl Calculator {
                             ui.label(RichText::new(format!("◇  {}", t(language, "Extra Pulls from Refund"))).size(11.5));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let bonus = self.visible_stats()
-                                    .and_then(|stats| stats.feedback.as_ref())
-                                    .and_then(|f| f.successful_means(available));
+                                    .and_then(|stats| stats.successful_budget_means.as_ref());
                                 let value = bonus.map_or("—".to_owned(),
                                     |means| format!("+{:.1}", means.average_points_funded));
                                 ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());

@@ -143,10 +143,10 @@ impl eframe::App for Calculator {
             self.manual_calculation_requested = false;
             self.recalculate();
         }
-        if self.calculating || self.ci_ready_pending.is_some() {
-            // Refresh while the worker is active, then paint one frame before
-            // CI receives the completion notification.
-            ctx.request_repaint_after(Duration::from_millis(50));
+        if self.ci_ready_pending.is_some() {
+            // Worker completion already requested the first paint; schedule
+            // one more only when CI needs to observe the rendered result.
+            ctx.request_repaint();
         }
         self.show_catalog_picker(ctx);
         if self.show_history {

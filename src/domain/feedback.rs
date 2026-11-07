@@ -6,6 +6,7 @@
 
 use crate::{Banner, BannerRule, RateMode};
 use crate::games::{Game, GameSetup};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 // Bound CPU and memory use independently of the requested sample count.
 const MAX_SAMPLES: usize = 1_000_000;
@@ -560,7 +561,19 @@ fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConfig,
 /// A common store balance is shared throughout both phases.
 pub fn estimate(setup: &GameSetup, mode: RateMode,
                 model: &FeedbackConfig) -> Result<FeedbackEstimate, String> {
+    estimate_with_options(setup, mode, model, MAX_MONTE_CARLO_WORKERS, None)
+}
+
+/// Bound workers assigned to one estimate and optionally cancel obsolete GUI
+/// requests. The original estimate() API retains its deterministic behavior.
+pub fn estimate_with_options(setup: &GameSetup, mode: RateMode,
+                             model: &FeedbackConfig, worker_limit: usize,
+                             cancellation: Option<(&AtomicU64, u64)>)
+                             -> Result<FeedbackEstimate, String> {
     model.validate()?;
+    if is_cancelled(cancellation) {
+        return Err("계산 요청이 취소되었습니다.".to_owned());
+    }
     // This estimator is public and can be called without the UI's exact
     // DP. Validate the same input bounds without redundantly constructing two
     // full distributions (or doing so three times for WuWa strategies).
@@ -577,9 +590,14 @@ pub fn estimate(setup: &GameSetup, mode: RateMode,
         }
     }
     let available = std::thread::available_parallelism().map_or(1, |count| count.get());
-    let workers = available.min(MAX_MONTE_CARLO_WORKERS)
+    let workers = available.min(MAX_MONTE_CARLO_WORKERS).min(worker_limit.max(1))
         .min((model.samples / MIN_SAMPLES_PER_WORKER).max(1));
-    estimate_with_workers(setup, mode, model, workers)
+    estimate_with_workers_cancel(setup, mode, model, workers, cancellation)
+}
+
+fn is_cancelled(cancellation: Option<(&AtomicU64, u64)>) -> bool {
+    cancellation.is_some_and(|(active, generation)|
+        active.load(Ordering::Relaxed) != generation)
 }
 
 /// The seed depends on the trial index, not on how workers are scheduled.
@@ -621,9 +639,12 @@ impl TrialTotals {
 }
 
 fn simulate_chunk(slots: &mut [RefundScenario], start_index: usize, setup: &GameSetup,
-                  mode: RateMode, model: &FeedbackConfig) -> TrialTotals {
+                  mode: RateMode, model: &FeedbackConfig,
+                  cancellation: Option<(&AtomicU64, u64)>) -> Option<TrialTotals> {
     let mut totals = TrialTotals::default();
     for (offset, slot) in slots.iter_mut().enumerate() {
+        // One atomic check per 256 paths bounds cancellation overhead.
+        if offset.is_multiple_of(256) && is_cancelled(cancellation) { return None; }
         let mut rng = SplitMix64(sample_seed(start_index + offset));
         let mut wallet = Wallet::new(model);
         let mut dedicated_character = setup.character_dedicated;
@@ -680,14 +701,25 @@ fn simulate_chunk(slots: &mut [RefundScenario], start_index: usize, setup: &Game
         totals.waveband_cost += wallet.waveband_points_spent as u128;
         *slot = RefundScenario::from_wallet(&wallet, model.initial_points);
     }
-    totals
+    if is_cancelled(cancellation) { None } else { Some(totals) }
 }
 
 /// A single preallocated scenario array is partitioned into non-overlapping
 /// mutable slices. Workers only return integer aggregates: no result cloning,
 /// locks, per-worker result arrays or scheduling-dependent floating sums.
+#[cfg(test)]
 fn estimate_with_workers(setup: &GameSetup, mode: RateMode, model: &FeedbackConfig,
                          requested_workers: usize) -> Result<FeedbackEstimate, String> {
+    estimate_with_workers_cancel(setup, mode, model, requested_workers, None)
+}
+
+fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &FeedbackConfig,
+                                requested_workers: usize,
+                                cancellation: Option<(&AtomicU64, u64)>)
+                                -> Result<FeedbackEstimate, String> {
+    if is_cancelled(cancellation) {
+        return Err("계산 요청이 취소되었습니다.".to_owned());
+    }
     let mut scenarios = Vec::new();
     scenarios.try_reserve_exact(model.samples).map_err(|_| {
         "시뮬레이션 결과 배열을 위한 메모리를 확보할 수 없습니다.".to_owned()
@@ -696,22 +728,27 @@ fn estimate_with_workers(setup: &GameSetup, mode: RateMode, model: &FeedbackConf
     let workers = requested_workers.max(1).min(model.samples);
     let chunk_size = model.samples.div_ceil(workers);
     let partials = if workers == 1 {
-        vec![simulate_chunk(&mut scenarios, 0, setup, mode, model)]
+        vec![simulate_chunk(&mut scenarios, 0, setup, mode, model, cancellation)]
     } else {
         std::thread::scope(|scope| {
             let mut handles = Vec::with_capacity(workers);
             for (chunk_index, slots) in scenarios.chunks_mut(chunk_size).enumerate() {
                 handles.push(scope.spawn(move || {
-                    simulate_chunk(slots, chunk_index * chunk_size, setup, mode, model)
+                    simulate_chunk(slots, chunk_index * chunk_size, setup, mode, model, cancellation)
                 }));
             }
             handles.into_iter().map(|handle| {
                 handle.join().map_err(|_| "병렬 시뮬레이션 작업이 중단되었습니다.".to_owned())
-            }).collect::<Result<Vec<TrialTotals>, String>>()
+            }).collect::<Result<Vec<Option<TrialTotals>>, String>>()
         })?
     };
     let mut totals = TrialTotals::default();
-    for part in partials { totals.merge(part); }
+    for part in partials {
+        totals.merge(part.ok_or_else(|| "계산 요청이 취소되었습니다.".to_owned())?);
+    }
+    if is_cancelled(cancellation) {
+        return Err("계산 요청이 취소되었습니다.".to_owned());
+    }
 
     // The public v1.x contract exposes all raw trial observations. Construct
     // only those required arrays; avoid duplicate intermediate path storage.
@@ -1270,6 +1307,27 @@ mod tests {
         assert!((sampled.average_raw - exact.mean).abs() < 0.025);
         assert_eq!(sampled.budgets.len(), model.samples);
         assert_eq!(sampled.scenarios.len(), model.samples);
+    }
+
+    #[test]
+    fn cancelled_generation_returns_without_retaining_partial_results() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 2_048;
+        let generation = AtomicU64::new(11);
+        assert!(estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            4, Some((&generation, 10))).is_err());
+
+        generation.store(10, Ordering::Relaxed);
+        let sequential = estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            1, None).unwrap();
+        let active = estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            4, Some((&generation, 10))).unwrap();
+        assert_eq!(sequential.scenarios, active.scenarios);
+        assert_eq!(sequential.raw_pulls, active.raw_pulls);
+        assert_eq!(sequential.budgets, active.budgets);
+        assert_eq!(sequential.average_raw.to_bits(), active.average_raw.to_bits());
     }
 
 }
