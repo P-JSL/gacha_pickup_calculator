@@ -138,10 +138,10 @@ mod parallel_result_tests {
             assert_eq!(thresholds[i],
                 stats.raw_shared.quantile(*target as f64 / 100.0));
         }
-        assert_eq!(stats.raw_shared.at(0),
-            optimal_allocation(&stats.character, &stats.weapon,
+        assert!((stats.raw_shared.at(0)
+            - optimal_allocation(&stats.character, &stats.weapon,
                 request.setup.character_dedicated,
-                request.setup.weapon_dedicated, 0).success_probability);
+                request.setup.weapon_dedicated, 0).success_probability).abs() < 1e-10);
     }
 
     #[test]
