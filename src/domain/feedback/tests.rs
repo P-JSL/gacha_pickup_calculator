@@ -485,6 +485,32 @@
     }
 
     #[test]
+    fn stella_maxed_return_starts_after_sixth_character_copy() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.character.rule = BannerRule::FeaturedCounter {
+            featured_rate: 1.0, hard_featured: 160,
+        };
+        setup.character.spark = None;
+        let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.samples = 16;
+        cfg.character_other_five_star_rate = 0.0;
+        cfg.character_four_star_rate = 0.0;
+        cfg.four_star_reward = 0;
+        cfg.stella_record_discs_per_character_pull = 0;
+        setup.character_owned = 5;
+        setup.set_targets(6, 0);
+        let sixth = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(sixth.scenarios[0].raw_pulls, 1);
+        assert_eq!(sixth.scenarios[0].earned_points, cfg.featured_duplicate);
+        setup.character_owned = 6;
+        // A duplicate of a fully upgraded character is 7th, after six owned.
+        setup.set_targets(7, 0);
+        let seventh = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(seventh.scenarios[0].raw_pulls, 1);
+        assert_eq!(seventh.scenarios[0].earned_points, cfg.featured_maxed);
+    }
+
+    #[test]
     fn stella_first_ten_uses_prepaid_gold_disc_bonus_not_expert_permits() {
         let mut setup = GameSetup::new(Game::StellaSora);
         setup.character.rule = BannerRule::FeaturedCounter {
