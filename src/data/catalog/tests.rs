@@ -40,7 +40,7 @@
     fn signature_pairs_resolve_only_to_real_five_star_catalog_entries() {
         let mut pairs = HashSet::new();
         let mut count = 0;
-        for line in include_str!("../signature_pairs.tsv").lines() {
+        for line in include_str!("../../signature_pairs.tsv").lines() {
             if line.starts_with('#') || line.trim().is_empty() { continue; }
             let parts: Vec<_> = line.split('\t').collect();
             assert_eq!(parts.len(), 4, "invalid signature mapping: {line}");
@@ -77,7 +77,7 @@
     #[test]
     fn all_unpaired_five_star_targets_are_explicitly_classified() {
         let mut exceptions = HashSet::new();
-        for line in include_str!("../unpaired_five_star_targets.tsv").lines() {
+        for line in include_str!("../../unpaired_five_star_targets.tsv").lines() {
             if line.starts_with('#') || line.is_empty() { continue; }
             let fields: Vec<_> = line.split('\t').collect();
             assert_eq!(fields.len(), 4, "bad unpaired target: {line}");
