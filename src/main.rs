@@ -9,6 +9,7 @@ use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedB
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[path = "ui/dashboard.rs"] mod dashboard_ui;
