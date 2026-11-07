@@ -48,6 +48,17 @@ pub struct SuccessfulBudgetMeans {
     pub average_earned_points: f64,
 }
 
+/// A conservative 95% simultaneous CDF confidence band implies a range
+/// of feasible resource quantiles. None for upper means finite sample data
+/// cannot establish a finite upper quantile at this coverage.
+#[derive(Clone, Debug, PartialEq)]
+pub struct QuantileConfidenceBand {
+    pub lower: usize,
+    pub upper: Option<usize>,
+    /// Massart/DKW sup-norm CDF tolerance, not a currency-unit margin.
+    pub cdf_tolerance: f64,
+}
+
 #[derive(Clone, Debug)]
 pub struct FeedbackEstimate {
     /// Sorted minimum additional flexible tickets needed beyond dedicated tickets.
@@ -89,6 +100,30 @@ impl FeedbackEstimate {
         if n == 0 || confidence <= 0.0 { return 0; }
         let rank = (confidence.clamp(0.0, 1.0) * n as f64).ceil() as usize;
         self.budgets[rank.saturating_sub(1).min(n - 1)]
+    }
+
+    /// Dvoretzky–Kiefer–Wolfowitz / Massart simultaneous nonparametric
+    /// confidence band for a target resource quantile. Valid when simulated
+    /// paths are independent draws from a fixed refund model:
+    ///   P(sup_x |F_n(x)-F(x)| > e) <= 2 exp(-2 n e²)
+    /// No finite upper bound is inferred when target+e >= 1. This covers
+    /// Monte Carlo sampling noise, NOT incorrect banner/refund assumptions.
+    pub fn quantile_confidence_band(&self, confidence: f64,
+                                    coverage: f64) -> Option<QuantileConfidenceBand> {
+        if self.budgets.is_empty() || !confidence.is_finite()
+            || !(0.0..=1.0).contains(&confidence)
+            || !coverage.is_finite() || !(0.0..1.0).contains(&coverage)
+            || coverage == 0.0
+        {
+            return None;
+        }
+        let n = self.budgets.len() as f64;
+        let epsilon = ( (2.0 / (1.0 - coverage)).ln() / (2.0 * n) ).sqrt();
+        let low_p = (confidence - epsilon).max(0.0);
+        let high_p = confidence + epsilon;
+        let lower = if low_p == 0.0 { 0 } else { self.quantile(low_p) };
+        let upper = if high_p >= 1.0 { None } else { Some(self.quantile(high_p)) };
+        Some(QuantileConfidenceBand { lower, upper, cdf_tolerance: epsilon })
     }
 
     /// One observed path exactly at the requested empirical quantile.
