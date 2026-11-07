@@ -1,6 +1,13 @@
 # 변경 이력 · Gacha Pickup Calculator
 
-최신 대상 버전은 **v1.0.5**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+최신 대상 버전은 **v1.0.6**입니다. 구버전 개별 문서와 스크린샷 대신 과거 배포 상세는 [GitHub Releases](https://github.com/P-JSL/gacha_pickup_calculator/releases)에서 확인할 수 있습니다.
+
+## v1.0.6 (2026-11-07)
+- Rust 실행 진입점 `lib.rs`/`main.rs`에서 단위 테스트를 분리하고, 도메인·화면·네트워크 코드의 모듈 단위 책임을 정리했습니다.
+- `feedback` 설정·결과·배너 추첨 규칙·병렬 실행·검증, `observations` CSV 파서·모델 비교를 독립 모듈로 분리했습니다.
+- `catalog` 데이터 색인과 이미지 UI, `runtime_updates` 원격 검증·캐시·번들 검증을 분리했습니다.
+- 대시보드 개요·설정·결과, 편집 설정·목표·재화, 세션 연산·내비게이션을 개별 egui 모듈로 분리했습니다.
+- 1.x 공개 API, 게임별 확률/환급 규칙, 시드 재현성, UI 이벤트·입력 완료 후 클릭 정책·세대 취소, 캐시 보안 검증은 유지합니다. [릴리즈 노트](../RELEASE_NOTES_v1.0.6.md), [모듈 책임표](ARCHITECTURE.md).
 
 ## v1.0.5 (2026-11-07)
 - 이전 요청 무효화 시 256개 시나리오 단위로 계산 중단 및 대기 중인 오래된 작업 제거. Run Simulation 명시 실행 정책 유지.
