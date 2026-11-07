@@ -17,7 +17,7 @@ pub struct RefundScenario {
     pub record_disc_units_earned: usize,
 }
 impl RefundScenario {
-    fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
+    pub(super) fn from_wallet(wallet: &Wallet, starting_points: usize) -> Self {
         let dedicated_used = wallet.raw_pulls - wallet.common_spent;
         let points_funded_pulls = wallet.common_spent - wallet.initial_flexible_required;
         let scenario = Self {
