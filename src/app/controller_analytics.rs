@@ -116,6 +116,23 @@ impl Calculator {
                 ui.add_space(8.0);
             }
         };
+        // Diagnose the exact hazard model without conflating public base
+        // odds, published consolidated odds, and community-fitted curves.
+        if let BannerRule::Standard { rarity, .. } = &self.setup.character.rule {
+            if let Some(mean) = rarity.expected_first_rare_pulls(self.mode) {
+                let model_rate = 100.0 / mean;
+                let stated_rate = match self.setup.game {
+                    Game::StarRail => 1.60,
+                    Game::WutheringWaves => 1.80,
+                    Game::Neverness => 1.87,
+                    Game::StellaSora => 0.0,
+                };
+                ui.label(RichText::new(format!(
+                    "5성 획득 모델 진단: 기본 {:.2}% · 이 모델의 무천장 시작 평균 {:.2}회/1장 · 역수 기준 {:.3}%/회 · 공개 종합률 약 {:.2}%/회. 서로 다른 수치이며, 실제 서버의 미공개 확률 곡선과 일치한다는 뜻은 아닙니다.",
+                    rarity.base * 100.0, mean, model_rate, stated_rate
+                )).color(MUTED).size(11.0));
+            }
+        }
         if let Some(feedback) = stats.feedback.as_ref() {
             if self.query_mode == QueryMode::RequiredBudget {
                 if let Some(band) = feedback.quantile_confidence_band(q, 0.95) {
