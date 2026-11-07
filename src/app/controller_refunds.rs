@@ -67,12 +67,13 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(
                         &mut self.feedback_cfg.stella_record_discs_per_character_pull)
                         .range(0..=300).suffix("개")).changed();
-                    ui.label("초회 3배 혜택 남은 횟수");
-                    dirty |= ui.add(egui::DragValue::new(
-                        &mut self.feedback_cfg.stella_first_ten_remaining)
-                        .range(0..=10).suffix("회")).changed();
+                    let mut first_multi = self.feedback_cfg.stella_first_ten_remaining == 10;
+                    if ui.checkbox(&mut first_multi, "첫 10연 모집 보너스 적용").changed() {
+                        self.feedback_cfg.stella_first_ten_remaining = if first_multi { 10 } else { 0 };
+                        dirty = true;
+                    }
                 });
-                ui.small("레코드 모집 1회=골든 디스크 300개. 30개/캐릭터 모집은 레코드 전용 10% 환급 가정이며 캐릭터권으로 전환하지 않습니다. 초회 3배 보너스는 계정별 남은 횟수를 알아야 하므로 기본 0회입니다.");
+                ui.small("캐릭터 1회당 골든 레코드 30개, 레코드 1회에 300개. 첫 10연(선택)은 10회분 300개 대신 900개 지급이며, 10회를 먼저 결제합니다. 전문가 증명서에 3배를 적용하지 않습니다.");
             } else {
                 ui.label(RichText::new("4성의 중복·보유 상태는 입력한 평균 보상 가정에 따라 계산합니다.")
                     .color(MUTED).size(11.0));
