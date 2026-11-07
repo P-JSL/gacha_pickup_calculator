@@ -116,6 +116,19 @@ impl Calculator {
                 ui.add_space(8.0);
             }
         };
+        if let Some(feedback) = stats.feedback.as_ref() {
+            if self.query_mode == QueryMode::RequiredBudget {
+                if let Some(band) = feedback.quantile_confidence_band(q, 0.95) {
+                    let upper = band.upper.map_or_else(
+                        || "표본만으로 상한을 특정할 수 없음".to_owned(),
+                        |n| format!("{n}뽑"));
+                    ui.label(RichText::new(format!(
+                        "Monte Carlo 표본 오차(95% 동시 신뢰대역): 목표 {}% 필요 재화 {}~{}. 표본 CDF 오차 한계 ±{:.2}%p. 게임 규칙·환급 가정의 오차는 포함하지 않습니다.",
+                        self.confidence, band.lower, upper, band.cdf_tolerance * 100.0
+                    )).color(GOLD).size(11.0));
+                }
+            }
+        }
         ui.add_space(8.0);
         section(ui, "07", "현재 보유량 대비 목표 달성 추가 비용",
             "기보유 캐릭터·장비, 배너별 전용권 및 교환 재화를 반영한 목표 달성 비용입니다.",
