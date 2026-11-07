@@ -23,6 +23,14 @@ pub(crate) struct CalculationResponse {
 }
 
 pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> {
+    let budget = std::thread::available_parallelism()
+        .map_or(1, |count| count.get()).min(8);
+    compute_with_cpu_budget(request, budget)
+}
+
+fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
+                           -> Result<Computed, String> {
+    let cpu_budget = budget.clamp(1, 8);
     let cancelled = || request.active_generation.load(Ordering::Relaxed) != request.generation;
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
     let character = request.setup.character.distribution(request.mode)?;
@@ -30,8 +38,6 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
     let weapon = request.setup.weapon.distribution(request.mode)?;
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
     let combined = character.combine(&weapon);
-    let cpu_budget = std::thread::available_parallelism()
-        .map_or(1, |count| count.get()).min(8);
     let cancellation = Some((&*request.active_generation, request.generation));
     let (feedback, wuwa_strategies) = if request.feedback_config.enabled
         && request.setup.game == Game::WutheringWaves
@@ -122,5 +128,42 @@ mod parallel_result_tests {
         let strategies = result.wuwa_strategies.as_ref().unwrap();
         assert_eq!(strategies.len(), 3);
         assert!(Arc::ptr_eq(result.feedback.as_ref().unwrap(), &strategies[1]));
+
+    #[test]
+    fn wuwa_strategies_match_bitwise_with_serial_and_shared_cpu_budget() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::WutheringWaves);
+        config.samples = 8_192;
+        config.wuwa_waveband_max = 2;
+        let request = CalculationRequest {
+            generation: 7, setup, mode: RateMode::PublishedOnly,
+            feedback_config: config, active_generation: Arc::new(AtomicU64::new(7)),
+        };
+        let serial = compute_with_cpu_budget(&request, 1).unwrap();
+        let parallel = compute_with_cpu_budget(&request, 8).unwrap();
+        for (left, right) in serial.wuwa_strategies.unwrap().iter()
+            .zip(parallel.wuwa_strategies.unwrap().iter()) {
+            assert_eq!(left.budgets, right.budgets);
+            assert_eq!(left.raw_pulls, right.raw_pulls);
+            assert_eq!(left.scenarios, right.scenarios);
+            assert_eq!(left.average_raw.to_bits(), right.average_raw.to_bits());
+            assert_eq!(left.total_returned_points_average.to_bits(),
+                       right.total_returned_points_average.to_bits());
+        }
+    }
+
+    #[test]
+    fn obsolete_generation_skips_computation_before_allocating_scenarios() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::WutheringWaves);
+        config.samples = 8_192;
+        let request = CalculationRequest {
+            generation: 2, setup, mode: RateMode::PublishedOnly,
+            feedback_config: config, active_generation: Arc::new(AtomicU64::new(3)),
+        };
+        assert!(compute_with_cpu_budget(&request, 8).is_err());
+    }
     }
 }
