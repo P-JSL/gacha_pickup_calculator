@@ -201,6 +201,12 @@
         assert_eq!(gap.additional_currency, 0);
         assert_eq!(gap.raw_probability, 0.0);
         assert_eq!(gap.current_probability, 1.0);
+        // Dashboard's overall curves must be on the same shared-ticket
+        // funding axis as the displayed success-rate metric.
+        assert_eq!(ChartSource::Exact(&stats.raw_shared).probability(setup.flexible),
+                   gap.raw_probability);
+        assert_eq!(ChartSource::Refund(stats.feedback.as_ref().unwrap())
+                   .probability(setup.flexible), gap.current_probability);
         assert!(gap.probability_uncertainty.is_some());
         let path = gap.boundary_path.unwrap();
         assert_eq!(path.raw_pulls, 3);
