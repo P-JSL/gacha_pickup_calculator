@@ -28,7 +28,7 @@ impl Calculator {
             ui.label(RichText::new(format!(
                 "{}  ·  E{} / {} S{}",
                 self.setup.game.label(), self.target_eid,
-                self.setup.game.secondary_banner_name(), self.target_refine,
+                self.setup.game.secondary_banner_name(), self.setup.game.weapon_upgrade_level(self.target_refine),
             )).color(PRIMARY).strong().size(12.0));
             ui.separator();
             if ui.button("목표 및 예산 변경").clicked() {
