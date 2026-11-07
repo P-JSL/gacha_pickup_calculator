@@ -2,9 +2,9 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표, 보유 캐릭터·장비, 천장, 게임별 재화와 환급 재투자를 계산하는 **Rust/egui 데스크톱 애플리케이션**입니다.
 
-**최신 정식 버전: v1.0.3** (2026-11-07 KST) · Windows x64 · [릴리즈와 전체 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.3)
+**최신 버전: v1.0.4** (2026-11-07 KST) · Windows x64 · [릴리즈와 전체 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.4)
 
-[Windows 전체 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.3/gacha-pickup-calculator-windows-x64-v1.0.3.zip) · [실제 GUI 캡처 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.3/gacha-pickup-calculator-screenshots-v1.0.3.zip) · [SHA-256 체크섬](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.3/SHA256SUMS.txt) · [Sigstore 출처 증명](https://github.com/P-JSL/gacha_pickup_calculator/attestations/64685326)
+[Windows 전체 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.4/gacha-pickup-calculator-windows-x64-v1.0.4.zip) · [실제 GUI 캡처 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.4/gacha-pickup-calculator-screenshots-v1.0.4.zip) · [SHA-256 체크섬](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.4/SHA256SUMS.txt)
 
 > **정확도 안내:** 배너 규칙에 대한 픽업 확률은 유한 상태 DP로 계산합니다. 환급·중복 획득·추가 뽑기 재투입은 보유 상태를 모두 알 수 없으므로 Monte Carlo 추정치가 포함됩니다. 비공개 소프트 천장, 베타 배너, 게임 규칙 변경은 공식 결과와 달라질 수 있습니다. **분석 결과는 실제 획득을 보증하지 않습니다.**
 
@@ -12,12 +12,12 @@
 
 1. 위의 **Windows 전체 ZIP**을 받아 **전체 압축을 해제**합니다.
 2. `gacha_pickup_calculator.exe`와 `Image/` 폴더가 같은 위치에 있도록 유지합니다.
-3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다. **이 안내는 현재 배포된 v1.0.3 바이너리에 적용됩니다.** 저장소 main의 개발 중 변경 사항이 자동 반영되지는 않습니다.
+3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다. **이 안내는 v1.0.4 바이너리에 적용됩니다.** 저장소 main의 이후 변경 사항이 설치된 실행 파일에 자동 반영되지는 않습니다.
 4. 게임을 고른 다음 Dashboard 또는 Simulator에서 목표·기보유 수량을 입력하고, Currency에서 보유 뽑기권과 재화를 설정합니다.
-5. **목표·천장·보유 재화 입력을 모두 마친 뒤 `Run Simulation` 버튼을 클릭**하면 확률·환급 계산이 시작됩니다. 작업이 완료되면 Analytics에서 성공 확률별 **추가 필요 뽑기권 환산량**을 확인합니다. *(이 수동 실행 변경은 저장소의 차기 빌드에 적용되며 현재 배포된 v1.0.3 바이너리에는 아직 반영되지 않았습니다.)*
+5. **목표·천장·보유 재화 입력을 모두 마친 뒤 `Run Simulation` 버튼을 클릭**하면 확률·환급 계산이 시작됩니다. 작업이 완료되면 Analytics에서 성공 확률별 **추가 필요 뽑기권 환산량**을 확인합니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v1.0.3.zip
+gacha-pickup-calculator-windows-x64-v1.0.4.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/
@@ -35,18 +35,18 @@ gacha-pickup-calculator-windows-x64-v1.0.3.zip
 Windows PowerShell에서 SHA-256을 확인할 수 있습니다.
 
 ```powershell
-Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.3.zip -Algorithm SHA256
+Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.4.zip -Algorithm SHA256
 ```
 
 공식 릴리즈의 체크섬과 비교한 뒤, GitHub CLI가 설치되어 있다면 **발급자 및 빌드 워크플로 출처**까지 확인하십시오.
 
 ```sh
-gh attestation verify gacha-pickup-calculator-windows-x64-v1.0.3.zip \
+gh attestation verify gacha-pickup-calculator-windows-x64-v1.0.4.zip \
   --repo P-JSL/gacha_pickup_calculator \
   --signer-workflow P-JSL/gacha_pickup_calculator/.github/workflows/rust.yml
 ```
 
-[릴리즈 서명·운영 가이드](docs/SECURE_RELEASE_v1_0_3.md)에 사용 방법과 한계를 설명했습니다. **v1.0.3의 Windows EXE는 Authenticode 미서명 상태**입니다. Sigstore 출처 증명은 Windows 코드 서명이나 SmartScreen 신뢰를 대체하지 않습니다.
+[릴리즈 서명·운영 가이드](docs/SECURE_RELEASE_v1_0_3.md)에 사용 방법과 한계를 설명했습니다. v1.0.3 Windows EXE는 Authenticode 미서명으로 확인되었습니다. v1.0.4는 실제 게시 자산의 서명 여부를 별도 확인해야 합니다. Sigstore 출처 증명은 Windows 코드 서명이나 SmartScreen 신뢰를 대체하지 않습니다.
 
 ## 주요 기능
 
@@ -111,9 +111,9 @@ python3 scripts/verify_release_contract.py
 
 이미지 수집은 일반 빌드에 포함되지 않습니다. 저장소에 포함된 `Image/` 파일을 사용하며, 외부 소스에서 이미지를 다시 받는 작업은 별도의 수동 [artwork refresh 워크플로](https://github.com/P-JSL/gacha_pickup_calculator/actions/workflows/refresh-artwork.yml)에서 검토합니다. Linux에서 이미지를 함께 실행하려면 빌드 후 `Image/` 폴더를 실행 파일 옆에 복사해야 합니다.
 
-### 개발 브랜치의 수동 실행 정책
+### 수동 실행과 병렬 Monte Carlo 정책
 
-저장소의 차기 빌드에서는 **입력 변경 시 자동 계산을 중단**하고, 모든 목표·천장·재화 입력을 끝낸 다음 `Run Simulation`을 클릭해야 새 계산을 시작하도록 수정하고 있습니다. GUI CI도 실제 버튼 클릭과 계산 완료 이벤트를 연결하며, 기존 정식 배포 `v1.0.3`에는 이 변경이 아직 포함되지 않습니다. [CI 상세 설계](docs/CI_CHANGE_SCOPES.md).
+v1.0.4부터 **입력 변경 시 자동 계산을 실행하지 않습니다.** 모든 목표·천장·재화 입력을 마친 후 `Run Simulation` 버튼을 클릭하면 시작하고, 작업 완료 세대를 감지하여 최신 요청의 결과만 표시합니다. 환급 Monte Carlo는 CPU·표본 수를 기준으로 최대 8개 작업자를 사용하며, 최소한의 원본 결과 배열에 표본을 나누어 기록합니다. 표본별 고정 난수 시드와 정수 누적으로 스레드 수와 관계없이 동일한 결과를 제공합니다. 선택 가능한 횟수는 5,000~1,000,000회이며, 메모리는 공개 원본 결과 수 N에 비례합니다. [CI 상세 설계](docs/CI_CHANGE_SCOPES.md).
 
 ### 구조·성능
 
@@ -127,7 +127,7 @@ python3 scripts/verify_release_contract.py
 
 ## 보안·배포 상태
 
-| 항목 | v1.0.3 확인 상태 |
+| 항목 | v1.0.3 당시 확인 상태 (v1.0.4 확정 현황 아님) |
 |---|---|
 | Windows/Ubuntu 빌드·테스트, RustSec, 이미지 검사, GUI 캡처 | 성공 |
 | CodeQL (Rust / Python / Actions) | 분석 워크플로 성공 — 발견 경고 0건을 의미하지는 않음 |
@@ -141,6 +141,6 @@ python3 scripts/verify_release_contract.py
 
 ## 문서·라이선스
 
-[변경 이력](docs/CHANGELOG.md) · [CI 변경 범위·검증 정책](docs/CI_CHANGE_SCOPES.md) · [v1.0.3 릴리즈 노트](RELEASE_NOTES_v1.0.3.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
+[변경 이력](docs/CHANGELOG.md) · [CI 변경 범위·검증 정책](docs/CI_CHANGE_SCOPES.md) · [v1.0.4 릴리즈 노트](RELEASE_NOTES_v1.0.4.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
 
 애플리케이션 코드에는 [MIT 라이선스](LICENSE)가 적용됩니다. **타사 게임 이미지와 제3자 리소스의 재배포 권리는 이 라이선스로 자동 부여되지 않습니다.** 배포·재사용 시 원저작권자의 조건을 별도로 확인하십시오.
