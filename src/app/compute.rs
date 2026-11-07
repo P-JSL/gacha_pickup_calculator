@@ -46,7 +46,7 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
                     variant.wuwa_waveband_max = max_wavebands;
                     let worker_limit = cpu_budget / 3 + usize::from(max_wavebands < cpu_budget % 3);
                     handles.push(scope.spawn(move || {
-                        crate::feedback::estimate_with_options(
+                        estimate_with_options(
                             &request.setup, request.mode, &variant, worker_limit, cancellation
                         ).map(Arc::new)
                     }));
