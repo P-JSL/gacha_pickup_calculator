@@ -207,19 +207,19 @@
                    gap.raw_probability);
         assert_eq!(ChartSource::Refund(stats.feedback.as_ref().unwrap())
                    .probability(setup.flexible), gap.current_probability);
-        let refunded = ChartSeries {
-            label: "환급 재투입 후",
-            source: ChartSource::Refund(stats.feedback.as_ref().unwrap()),
-            color: MINT,
-        };
-        let unrefunded = ChartSeries {
-            label: "환급 전",
-            source: ChartSource::Exact(&stats.raw_shared),
-            color: PRIMARY,
-        };
         // Regardless of draw-order, a hovered amount must prominently
         // report the WITH-refund probability (100%), not the raw 0%.
         for reversed in [false, true] {
+            let refunded = ChartSeries {
+                label: "환급 재투입 후",
+                source: ChartSource::Refund(stats.feedback.as_ref().unwrap()),
+                color: MINT,
+            };
+            let unrefunded = ChartSeries {
+                label: "환급 전",
+                source: ChartSource::Exact(&stats.raw_shared),
+                color: PRIMARY,
+            };
             let series = if reversed {
                 [refunded, unrefunded]
             } else {
