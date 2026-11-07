@@ -27,12 +27,9 @@ impl Calculator {
                 repaint.request_repaint();
             }
         });
-        // Screenshot automation must re-calculate after each game switch.
-        // Production default remains OFF; the CI flag is never set by the app.
-        let mut ui_preferences = UiPreferences::default();
-        if std::env::var("GACHA_CI_AUTO_REFRESH").as_deref() == Ok("1") {
-            ui_preferences.auto_recalculate = true;
-        }
+        // CI observes an explicit Run Simulation click and the corresponding
+        // finished worker generation; it never forces automatic calculation.
+        let ci_capture = std::env::var("GACHA_CI_SIMULATION_EVENTS").as_deref() == Ok("1");
         let initial_selection = GameSession::defaults(Game::StarRail);
         let mut app = Self {
             setup: GameSetup::new(Game::StarRail),
@@ -45,9 +42,9 @@ impl Calculator {
             feedback_cfg: FeedbackConfig::for_game(Game::StarRail),
             stats: None,
             stats_game: None,
-            input_needs_calculation: false,
+            input_needs_calculation: true,
             manual_calculation_requested: false,
-            ui_preferences,
+            ui_preferences: UiPreferences::default(),
             language_preference: i18n::load_preference(),
             system_language: i18n::system_language(),
             language_save_error: None,
@@ -57,8 +54,10 @@ impl Calculator {
             worker,
             results,
             generation: 0,
-            pending_since: None,
             calculating: false,
+            ci_capture,
+            ci_ui_ready_reported: false,
+            ci_ready_pending: None,
             observation_path: String::new(),
             observation_expected_sha256: String::new(),
             observation_data: None,
@@ -75,7 +74,8 @@ impl Calculator {
             selected_weapon_id: initial_selection.weapon_id,
             game_sessions: HashMap::new(),
         };
-        app.recalculate();
+        // Inputs remain editable. No worker request exists until the user
+        // clicks Run Simulation after finishing the configuration.
         app
     }
 
@@ -155,10 +155,16 @@ impl Calculator {
         let choice = catalog::picker(ctx, &mut self.catalog_ui, self.setup.game, kind,
             &mut open, &mut self.picker_filter, &current);
         if let Some(id) = choice {
-            apply_catalog_choice(
+            let previous_character = self.selected_character_id.clone();
+            let previous_weapon = self.selected_weapon_id.clone();
+            if apply_catalog_choice(
                 self.setup.game, kind, &id,
                 &mut self.selected_character_id, &mut self.selected_weapon_id,
-            );
+            ) && (self.selected_character_id != previous_character
+                || self.selected_weapon_id != previous_weapon) {
+                // Choosing a character or weapon is an input edit, not a run.
+                self.invalidate_calculation();
+            }
             self.picker_kind = None;
         } else if !open {
             self.picker_kind = None;
@@ -204,10 +210,20 @@ impl Calculator {
         self.observation_message.clear();
     }
 
+    /// Mark edited inputs stale without starting or scheduling a calculation.
+    pub(crate) fn invalidate_calculation(&mut self) {
+        self.input_needs_calculation = true;
+        self.generation = self.generation.wrapping_add(1);
+        self.calculating = false;
+        self.ci_ready_pending = None;
+    }
+
+    /// Only called for an explicit Run Simulation button request.
     pub(crate) fn recalculate(&mut self) {
         self.setup.set_targets(self.target_eid + 1, self.target_refine);
         self.generation = self.generation.wrapping_add(1);
         self.calculating = true;
+        self.ci_ready_pending = None;
         // Keep the last completed image on screen during background calculation.
         self.input_needs_calculation = false;
         self.error = None;
@@ -219,14 +235,20 @@ impl Calculator {
         };
         if self.worker.send(request).is_err() {
             self.calculating = false;
+            self.input_needs_calculation = true;
             self.error = Some("백그라운드 계산 작업을 시작할 수 없습니다.".to_owned());
+            if self.ci_capture {
+                eprintln!("GACHA_CI_SIM_FAILED game={:?} generation={}", self.setup.game, self.generation);
+            }
+        } else if self.ci_capture {
+            eprintln!("GACHA_CI_SIM_STARTED game={:?} generation={}", self.setup.game, self.generation);
         }
     }
 
     pub(crate) fn poll_results(&mut self) {
         while let Ok(response) = self.results.try_recv() {
             // Ignore results from settings the user has since changed.
-            if response.generation != self.generation || self.pending_since.is_some() {
+            if response.generation != self.generation {
                 continue;
             }
             self.calculating = false;
@@ -249,17 +271,17 @@ impl Calculator {
                     self.stats_game = Some(self.setup.game);
                     self.input_needs_calculation = false;
                     self.error = None;
+                    if self.ci_capture { self.ci_ready_pending = Some(response.generation); }
                 }
-                Err(message) => { self.error = Some(message); }
+                Err(message) => {
+                    self.input_needs_calculation = true;
+                    self.error = Some(message);
+                    if self.ci_capture {
+                        eprintln!("GACHA_CI_SIM_FAILED game={:?} generation={}", self.setup.game, response.generation);
+                    }
+                }
             }
         }
-    }
-
-    pub(crate) fn schedule_recalculation(&mut self) {
-        self.pending_since = Some(Instant::now());
-        self.error = None;
-        self.calculating = true;
-        self.input_needs_calculation = true;
     }
 
     /// Enter-driven navigation search; only actual sections and supported games are matched.

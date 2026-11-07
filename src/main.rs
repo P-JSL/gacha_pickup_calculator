@@ -9,7 +9,7 @@ use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedB
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[path = "ui/dashboard.rs"] mod dashboard_ui;
 #[path = "data/catalog.rs"] mod catalog;
@@ -58,10 +58,11 @@ fn main() -> eframe::Result {
 mod chart_tests {
     use super::*;
     #[test]
-    fn automatic_recalculation_is_disabled_by_default() {
+    fn simulation_requires_explicit_user_action_by_default() {
         let prefs = UiPreferences::default();
-        assert!(!prefs.auto_recalculate);
         assert!(prefs.show_hover_guides);
+        // Neither auto-recalculate nor a debounce timer exists in UI preferences.
+        // Calculation is issued only after the Run Simulation click is consumed.
     }
 
     fn deterministic_distribution(pulls: usize) -> Distribution {

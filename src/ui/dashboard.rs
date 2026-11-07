@@ -493,7 +493,7 @@ impl Calculator {
                             .fill(DEEP_CARD).corner_radius(9)
                             .min_size(egui::vec2(86.0, 38.0))).clicked() {
                             self.change_game(self.setup.game);
-                            self.manual_calculation_requested = true;
+                            dirty = true;
                         }
                         if ui.button(t(language, "Advanced settings")).clicked() {
                             self.view_mode = ViewMode::Settings;
