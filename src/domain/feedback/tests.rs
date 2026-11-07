@@ -419,6 +419,23 @@
     }
 
     #[test]
+    fn verified_maxed_coral_and_off_banner_arc_return_amounts() {
+        let wuwa = FeedbackConfig::for_game(Game::WutheringWaves);
+        assert_eq!(wuwa.featured_first, 15);
+        assert_eq!(wuwa.featured_duplicate, 15);
+        assert_eq!(wuwa.featured_maxed, 40);
+        assert_eq!(wuwa.four_star_reward, 3);
+        assert_eq!(wuwa.four_star_maxed, 8);
+        let mut wallet = Wallet::new(&wuwa);
+        // The eighth character copy must give a 40-coral refund.
+        award_featured(&mut wallet, &wuwa, 7, 0, BannerKind::Character);
+        assert_eq!(wallet.points, 40);
+        let nte = FeedbackConfig::for_game(Game::Neverness);
+        assert_eq!(nte.off_banner_rare, 40);
+        assert_eq!(nte.weapon_rare, 40);
+    }
+
+    #[test]
     fn nte_tenth_dice_awards_additional_a_rank_after_the_paid_roll() {
         let mut setup = GameSetup::new(Game::Neverness);
         setup.character.rule = BannerRule::Standard {
