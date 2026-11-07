@@ -1309,4 +1309,25 @@ mod tests {
         assert_eq!(sampled.scenarios.len(), model.samples);
     }
 
+    #[test]
+    fn cancelled_generation_returns_without_retaining_partial_results() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 2_048;
+        let generation = AtomicU64::new(11);
+        assert!(estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            4, Some((&generation, 10))).is_err());
+
+        generation.store(10, Ordering::Relaxed);
+        let sequential = estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            1, None).unwrap();
+        let active = estimate_with_options(&setup, RateMode::PublishedOnly, &config,
+            4, Some((&generation, 10))).unwrap();
+        assert_eq!(sequential.scenarios, active.scenarios);
+        assert_eq!(sequential.raw_pulls, active.raw_pulls);
+        assert_eq!(sequential.budgets, active.budgets);
+        assert_eq!(sequential.average_raw.to_bits(), active.average_raw.to_bits());
+    }
+
 }
