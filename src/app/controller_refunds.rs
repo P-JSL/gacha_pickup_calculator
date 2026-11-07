@@ -170,11 +170,14 @@ impl Calculator {
                     ui.small("비픽업 5성은 픽업 천장을 초기화하지 않고, 중복 획득 보상 가정으로 환급됩니다.");
                 }
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(if self.setup.game == Game::Neverness {
-                        "Arc A급 보장 간격(개)"
-                    } else { "4성 최대 천장" });
-                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_hard)
-                        .range(1..=20)).changed();
+                    if self.setup.game == Game::Neverness {
+                        // An Arc batch always includes an A-class-or-higher result.
+                        ui.label("Arc A급 보장 간격: 10개 (고정)");
+                    } else {
+                        ui.label("4성 최대 천장");
+                        dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_hard)
+                            .range(1..=20)).changed();
+                    }
                     ui.separator();
                     ui.label("시뮬레이션 횟수");
                     egui::ComboBox::from_id_salt("sample_count")
