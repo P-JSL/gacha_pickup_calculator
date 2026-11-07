@@ -125,7 +125,7 @@
         let mut rng = SplitMix64(17);
         assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0));
         assert_eq!(pity, 0);
-        assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false));
+        assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0));
     }
 
     #[test]
