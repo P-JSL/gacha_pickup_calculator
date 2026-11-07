@@ -14,15 +14,20 @@ pub(super) fn buy_available_wavebands(wallet: &mut Wallet, model: &FeedbackConfi
 #[derive(Clone, Copy)]
 pub(super) enum BannerKind { Character, Weapon }
 
+/// 4★ base rates are *unconditional* per draw, not conditional on missing
+/// a 5★. A 5★ result takes precedence and also resets the 4★ pity. Thus
+/// P(4★ | no 5★) = min(1, P(4★) / (1 - P(5★))).
+/// A user-entered pair summing above 100% is impossible; 5★ precedence
+/// caps the achievable 4★ rate. Duplicates remain explicit account assumptions.
 pub(super) fn maybe_four_star(rng: &mut SplitMix64, model: &FeedbackConfig, kind: BannerKind,
-                   four_pity: &mut usize, rare: bool) -> bool {
-    // The 4★ return model is approximate: exact 4★ item ownership, featured
-    // status, cross-rarity precedence and separate 4★ pity are not available.
+                   four_pity: &mut usize, rare: bool, rare_probability: f64) -> bool {
     if rare { *four_pity = 0; return false; }
-    let chance = match kind {
+    let base_four = match kind {
         BannerKind::Character => model.character_four_star_rate,
         BannerKind::Weapon => model.weapon_four_star_rate,
     };
+    let chance = (base_four / (1.0 - rare_probability).max(f64::EPSILON))
+        .min(1.0);
     let hit = *four_pity + 1 >= model.four_star_hard || rng.hits(chance);
     if hit { *four_pity = 0; } else { *four_pity += 1; }
     hit
@@ -85,8 +90,9 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
                 wallet.board_dice_earned += returned;
             }
         }
-        let rare = rng.hits(rarity.chance(pity + 1, mode));
-        if maybe_four_star(rng, model, kind, &mut four_pity, rare) {
+        let rare_probability = rarity.chance(pity + 1, mode);
+        let rare = rng.hits(rare_probability);
+        if maybe_four_star(rng, model, kind, &mut four_pity, rare, rare_probability) {
             wallet.refund(match kind {
                 BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
@@ -123,12 +129,27 @@ pub(super) fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKin
     let already_unclaimed = rule.spark.as_ref().is_some_and(|s| !s.used && s.progress >= s.at);
     if already_unclaimed { won += 1; }
     let mut progress = rule.spark.as_ref().map_or(0, |s| s.progress);
-    while won < rule.target_copies {
-        wallet.pay(dedicated);
+    // The optional Stella first-multi promotion is for a *paid ten-pull*:
+    // 10 pulls are funded before any of their refunds, and all 10 are drawn
+    // even if the goal is achieved early. The official extra 600 Gold Discs
+    // (on top of 10 × 30) do not multiply Expert Permit refunds.
+    let first_multi = matches!(kind, BannerKind::Character)
+        && model.stella_first_ten_remaining == 10 && won < rule.target_copies;
+    let mut prepaid = if first_multi {
+        for _ in 0..10 { wallet.pay(dedicated); }
+        wallet.record_disc_units = wallet.record_disc_units.saturating_add(
+            model.stella_record_discs_per_character_pull.saturating_mul(20));
+        10
+    } else { 0 };
+    while won < rule.target_copies || prepaid > 0 {
+        if prepaid > 0 { prepaid -= 1; } else { wallet.pay(dedicated); }
         if matches!(kind, BannerKind::Character) {
             wallet.begin_character_pull(model);
         }
-        let success = rng.hits(if pity + 1 >= *hard_featured { 1.0 } else { *featured_rate });
+        let featured_probability = if pity + 1 >= *hard_featured {
+            1.0
+        } else { *featured_rate };
+        let success = rng.hits(featured_probability);
         // Sampling the nonfeatured rate conditional on a featured miss retains
         // the desired unconditional rarity rate. Nonfeatured Stella Sora
         // 5-star drops do not reset the featured-only pity counter.
@@ -136,8 +157,11 @@ pub(super) fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKin
             BannerKind::Character => model.character_other_five_star_rate,
             BannerKind::Weapon => model.weapon_other_five_star_rate,
         };
-        let off_rare = !success && rng.hits((off_rate / (1.0 - featured_rate).max(f64::EPSILON)).min(1.0));
-        if maybe_four_star(rng, model, kind, &mut four_pity, success || off_rare) {
+        let off_rare = !success && rng.hits(
+            (off_rate / (1.0 - featured_probability).max(f64::EPSILON)).min(1.0));
+        let five_rate = (featured_probability + off_rate).min(1.0);
+        if maybe_four_star(rng, model, kind, &mut four_pity,
+                           success || off_rare, five_rate) {
             wallet.refund(match kind {
                 BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
@@ -179,7 +203,7 @@ pub(super) fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConf
             let x = rng.uniform();
             if x < 0.0075 { featured += 1; four_pity = 0; }
             else if x < 0.03 { off += 1; four_pity = 0; }
-            else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false) {
+            else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false, 0.03) {
                 pending_four_star_points = pending_four_star_points
                     .saturating_add(model.weapon_four_star_reward);
             }
