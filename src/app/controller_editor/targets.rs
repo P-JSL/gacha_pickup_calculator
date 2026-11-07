@@ -10,7 +10,7 @@ impl Calculator {
                 egui::ComboBox::from_id_salt("eid").width(175.0)
                     .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
                     .show_ui(&mut cols[0], |ui| {
-                        for level in 0..=6 {
+                        for level in 0..self.setup.game.max_character_copies() {
                             dirty |= ui.selectable_value(&mut self.target_eid, level,
                                 format!("E{level} / {}장", level + 1)).changed();
                         }
@@ -18,24 +18,24 @@ impl Calculator {
                 cols[0].horizontal(|ui| {
                     ui.label("기보유");
                     dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
-                        .range(0..=7).speed(1).suffix("장")).changed();
+                        .range(0..=self.setup.game.max_character_copies()).speed(1).suffix("장")).changed();
                 });
                 cols[1].label(RichText::new(format!("{} 재련 목표", self.setup.game.secondary_banner_name())).color(MUTED));
                 self.catalog_selector(&mut cols[1], catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("refine").width(175.0)
                     .selected_text(if self.target_refine == 0 { "필요 없음".to_owned() }
-                        else { format!("S{} · 총 {}장", self.target_refine, self.target_refine) })
+                        else { format!("S{} · 총 {}장", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine) })
                     .show_ui(&mut cols[1], |ui| {
-                        for level in 0..=5 {
+                        for level in 0..=self.setup.game.max_weapon_copies() {
                             let label = if level == 0 { "사용하지 않음".to_string() }
-                                else { format!("S{level} / {level}장") };
+                                else { format!("S{} / {level}장", self.setup.game.weapon_upgrade_level(level)) };
                             dirty |= ui.selectable_value(&mut self.target_refine, level, label).changed();
                         }
                     });
                 cols[1].horizontal(|ui| {
                     ui.label("기보유");
                     dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
-                        .range(0..=5).speed(1).suffix("장")).changed();
+                        .range(0..=self.setup.game.max_weapon_copies()).speed(1).suffix("장")).changed();
                 });
             });
         });
@@ -51,25 +51,25 @@ impl Calculator {
                 self.catalog_selector(ui, catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("weapon_only_goal")
                     .selected_text(if self.target_refine == 0 { "필요 없음".into() }
-                        else { format!("S{} · {}장", self.target_refine, self.target_refine) })
+                        else { format!("S{} · {}장", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine) })
                     .show_ui(ui, |ui| {
-                        for count in 0..=5 {
+                        for count in 0..=self.setup.game.max_weapon_copies() {
                             dirty |= ui.selectable_value(&mut self.target_refine, count,
                                 if count == 0 { "필요 없음".into() }
-                                else { format!("S{count} / {count}장") }).changed();
+                                else { format!("S{} / {count}장", self.setup.game.weapon_upgrade_level(count)) }).changed();
                         }
                     });
                 ui.horizontal(|ui| {
                     ui.label("기보유");
                     dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
-                        .range(0..=5).suffix("장")).changed();
+                        .range(0..=self.setup.game.max_weapon_copies()).suffix("장")).changed();
                 });
             } else {
                 self.catalog_selector(ui, catalog::Kind::Character);
                 egui::ComboBox::from_id_salt("character_only_goal")
                     .selected_text(format!("E{} · 총 {}장", self.target_eid, self.target_eid + 1))
                     .show_ui(ui, |ui| {
-                        for level in 0..=6 {
+                        for level in 0..self.setup.game.max_character_copies() {
                             dirty |= ui.selectable_value(&mut self.target_eid, level,
                                 format!("E{level} / {}장", level + 1)).changed();
                         }
@@ -77,7 +77,7 @@ impl Calculator {
                 ui.horizontal(|ui| {
                     ui.label("기보유");
                     dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
-                        .range(0..=7).suffix("장")).changed();
+                        .range(0..=self.setup.game.max_character_copies()).suffix("장")).changed();
                 });
             }
         });

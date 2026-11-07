@@ -193,7 +193,14 @@ pub(super) fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKin
         }
         if success {
             pity = 0;
-            award_featured(wallet, model, owned, won, kind);
+            // Stella Sora is fully upgraded after six character copies,
+            // unlike the seven-copy HSR/WuWa/NTE model. The seventh and
+            // subsequent character copies use the configured maxed return.
+            if matches!(kind, BannerKind::Character) && owned + won >= 6 {
+                wallet.refund(model.featured_maxed);
+            } else {
+                award_featured(wallet, model, owned, won, kind);
+            }
             won += 1;
         } else {
             pity += 1;

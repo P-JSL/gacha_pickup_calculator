@@ -106,7 +106,7 @@ impl Calculator {
                             .width(ui.available_width().min(145.0))
                             .selected_text(format!("E{} / {}", self.target_eid, self.target_eid + 1))
                             .show_ui(ui, |ui| {
-                                for level in 0..=6 {
+                                for level in 0..self.setup.game.max_character_copies() {
                                     dirty |= ui.selectable_value(&mut self.target_eid, level,
                                         format!("E{level} / {}", level + 1)).changed();
                                 }
@@ -114,7 +114,7 @@ impl Calculator {
                         ui.horizontal(|ui| {
                             ui.label(t(language, "Owned copies"));
                             dirty |= ui.add(egui::DragValue::new(&mut self.setup.character_owned)
-                                .range(0..=7).suffix(t(language, "Copies unit"))).changed();
+                                .range(0..=self.setup.game.max_character_copies()).suffix(t(language, "Copies unit"))).changed();
                         });
                     });
                     setting_tile(&mut cols[1], "⚔",
@@ -125,12 +125,12 @@ impl Calculator {
                                 .selected_text(if self.target_refine == 0 {
                                     t(language, "No target").to_owned()
                                 } else {
-                                    format!("S{} / {}", self.target_refine, self.target_refine)
+                                    format!("S{} / {}", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine)
                                 })
                                 .show_ui(ui, |ui| {
-                                    for level in 0..=5 {
+                                    for level in 0..=self.setup.game.max_weapon_copies() {
                                         let label = if level == 0 { t(language, "Not needed").to_owned() }
-                                            else { format!("S{level} / {level}") };
+                                            else { format!("S{} / {level}", self.setup.game.weapon_upgrade_level(level)) };
                                         dirty |= ui.selectable_value(
                                             &mut self.target_refine, level, label
                                         ).changed();
@@ -139,7 +139,7 @@ impl Calculator {
                             ui.horizontal(|ui| {
                                 ui.label(t(language, "Owned copies"));
                                 dirty |= ui.add(egui::DragValue::new(&mut self.setup.weapon_owned)
-                                    .range(0..=5).suffix(t(language, "Copies unit"))).changed();
+                                    .range(0..=self.setup.game.max_weapon_copies()).suffix(t(language, "Copies unit"))).changed();
                             });
                         });
                 });

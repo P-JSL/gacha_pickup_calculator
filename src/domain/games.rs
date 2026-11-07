@@ -72,6 +72,21 @@ impl Game {
     pub fn cost_per_pull(self) -> usize {
         if self == Self::StellaSora { 300 } else { 160 }
     }
+    /// Stella Sora has five upgrades beyond the first copy (six total).
+    /// The other three supported games use six upgrades (seven total).
+    pub fn max_character_copies(self) -> usize {
+        if self == Self::StellaSora { 6 } else { 7 }
+    }
+    /// Stella Sora Lost Records also have five upgrades (six copies).
+    /// Other featured equipment goals top out at five copies.
+    pub fn max_weapon_copies(self) -> usize {
+        if self == Self::StellaSora { 6 } else { 5 }
+    }
+    /// Converts owned equipment copies to the game's displayed refinement
+    /// level without modifying the underlying quantity calculation.
+    pub fn weapon_upgrade_level(self, copies: usize) -> usize {
+        if self == Self::StellaSora { copies.saturating_sub(1) } else { copies }
+    }
     pub fn special_notes(self) -> &'static str {
         match self {
             Self::StarRail => "일반 한정 캐릭터 90회/50:50, 광추 80회/75:25; 픽업 실패 후 다음 5성 확정. 소프트 천장 증가는 비공식 모델.",
@@ -138,10 +153,10 @@ impl GameSetup {
             ),
             Game::StellaSora => (
                 Banner { rule: BannerRule::FeaturedCounter { featured_rate: 0.01, hard_featured: 160 },
-                    pity: 0, guaranteed: false, target_copies: 7,
+                    pity: 0, guaranteed: false, target_copies: 6,
                     spark: Some(Spark { at: 120, progress: 0, used: false }), any_rare_pity: 0 },
                 Banner { rule: BannerRule::FeaturedCounter { featured_rate: 0.015, hard_featured: 120 },
-                    pity: 0, guaranteed: false, target_copies: 5, spark: None, any_rare_pity: 0 },
+                    pity: 0, guaranteed: false, target_copies: 6, spark: None, any_rare_pity: 0 },
             ),
         };
         Self { game, character, weapon, character_owned: 0, weapon_owned: 0,
@@ -187,6 +202,22 @@ fn regular(base: f64, hard: usize, soft: SoftPity, featured_share: f64, pity: us
 #[cfg(test)]
 mod currency_tests {
     use super::*;
+
+    #[test]
+    fn stella_and_other_games_have_correct_full_upgrade_copy_bounds() {
+        assert_eq!(Game::StellaSora.max_character_copies(), 6);
+        assert_eq!(Game::StellaSora.max_weapon_copies(), 6);
+        assert_eq!(Game::StellaSora.weapon_upgrade_level(1), 0);
+        assert_eq!(Game::StellaSora.weapon_upgrade_level(6), 5);
+        let stella = GameSetup::new(Game::StellaSora);
+        assert_eq!(stella.character.target_copies, 6);
+        assert_eq!(stella.weapon.target_copies, 6);
+        for game in [Game::StarRail, Game::WutheringWaves, Game::Neverness] {
+            assert_eq!(game.max_character_copies(), 7);
+            assert_eq!(game.max_weapon_copies(), 5);
+            assert_eq!(game.weapon_upgrade_level(5), 5);
+        }
+    }
     #[test]
     fn native_currency_converts_only_in_complete_pulls_for_all_games() {
         for game in Game::ALL {
