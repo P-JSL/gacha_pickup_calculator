@@ -68,9 +68,9 @@ impl FeedbackConfig {
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
-                featured_first: 15, featured_duplicate: 15, featured_maxed: 15,
+                featured_first: 15, featured_duplicate: 15, featured_maxed: 40,
                 off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
-                four_star_reward: 3, four_star_maxed: 3, four_star_maxed_share: 0.0,
+                four_star_reward: 3, four_star_maxed: 8, four_star_maxed_share: 0.0,
                 weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -84,7 +84,7 @@ impl FeedbackConfig {
                 // missing board-tile rewards remain community assumptions.
                 enabled: true, points_per_ticket: 24, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40, featured_maxed: 80,
-                off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
+                off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 6, four_star_maxed: 12, four_star_maxed_share: 0.0,
                 weapon_four_star_reward: 4,
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
