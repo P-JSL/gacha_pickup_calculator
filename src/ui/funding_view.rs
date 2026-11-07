@@ -183,7 +183,7 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
             debug_assert_eq!(path.raw_pulls, path.dedicated_used
                 + path.points_funded_pulls + path.initial_flexible_required);
             ui.small(format!(
-                "{}% 경계의 실제 한 표본: 총 {}회 = 전용권 {}회 + 환급 포인트 충당 {}회 + 최초 자유권 {}회",
+                "{}% 경계의 실제 한 표본: 총 {}회 = 전용권 {}회 + 기존·환급 교환 포인트 충당 {}회 + 최초 자유권 {}회",
                 gap.confidence, path.raw_pulls, path.dedicated_used,
                 path.points_funded_pulls, path.initial_flexible_required
             ));
@@ -196,7 +196,7 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
                 lower, upper_label, epsilon * 100.0
             ));
         }
-        ui.small("환급은 각 뽑기 이후에만 다음 뽑기에 투입합니다. 개별 캐릭터·장비 수량은 환급 전 독립 참고값이며 둘을 합산하지 않습니다.");
+        ui.small("기보유 교환 포인트는 첫 결제부터 사용 가능하고 새 환급은 다음 결제부터 사용합니다. 개별 캐릭터·장비 수량은 환급 전 독립 참고값이므로 합산하지 않습니다.");
     }
     ui.add_space(5.0);
     if setup.game.shares_featured_ticket() {
