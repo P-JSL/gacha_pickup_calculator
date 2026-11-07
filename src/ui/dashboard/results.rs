@@ -75,7 +75,7 @@ impl Calculator {
                             (t(language, "Target Character"), results.map(|(_,ch,_)|
                                 format!("E{} · {:.2}%", self.target_eid,ch*100.0))),
                             (&format!("{} · {}", t(language, "Target Weapon"), i18n::banner_name(language, self.setup.game)), results.map(|(_,_,wp)|
-                                format!("S{} · {:.2}%", self.target_refine,wp*100.0))),
+                                format!("S{} · {:.2}%", self.setup.game.weapon_upgrade_level(self.target_refine),wp*100.0))),
                         ] {
                             ui.horizontal(|ui| {
                                 ui.label(RichText::new("☑").color(SUCCESS).size(13.0));
@@ -97,7 +97,7 @@ impl Calculator {
                                 ui.set_width(ui.available_width());
                                 ui.horizontal(|ui| {
                                     ui.label(RichText::new(format!(
-                                        "★ {} (E{}S{})", t(language, "Overall"), self.target_eid,self.target_refine
+                                        "★ {} (E{}S{})", t(language, "Overall"), self.target_eid,self.setup.game.weapon_upgrade_level(self.target_refine)
                                     )).size(11.0).strong());
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -149,7 +149,7 @@ impl Calculator {
                                             .size(10.8).strong());
                                         ui.label(RichText::new(format!(
                                             "E{} · {} S{}", entry.eid,
-                                            i18n::banner_name(language, entry.game),entry.refine
+                                            i18n::banner_name(language, entry.game),entry.game.weapon_upgrade_level(entry.refine)
                                         )).color(MUTED).size(9.5));
                                     });
                                     ui.with_layout(
