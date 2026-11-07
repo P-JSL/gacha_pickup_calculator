@@ -82,6 +82,11 @@ impl Game {
     pub fn max_weapon_copies(self) -> usize {
         if self == Self::StellaSora { 6 } else { 5 }
     }
+    /// Converts owned equipment copies to the game's displayed refinement
+    /// level without modifying the underlying quantity calculation.
+    pub fn weapon_upgrade_level(self, copies: usize) -> usize {
+        if self == Self::StellaSora { copies.saturating_sub(1) } else { copies }
+    }
     pub fn special_notes(self) -> &'static str {
         match self {
             Self::StarRail => "일반 한정 캐릭터 90회/50:50, 광추 80회/75:25; 픽업 실패 후 다음 5성 확정. 소프트 천장 증가는 비공식 모델.",
