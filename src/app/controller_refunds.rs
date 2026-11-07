@@ -67,12 +67,13 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(
                         &mut self.feedback_cfg.stella_record_discs_per_character_pull)
                         .range(0..=300).suffix("개")).changed();
-                    ui.label("초회 3배 혜택 남은 횟수");
-                    dirty |= ui.add(egui::DragValue::new(
-                        &mut self.feedback_cfg.stella_first_ten_remaining)
-                        .range(0..=10).suffix("회")).changed();
+                    let mut first_multi = self.feedback_cfg.stella_first_ten_remaining == 10;
+                    if ui.checkbox(&mut first_multi, "첫 10연 모집 보너스 적용").changed() {
+                        self.feedback_cfg.stella_first_ten_remaining = if first_multi { 10 } else { 0 };
+                        dirty = true;
+                    }
                 });
-                ui.small("레코드 모집 1회=골든 디스크 300개. 30개/캐릭터 모집은 레코드 전용 10% 환급 가정이며 캐릭터권으로 전환하지 않습니다. 초회 3배 보너스는 계정별 남은 횟수를 알아야 하므로 기본 0회입니다.");
+                ui.small("캐릭터 1회당 골든 레코드 30개, 레코드 1회에 300개. 첫 10연(선택)은 10회분 300개 대신 900개 지급이며, 10회를 먼저 결제합니다. 전문가 증명서에 3배를 적용하지 않습니다.");
             } else {
                 ui.label(RichText::new("4성의 중복·보유 상태는 입력한 평균 보상 가정에 따라 계산합니다.")
                     .color(MUTED).size(11.0));
@@ -133,7 +134,9 @@ impl Calculator {
                     ui.label(format!("{} 4성 평균 환급", self.setup.game.secondary_banner_name()));
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_reward)
                         .range(0..=100_000)).changed();
-                    ui.label("캐릭터 4성 기본률(%)");
+                    ui.label(if self.setup.game == Game::Neverness {
+                        "보드 A급 기본률 가정(%)"
+                    } else { "캐릭터 4성 기본률(%)" });
                     let mut rate = self.feedback_cfg.character_four_star_rate * 100.0;
                     if ui.add(egui::DragValue::new(&mut rate).range(0.0..=100.0).speed(0.1)).changed() {
                         self.feedback_cfg.character_four_star_rate = rate / 100.0;
@@ -167,9 +170,14 @@ impl Calculator {
                     ui.small("비픽업 5성은 픽업 천장을 초기화하지 않고, 중복 획득 보상 가정으로 환급됩니다.");
                 }
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("4성 최대 천장");
-                    dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_hard)
-                        .range(1..=20)).changed();
+                    if self.setup.game == Game::Neverness {
+                        // An Arc batch always includes an A-class-or-higher result.
+                        ui.label("Arc A급 보장 간격: 10개 (고정)");
+                    } else {
+                        ui.label("4성 최대 천장");
+                        dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_hard)
+                            .range(1..=20)).changed();
+                    }
                     ui.separator();
                     ui.label("시뮬레이션 횟수");
                     egui::ComboBox::from_id_salt("sample_count")
@@ -182,7 +190,9 @@ impl Calculator {
                         });
                 });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("캐릭터 4성 현재 스택");
+                    ui.label(if self.setup.game == Game::Neverness {
+                        "10회 추가 A급 선물 진행도"
+                    } else { "캐릭터 4성 현재 스택" });
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.character_four_star_pity)
                         .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
                     ui.separator();
@@ -190,7 +200,10 @@ impl Calculator {
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.weapon_four_star_pity)
                         .range(0..=self.feedback_cfg.four_star_hard.saturating_sub(1))).changed();
                 });
-                        ui.colored_label(MUTED, "환급은 장당 반환량과 4성 발생 모델을 지정한 조건부 추정입니다. 실제 결과·계정의 중복 보유율과 다를 수 있습니다.");
+                        if self.setup.game == Game::Neverness {
+                    ui.small("보드 10회마다 자연 획득과 별개의 추가 A급 1개를 받는 규칙을 반영합니다. 보상은 캐릭터 20%/Arc 80%로 근사하며, 보드 타일별 A급 출현률·소유 중복률은 정확히 재현되지 않습니다.");
+                }
+                ui.colored_label(MUTED, "4성/A급 확률은 단일 뽑기 전체 기준입니다. 천장·보너스 지급은 별도로 처리하며, 중복 보유량을 모르는 환급은 조건부 추정입니다.");
                     });
             }
         });

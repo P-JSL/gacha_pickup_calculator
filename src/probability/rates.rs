@@ -25,6 +25,30 @@ pub enum SoftPity {
 }
 
 impl RateSchedule {
+    /// Exact first-rare expectation for this *specified hazard schedule* at
+    /// zero pity: E[T] = sum_{k=0}^{H-1} prod_{i=1}^{k}(1-h(i)).
+    /// It is not an estimate of the game's unpublished server-side hazard.
+    pub fn expected_first_rare_pulls(&self, mode: RateMode) -> Option<f64> {
+        if self.hard == 0 || self.hard > 500 || !self.base.is_finite()
+            || !(0.0..=1.0).contains(&self.base)
+        {
+            return None;
+        }
+        let mut survival = 1.0;
+        let mut expected = 0.0;
+        for draw in 1..=self.hard {
+            expected += survival;
+            survival *= 1.0 - self.chance(draw, mode);
+        }
+        Some(expected)
+    }
+
+    /// Renewal rate for an unlimited sequence of rare outcomes in this model;
+    /// it is not the featured-character probability or the published base rate.
+    pub fn implied_rare_rate(&self, mode: RateMode) -> Option<f64> {
+        self.expected_first_rare_pulls(mode).map(|mean| 1.0 / mean)
+    }
+
     pub fn chance(&self, next: usize, mode: RateMode) -> f64 {
         if next >= self.hard {
             return 1.0;
@@ -80,3 +104,36 @@ fn nte_community_hazard(next: usize) -> f64 {
     0.0
 }
 
+
+#[cfg(test)]
+mod expectation_tests {
+    use super::*;
+
+    #[test]
+    fn survival_sum_matches_closed_form_and_hard_guarantee() {
+        let model = RateSchedule {
+            base: 0.1, hard: 3, soft: SoftPity::None
+        };
+        let mean = model.expected_first_rare_pulls(RateMode::PublishedOnly).unwrap();
+        assert!((mean - (1.0 + 0.9 + 0.9 * 0.9)).abs() < 1e-12);
+        assert!((model.implied_rare_rate(RateMode::PublishedOnly).unwrap()
+            - 1.0 / 2.71).abs() < 1e-12);
+        let certain = RateSchedule { base: 0.0, hard: 80, soft: SoftPity::None };
+        assert_eq!(certain.expected_first_rare_pulls(RateMode::PublishedOnly), Some(80.0));
+    }
+
+    #[test]
+    fn calibration_profiles_do_not_confuse_base_and_consolidated_rates() {
+        let character = RateSchedule {
+            base: 0.006, hard: 90,
+            soft: SoftPity::Linear { starts_at: 74, increment: 0.06 }
+        };
+        // Community profile is an empirical approximation of the published
+        // 1.6% consolidated 5★ rate; the official exact hazard is unknown.
+        let published = character.implied_rare_rate(RateMode::PublishedOnly).unwrap();
+        let estimate = character.implied_rare_rate(RateMode::CommunityEstimate).unwrap();
+        assert!((published - 0.0143472426868).abs() < 1e-7);
+        assert!((estimate - 0.016).abs() < 0.0002);
+        assert!(estimate > published);
+    }
+}

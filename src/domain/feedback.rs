@@ -18,7 +18,7 @@ const MIN_SAMPLES_PER_WORKER: usize = 4_096;
 #[path = "feedback/config.rs"] mod config;
 #[path = "feedback/results.rs"] mod results;
 pub use config::FeedbackConfig;
-pub use results::{FeedbackEstimate, RefundScenario, SuccessfulBudgetMeans};
+pub use results::{FeedbackEstimate, RefundScenario, SuccessfulBudgetMeans, QuantileConfidenceBand};
 
 struct SplitMix64(u64);
 impl SplitMix64 {
@@ -45,8 +45,6 @@ struct Wallet {
     wavebands_bought: usize,
     board_dice_earned: usize,
     record_disc_units: usize,
-    stella_first_ten_remaining: usize,
-    reward_multiplier: usize,
 }
 impl Wallet {
     fn new(model: &FeedbackConfig) -> Self {
@@ -54,8 +52,7 @@ impl Wallet {
             common_spent: 0, initial_flexible_required: 0, raw_pulls: 0,
             waveband_points_spent: 0, wavebands_bought: 0,
             board_dice_earned: 0, record_disc_units: 0,
-            stella_first_ten_remaining: model.stella_first_ten_remaining,
-            reward_multiplier: 1 }
+            }
     }
     /// The ticket for the current pull is payable only with returns obtained *before* that pull.
     fn pay(&mut self, dedicated_remaining: &mut usize) {
@@ -67,20 +64,15 @@ impl Wallet {
         }
     }
     fn refund(&mut self, reward: usize) {
-        self.points = self.points.saturating_add(
-            reward.saturating_mul(self.reward_multiplier));
+        self.points = self.points.saturating_add(reward);
     }
 
-    /// Activate optional account-specific first-ten rewards and accrue record-only discs.
+    /// Standard Stella character draw: 30 Gold Discs, usable only on records.
+    /// An optional initial paid 10-pull grants its additional 600 discs in
+    /// roll_featured; it never multiplies Expert Permits.
     fn begin_character_pull(&mut self, model: &FeedbackConfig) {
         self.record_disc_units = self.record_disc_units
             .saturating_add(model.stella_record_discs_per_character_pull);
-        self.reward_multiplier = if self.stella_first_ten_remaining > 0 {
-            self.stella_first_ten_remaining -= 1;
-            3
-        } else {
-            1
-        };
     }
     fn reconcile_funding(&mut self) {
         // Corals spent on a Waveband cannot also subsidize a ticket.

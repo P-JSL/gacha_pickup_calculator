@@ -45,7 +45,8 @@ pub struct FeedbackConfig {
     pub nte_five_dice_chance: f64,
     /// Stella Sora limited recruitment awards Gold Disc units, never character passes.
     pub stella_record_discs_per_character_pull: usize,
-    /// Account-specific first-time boosted character draws; zero if unknown or claimed.
+    /// 0 = no eligible first 10-pull; 10 = explicitly buy the first 10-pull.
+    /// Its bonus is 900 versus 300 Gold Discs, NOT 3× Expert Permits.
     pub stella_first_ten_remaining: usize,
 }
 
@@ -67,9 +68,9 @@ impl FeedbackConfig {
             },
             Game::WutheringWaves => Self {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
-                featured_first: 15, featured_duplicate: 15, featured_maxed: 15,
+                featured_first: 15, featured_duplicate: 15, featured_maxed: 40,
                 off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
-                four_star_reward: 3, four_star_maxed: 3, four_star_maxed_share: 0.0,
+                four_star_reward: 3, four_star_maxed: 8, four_star_maxed_share: 0.0,
                 weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -83,7 +84,7 @@ impl FeedbackConfig {
                 // missing board-tile rewards remain community assumptions.
                 enabled: true, points_per_ticket: 24, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40, featured_maxed: 80,
-                off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
+                off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 6, four_star_maxed: 12, four_star_maxed_share: 0.0,
                 weapon_four_star_reward: 4,
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
@@ -99,11 +100,11 @@ impl FeedbackConfig {
                 // First-time featured 5★ collections award no duplicate permits.
                 // The 4★ return assumes all 4★ results are already owned.
                 enabled: true, points_per_ticket: 100, initial_points: 0,
-                featured_first: 0, featured_duplicate: 200, featured_maxed: 200,
+                featured_first: 0, featured_duplicate: 200, featured_maxed: 500,
                 off_banner_rare: 200, weapon_first: 0, weapon_rare: 200,
-                four_star_reward: 40, four_star_maxed: 40, four_star_maxed_share: 0.0,
+                four_star_reward: 40, four_star_maxed: 70, four_star_maxed_share: 0.0,
                 weapon_four_star_reward: 40,
-                character_four_star_rate: 0.08, weapon_four_star_rate: 0.08,
+                character_four_star_rate: 0.04, weapon_four_star_rate: 0.08,
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
                 weapon_four_star_pity: 0, samples: 20_000, wuwa_waveband_max: 0, wuwa_waveband_cost: 360,
@@ -129,7 +130,7 @@ impl FeedbackConfig {
             || !valid_probability(self.nte_five_dice_chance)
             || self.nte_one_die_chance + self.nte_five_dice_chance > 1.0
             || self.stella_record_discs_per_character_pull > 300
-            || self.stella_first_ten_remaining > 10 {
+            || !matches!(self.stella_first_ten_remaining, 0 | 10) {
             return Err("환급 설정의 가격·확률·표본 수가 허용 범위를 벗어났습니다.".to_owned());
         }
         Ok(())
