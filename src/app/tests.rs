@@ -209,7 +209,9 @@
         assert_eq!(path.initial_flexible_required, 1);
         assert_eq!(path.raw_pulls, path.dedicated_used
             + path.points_funded_pulls + path.initial_flexible_required);
-        assert_eq!(gap.quantile_uncertainty.unwrap().1, Some(1));
+        // At n=128, the simultaneous DKW band cannot bound the 90th
+        // percentile from above: do not fabricate a finite upper limit.
+        assert_eq!(gap.quantile_uncertainty.unwrap().1, None);
 
         // Increasing the pre-existing balance can never reduce the success
         // probability, and no refund may subsidize the first payment.
