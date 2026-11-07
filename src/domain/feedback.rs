@@ -644,7 +644,7 @@ fn simulate_chunk(slots: &mut [RefundScenario], start_index: usize, setup: &Game
     let mut totals = TrialTotals::default();
     for (offset, slot) in slots.iter_mut().enumerate() {
         // One atomic check per 256 paths bounds cancellation overhead.
-        if offset % 256 == 0 && is_cancelled(cancellation) { return None; }
+        if offset.is_multiple_of(256) && is_cancelled(cancellation) { return None; }
         let mut rng = SplitMix64(sample_seed(start_index + offset));
         let mut wallet = Wallet::new(model);
         let mut dedicated_character = setup.character_dedicated;
