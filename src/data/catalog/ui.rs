@@ -43,7 +43,7 @@ impl CatalogUi {
 
     /// Only verified local, bounded PNGs are loaded. Never perform an
     /// HTTP request or parse scripts from the image catalog at runtime.
-    fn fetch_icon(relative: &str) -> Option<egui::ColorImage> {
+    pub(super) fn fetch_icon(relative: &str) -> Option<egui::ColorImage> {
         let mut parts = relative.split('/');
         let game = parts.next()?;
         let file = parts.next()?;
