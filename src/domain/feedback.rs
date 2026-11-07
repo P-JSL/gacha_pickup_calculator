@@ -1241,4 +1241,31 @@ mod tests {
         assert!(model.validate().is_err());
     }
 
+
+    #[test]
+    fn sampled_simple_banner_agrees_with_independent_exact_dp() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 0.5, hard: 2, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut model = FeedbackConfig::for_game(Game::StarRail);
+        model.samples = 25_000;
+        model.four_star_reward = 0;
+        model.four_star_maxed = 0;
+        model.weapon_four_star_reward = 0;
+        model.off_banner_rare = 0;
+        let exact = setup.character.distribution(RateMode::PublishedOnly).unwrap();
+        let sampled = estimate(&setup, RateMode::PublishedOnly, &model).unwrap();
+        assert!((sampled.probability(1).0 - exact.at(1)).abs() < 0.025);
+        assert!((sampled.average_raw - exact.mean).abs() < 0.025);
+        assert_eq!(sampled.budgets.len(), model.samples);
+        assert_eq!(sampled.scenarios.len(), model.samples);
+    }
+
 }
