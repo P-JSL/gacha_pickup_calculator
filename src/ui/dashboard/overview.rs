@@ -87,6 +87,36 @@ impl Calculator {
                         "Recalculate to update funding estimate")).color(GOLD));
                 }
             });
+
+        } else if self.calculating {
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
+            });
+        } else {
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                if let Some(error) = &self.error {
+                    ui.colored_label(Color32::LIGHT_RED, error);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Changes pending. Select Run Simulation to update.")).color(YELLOW));
+                }
+            });
+        }
+
+        ui.add_space(11.0);
+        dirty |= self.workspace_quick_settings(ui);
+        // Keep game choices and finished-input controls visible before the
+        // relatively tall charts. Expanding refund details cannot push the
+        // game selector below the desktop viewport.
+        if let Some(stats) = self.visible_stats() {
+            let free_pulls = self.setup.available_flexible();
+            let chance = self.current_goal_funding().map_or_else(
+                || stats.feedback.as_ref().map_or(
+                    stats.raw_shared.at(free_pulls),
+                    |f| f.probability(free_pulls).0
+                ),
+                |funding| funding.current_probability
+            );
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
@@ -130,23 +160,7 @@ impl Calculator {
                     format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
-        } else if self.calculating {
-            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
-                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
-            });
-        } else {
-            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
-                if let Some(error) = &self.error {
-                    ui.colored_label(Color32::LIGHT_RED, error);
-                } else {
-                    ui.label(RichText::new(t(language,
-                        "Changes pending. Select Run Simulation to update.")).color(YELLOW));
-                }
-            });
         }
-
-        ui.add_space(11.0);
-        dirty |= self.workspace_quick_settings(ui);
         if let Some(stats) = self.visible_stats() {
             if let Some(strategies) = &stats.wuwa_strategies {
                 ui.add_space(10.0);
