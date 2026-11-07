@@ -2,7 +2,9 @@
 
 use eframe::egui::{self, Color32, RichText};
 use egui_plot::{Legend, Line, Plot, PlotPoints};
-use gacha_pickup_calculator::feedback::{estimate, estimate_with_options, FeedbackConfig, FeedbackEstimate, SuccessfulBudgetMeans};
+use gacha_pickup_calculator::feedback::{estimate_with_options, FeedbackConfig, FeedbackEstimate, SuccessfulBudgetMeans};
+#[cfg(test)]
+use gacha_pickup_calculator::feedback::estimate;
 use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
