@@ -125,12 +125,12 @@ impl Calculator {
                                 .selected_text(if self.target_refine == 0 {
                                     t(language, "No target").to_owned()
                                 } else {
-                                    format!("S{} / {}", self.target_refine, self.target_refine)
+                                    format!("S{} / {}", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine)
                                 })
                                 .show_ui(ui, |ui| {
                                     for level in 0..=self.setup.game.max_weapon_copies() {
                                         let label = if level == 0 { t(language, "Not needed").to_owned() }
-                                            else { format!("S{level} / {level}") };
+                                            else { format!("S{} / {level}", self.setup.game.weapon_upgrade_level(level)) };
                                         dirty |= ui.selectable_value(
                                             &mut self.target_refine, level, label
                                         ).changed();
