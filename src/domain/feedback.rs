@@ -723,13 +723,17 @@ fn estimate_with_workers(setup: &GameSetup, mode: RateMode, model: &FeedbackConf
     raw_pulls.try_reserve_exact(model.samples).map_err(|_| {
         "시뮬레이션 결과 배열을 위한 메모리를 확보할 수 없습니다.".to_owned()
     })?;
+    // Retain the original per-trial raw-pull order before sorting scenarios.
     for scenario in &scenarios {
-        budgets.push(scenario.initial_flexible_required);
         raw_pulls.push(scenario.raw_pulls);
     }
     scenarios.sort_unstable_by_key(|scenario|
         (scenario.initial_flexible_required, scenario.raw_pulls));
-    budgets.sort_unstable();
+    // Sorting scenarios by budget already orders the budget CDF. Avoid a
+    // redundant second O(N log N) sort for large trial counts.
+    for scenario in &scenarios {
+        budgets.push(scenario.initial_flexible_required);
+    }
 
     // Integer aggregation makes the public means bit-identical for every
     // worker count; floating-point division happens only once per metric.
