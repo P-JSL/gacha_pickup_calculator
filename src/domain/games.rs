@@ -72,6 +72,16 @@ impl Game {
     pub fn cost_per_pull(self) -> usize {
         if self == Self::StellaSora { 300 } else { 160 }
     }
+    /// Stella Sora has five upgrades beyond the first copy (six total).
+    /// The other three supported games use six upgrades (seven total).
+    pub fn max_character_copies(self) -> usize {
+        if self == Self::StellaSora { 6 } else { 7 }
+    }
+    /// Stella Sora Lost Records also have five upgrades (six copies).
+    /// Other featured equipment goals top out at five copies.
+    pub fn max_weapon_copies(self) -> usize {
+        if self == Self::StellaSora { 6 } else { 5 }
+    }
     pub fn special_notes(self) -> &'static str {
         match self {
             Self::StarRail => "일반 한정 캐릭터 90회/50:50, 광추 80회/75:25; 픽업 실패 후 다음 5성 확정. 소프트 천장 증가는 비공식 모델.",
@@ -138,10 +148,10 @@ impl GameSetup {
             ),
             Game::StellaSora => (
                 Banner { rule: BannerRule::FeaturedCounter { featured_rate: 0.01, hard_featured: 160 },
-                    pity: 0, guaranteed: false, target_copies: 7,
+                    pity: 0, guaranteed: false, target_copies: 6,
                     spark: Some(Spark { at: 120, progress: 0, used: false }), any_rare_pity: 0 },
                 Banner { rule: BannerRule::FeaturedCounter { featured_rate: 0.015, hard_featured: 120 },
-                    pity: 0, guaranteed: false, target_copies: 5, spark: None, any_rare_pity: 0 },
+                    pity: 0, guaranteed: false, target_copies: 6, spark: None, any_rare_pity: 0 },
             ),
         };
         Self { game, character, weapon, character_owned: 0, weapon_owned: 0,
