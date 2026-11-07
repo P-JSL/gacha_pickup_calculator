@@ -2,9 +2,11 @@ name: CodeQL security analysis
 
 # Keep required check contexts present on documentation-only PRs. Job-level
 # skipping (not on.paths) prevents permanently pending branch-protection checks.
+# Keep CodeQL analysis running once started, including action preparation.
+# Queued older PR runs may be superseded; never interrupt active runners.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 on:
   push:
