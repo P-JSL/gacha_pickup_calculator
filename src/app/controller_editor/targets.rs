@@ -24,11 +24,11 @@ impl Calculator {
                 self.catalog_selector(&mut cols[1], catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("refine").width(175.0)
                     .selected_text(if self.target_refine == 0 { "필요 없음".to_owned() }
-                        else { format!("S{} · 총 {}장", self.target_refine, self.target_refine) })
+                        else { format!("S{} · 총 {}장", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine) })
                     .show_ui(&mut cols[1], |ui| {
                         for level in 0..=self.setup.game.max_weapon_copies() {
                             let label = if level == 0 { "사용하지 않음".to_string() }
-                                else { format!("S{level} / {level}장") };
+                                else { format!("S{} / {level}장", self.setup.game.weapon_upgrade_level(level)) };
                             dirty |= ui.selectable_value(&mut self.target_refine, level, label).changed();
                         }
                     });
@@ -51,12 +51,12 @@ impl Calculator {
                 self.catalog_selector(ui, catalog::Kind::Weapon);
                 egui::ComboBox::from_id_salt("weapon_only_goal")
                     .selected_text(if self.target_refine == 0 { "필요 없음".into() }
-                        else { format!("S{} · {}장", self.target_refine, self.target_refine) })
+                        else { format!("S{} · {}장", self.setup.game.weapon_upgrade_level(self.target_refine), self.target_refine) })
                     .show_ui(ui, |ui| {
                         for count in 0..=self.setup.game.max_weapon_copies() {
                             dirty |= ui.selectable_value(&mut self.target_refine, count,
                                 if count == 0 { "필요 없음".into() }
-                                else { format!("S{count} / {count}장") }).changed();
+                                else { format!("S{} / {count}장", self.setup.game.weapon_upgrade_level(count)) }).changed();
                         }
                     });
                 ui.horizontal(|ui| {
