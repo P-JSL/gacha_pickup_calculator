@@ -21,7 +21,9 @@ pub(crate) fn remaining_shared_distribution(
     residual(character, dedicated_character).combine(&residual(weapon, dedicated_weapon))
 }
 
-/// One O(n log n) dense distribution join and one O(log n) quantile lookup.
+/// Exact-reference test helper. Runtime now retains the joined CDF from
+/// the calculation worker; do not rebuild the same convolution on each frame.
+#[cfg(test)]
 pub(crate) fn minimum_shared_pulls(
     character: &Distribution,
     weapon: &Distribution,
