@@ -28,7 +28,7 @@ pub(crate) fn edit_ticket_inventory(ui: &mut egui::Ui, setup: &mut GameSetup, ro
 }
 
 /// Match simulation assumptions across all three WuWa coral strategies.
-pub(crate) fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[FeedbackEstimate],
+pub(crate) fn wuwa_strategy_table(ui: &mut egui::Ui, strategies: &[Arc<FeedbackEstimate>],
     setup: &GameSetup, confidence: usize) {
     let owned = setup.available_flexible();
     let threshold = confidence as f64 / 100.0;
