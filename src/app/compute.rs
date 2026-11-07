@@ -4,8 +4,8 @@ pub(crate) struct Computed {
     pub(crate) character: Distribution,
     pub(crate) weapon: Distribution,
     pub(crate) combined: Distribution,
-    pub(crate) feedback: Option<FeedbackEstimate>,
-    pub(crate) wuwa_strategies: Option<Vec<FeedbackEstimate>>,
+    pub(crate) feedback: Option<Arc<FeedbackEstimate>>,
+    pub(crate) wuwa_strategies: Option<Vec<Arc<FeedbackEstimate>>>,
     pub(crate) exact_shared_required: Option<[usize; 6]>,
 }
 
@@ -32,12 +32,13 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
         for max_wavebands in 0..=2 {
             let mut variant = request.feedback_config.clone();
             variant.wuwa_waveband_max = max_wavebands;
-            strategies.push(estimate(&request.setup, request.mode, &variant)?);
+            strategies.push(Arc::new(estimate(&request.setup, request.mode, &variant)?));
         }
-        let selected = strategies[request.feedback_config.wuwa_waveband_max.min(2)].clone();
+        // Reuse the selected scenario set instead of cloning up to a million trials.
+        let selected = Arc::clone(&strategies[request.feedback_config.wuwa_waveband_max.min(2)]);
         (Some(selected), Some(strategies))
     } else if request.feedback_config.enabled {
-        (Some(estimate(&request.setup, request.mode, &request.feedback_config)?), None)
+        (Some(Arc::new(estimate(&request.setup, request.mode, &request.feedback_config)?)), None)
     } else {
         (None, None)
     };
@@ -65,3 +66,24 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
     })
 }
 
+
+
+#[cfg(test)]
+mod parallel_result_tests {
+    use super::*;
+
+    #[test]
+    fn chosen_wuwa_strategy_shares_trial_storage_without_cloning() {
+        let mut setup = GameSetup::new(Game::WutheringWaves);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::WutheringWaves);
+        config.samples = 64;
+        config.wuwa_waveband_max = 1;
+        let result = compute(&CalculationRequest {
+            generation: 1, setup, mode: RateMode::PublishedOnly, feedback_config: config,
+        }).unwrap();
+        let strategies = result.wuwa_strategies.as_ref().unwrap();
+        assert_eq!(strategies.len(), 3);
+        assert!(Arc::ptr_eq(result.feedback.as_ref().unwrap(), &strategies[1]));
+    }
+}

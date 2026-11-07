@@ -9,6 +9,7 @@ use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedB
 use gacha_pickup_calculator::observations::{parse_observation_csv, ObservationDataset};
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[path = "ui/dashboard.rs"] mod dashboard_ui;
@@ -198,7 +199,7 @@ mod chart_tests {
         let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
         let stats = Computed {
             combined: character.combine(&weapon),
-            character, weapon, feedback: Some(feedback),
+            character, weapon, feedback: Some(Arc::new(feedback)),
             wuwa_strategies: None, exact_shared_required: None,
         };
         let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
