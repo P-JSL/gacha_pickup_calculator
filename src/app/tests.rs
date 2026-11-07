@@ -207,6 +207,29 @@
                    gap.raw_probability);
         assert_eq!(ChartSource::Refund(stats.feedback.as_ref().unwrap())
                    .probability(setup.flexible), gap.current_probability);
+        let refunded = ChartSeries {
+            label: "환급 재투입 후",
+            source: ChartSource::Refund(stats.feedback.as_ref().unwrap()),
+            color: MINT,
+        };
+        let unrefunded = ChartSeries {
+            label: "환급 전",
+            source: ChartSource::Exact(&stats.raw_shared),
+            color: PRIMARY,
+        };
+        // Regardless of draw-order, a hovered amount must prominently
+        // report the WITH-refund probability (100%), not the raw 0%.
+        for reversed in [false, true] {
+            let series = if reversed {
+                [refunded, unrefunded]
+            } else {
+                [unrefunded, refunded]
+            };
+            let lines = chart_tooltip_lines(&series, setup.flexible, Language::Korean);
+            assert_eq!(lines.len(), 2);
+            assert_eq!(lines[0].0, "1 뽑 이내 · 환급 재투입 포함 100.0%");
+            assert_eq!(lines[1].0, "환급 전(참고) 0.0%");
+        }
         assert!(gap.probability_uncertainty.is_some());
         let path = gap.boundary_path.unwrap();
         assert_eq!(path.raw_pulls, 3);
@@ -335,12 +358,24 @@
         let graph = egui::Rect::from_min_size(egui::pos2(40.0, 20.0), egui::vec2(170.0, 90.0));
         for pos in [graph.left_top(), graph.right_top(), graph.left_bottom(),
                     graph.right_bottom(), graph.center()] {
-            let rect = chart_tooltip_rect(graph, pos, 340.0, 22.0);
+            let rect = chart_tooltip_rect(graph, pos, 340.0, 38.0);
             assert!(graph.contains(rect.left_top()));
             assert!(graph.contains(rect.right_bottom()));
             assert!(rect.width() <= graph.width());
             assert!(rect.height() <= graph.height());
         }
+    }
+
+    #[test]
+    fn single_banner_tooltip_keeps_original_probability_when_no_refund_series_exists() {
+        let distribution = Distribution::new(vec![0.0, 0.755, 0.245]);
+        let series = [ChartSeries {
+            label: "캐릭터", source: ChartSource::Exact(&distribution),
+            color: MINT,
+        }];
+        let lines = chart_tooltip_lines(&series, 1, Language::Korean);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].0, "1 뽑 이내 · 캐릭터 75.5%");
     }
 
     #[test]
