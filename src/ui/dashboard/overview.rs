@@ -92,7 +92,7 @@ impl Calculator {
                     probability_card(&mut columns[0], t(language, "Character Probability"),
                         format!("E{} {}: {:.2}%", self.target_eid, t(language, "Success"), char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
                     probability_card(&mut columns[1], &format!("{banner_name} {}", t(language, "Probability")),
-                        format!("S{} {}: {:.2}%", self.target_refine, t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
+                        format!("S{} {}: {:.2}%", self.setup.game.weapon_upgrade_level(self.target_refine), t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
                     probability_card(&mut columns[2], t(language, "Overall Result"),
                         format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
