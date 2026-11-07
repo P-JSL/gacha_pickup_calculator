@@ -15,11 +15,26 @@ impl Calculator {
                 self.setup.weapon_dedicated,
                 free_pulls,
             );
-            let chance = stats.feedback.as_ref().map(|f| f.probability(free_pulls).0)
-                .unwrap_or(raw.success_probability);
-            let expected = stats.feedback.as_ref().map(|f| f.average_raw)
-                .unwrap_or(stats.combined.mean);
-            let meta = if stats.feedback.is_some() { t(language, "Including recycled refunds") } else { t(language, "Accurate probability DP") };
+            let chance = funding.map_or_else(|| stats.feedback.as_ref()
+                .map_or(raw.success_probability, |f| f.probability(free_pulls).0),
+                |gap| gap.current_probability);
+            let expected = stats.feedback.as_ref().map_or(stats.combined.mean, |f| f.average_raw);
+            let meta = funding.map_or_else(
+                || if stats.feedback.is_some() {
+                    t(language, "Including recycled refunds").to_owned()
+                } else {
+                    t(language, "Accurate probability DP").to_owned()
+                },
+                |gap| if gap.uses_refunds {
+                    format!("환급 전 {:.2}% → 재투입 후 {:.2}%",
+                        gap.raw_probability * 100.0, gap.current_probability * 100.0)
+                } else { t(language, "Accurate probability DP").to_owned() },
+            );
+            let mean_note = stats.feedback.as_ref().map_or_else(
+                || t(language, "Average pulls to all targets").to_owned(),
+                |f| format!("총 시도 평균 · 환급 후 최초 자유권 평균 {:.1}장",
+                    f.average_initial_flexible),
+            );
             if self.input_needs_calculation && !self.calculating {
                 ui.label(RichText::new(t(language, "Changes pending. Select Run Simulation to update."))
                     .color(YELLOW).size(10.0));
@@ -48,9 +63,9 @@ impl Calculator {
                 };
                 overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
                 overview_metric(&mut columns[1], 1, t(language, "Target Success Rate"),
-                    format!("{:.2}%", chance * 100.0), meta.to_owned(), SUCCESS);
+                    format!("{:.2}%", chance * 100.0), meta, SUCCESS);
                 overview_metric(&mut columns[2], 2, t(language, "Expected Pulls"),
-                    format!("{expected:.1}"), t(language, "Average pulls to all targets").to_owned(), PINK);
+                    format!("{expected:.1}"), mean_note, PINK);
                 let (value, note, color) = funding.map_or_else(
                     || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
                     |g| (format!("+{} {}", g.additional_shared,
@@ -84,9 +99,17 @@ impl Calculator {
             let chart_weapon = [ChartSeries {
                 label: banner_name, source: ChartSource::Exact(&stats.weapon), color: YELLOW,
             }];
-            let chart_total = [ChartSeries {
-                label: t(language, "Overall"), source: ChartSource::Exact(&stats.combined), color: PINK,
+            // The overall chart and the success-rate KPI now both use shared
+            // initial tickets; the old total-pulls curve had a different X-axis
+            // and could falsely suggest refunds were not being applied.
+            let mut chart_total = vec![ChartSeries {
+                label: "환급 전", source: ChartSource::Exact(&stats.raw_shared), color: MUTED,
             }];
+            if let Some(refund) = stats.feedback.as_ref() {
+                chart_total.push(ChartSeries {
+                    label: "환급 재투입 후", source: ChartSource::Refund(refund), color: PINK,
+                });
+            }
             if ui.available_width() >= 900.0 {
                 ui.columns(3, |columns| {
                     probability_card(&mut columns[0], t(language, "Character Probability"),
@@ -105,6 +128,9 @@ impl Calculator {
                 ui.add_space(8.0);
                 probability_card(ui, t(language, "Overall Result"),
                     format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
+            }
+            if stats.feedback.is_some() {
+                ui.small("개별 캐릭터·장비 그래프는 환급 전 단독 참고값입니다. 전체 그래프만 두 배너의 공동 재화 및 환급 재투입을 반영한 직접 비교입니다.");
             }
 
         } else if self.calculating {
