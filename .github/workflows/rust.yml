@@ -1,9 +1,11 @@
 name: Rust CI and Release
 
-# Supersede older PR attempts, never interrupt an in-progress main release.
+# Do not cancel running runners when another PR commit is pushed.
+# GitHub may replace one pending same-branch run, but a started checkout,
+# compilation or release-validation job finishes without spurious cancellation.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 on:
   push:
