@@ -20,7 +20,8 @@ pub(super) enum BannerKind { Character, Weapon }
 /// A user-entered pair summing above 100% is impossible; 5★ precedence
 /// caps the achievable 4★ rate. Duplicates remain explicit account assumptions.
 pub(super) fn maybe_four_star(rng: &mut SplitMix64, model: &FeedbackConfig, kind: BannerKind,
-                   four_pity: &mut usize, rare: bool, rare_probability: f64) -> bool {
+                   four_pity: &mut usize, rare: bool, rare_probability: f64,
+                   apply_ten_pull_guarantee: bool) -> bool {
     if rare { *four_pity = 0; return false; }
     let base_four = match kind {
         BannerKind::Character => model.character_four_star_rate,
@@ -28,7 +29,8 @@ pub(super) fn maybe_four_star(rng: &mut SplitMix64, model: &FeedbackConfig, kind
     };
     let chance = (base_four / (1.0 - rare_probability).max(f64::EPSILON))
         .min(1.0);
-    let hit = *four_pity + 1 >= model.four_star_hard || rng.hits(chance);
+    let hit = (apply_ten_pull_guarantee && *four_pity + 1 >= model.four_star_hard)
+        || rng.hits(chance);
     if hit { *four_pity = 0; } else { *four_pity += 1; }
     hit
 }
@@ -69,6 +71,13 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
         BannerKind::Character => model.character_four_star_pity,
         BannerKind::Weapon => model.weapon_four_star_pity,
     };
+    // NTE's every-10-dice A-rank gift is an EXTRA item, not a replacement
+    // for the rarest/4★ outcome. The current saved count carries between
+    // limited boards; the 20/80 character/Arc split is a published approximation.
+    let mut nte_bonus_progress = if game == Game::Neverness
+        && matches!(kind, BannerKind::Character) {
+        model.character_four_star_pity
+    } else { 0 };
     while won < rule.target_copies {
         wallet.pay(dedicated);
         if matches!(kind, BannerKind::Character) {
@@ -92,7 +101,8 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
         }
         let rare_probability = rarity.chance(pity + 1, mode);
         let rare = rng.hits(rare_probability);
-        if maybe_four_star(rng, model, kind, &mut four_pity, rare, rare_probability) {
+        if maybe_four_star(rng, model, kind, &mut four_pity, rare,
+                           rare_probability, game != Game::Neverness) {
             wallet.refund(match kind {
                 BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
@@ -109,6 +119,20 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
                 guaranteed = true;
             }
         } else { pity += 1; }
+        if game == Game::Neverness && matches!(kind, BannerKind::Character) {
+            nte_bonus_progress += 1;
+            if nte_bonus_progress >= 10 {
+                nte_bonus_progress = 0;
+                let bonus = if rng.hits(0.20) {
+                    character_four_star_refund(rng, model)
+                } else {
+                    model.weapon_four_star_reward
+                };
+                // A 10-roll gift is acquired *after* funding roll 10,
+                // and can only subsidize subsequent rolls.
+                wallet.refund(bonus);
+            }
+        }
         if waveband_limit > 0 {
             buy_available_wavebands(wallet, model, owned, &mut won, rule.target_copies,
                 waveband_limit, &mut bought);
@@ -161,7 +185,7 @@ pub(super) fn roll_featured(rng: &mut SplitMix64, rule: &Banner, kind: BannerKin
             (off_rate / (1.0 - featured_probability).max(f64::EPSILON)).min(1.0));
         let five_rate = (featured_probability + off_rate).min(1.0);
         if maybe_four_star(rng, model, kind, &mut four_pity,
-                           success || off_rare, five_rate) {
+                           success || off_rare, five_rate, true) {
             wallet.refund(match kind {
                 BannerKind::Character => character_four_star_refund(rng, model),
                 BannerKind::Weapon => model.weapon_four_star_reward,
@@ -203,7 +227,7 @@ pub(super) fn roll_arc(rng: &mut SplitMix64, rule: &Banner, model: &FeedbackConf
             let x = rng.uniform();
             if x < 0.0075 { featured += 1; four_pity = 0; }
             else if x < 0.03 { off += 1; four_pity = 0; }
-            else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false, 0.03) {
+            else if maybe_four_star(rng, model, BannerKind::Weapon, &mut four_pity, false, 0.03, true) {
                 pending_four_star_points = pending_four_star_points
                     .saturating_add(model.weapon_four_star_reward);
             }
