@@ -169,7 +169,6 @@ fn run_update(send: &Sender<UpdateEvent>) {
 use network::*;
 
 #[path = "runtime_updates/cache.rs"] mod cache;
-pub(crate) use cache::cache_root;
 use cache::{read_active_bundle, fetch_and_stage};
 #[cfg(test)]
 use cache::{read_bounded_cache, source_url, write_atomic};
