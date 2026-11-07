@@ -159,7 +159,7 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
         // results at the same confidence, dedicated inventory, and shared
         // funding axis. Never add two standalone target quantiles.
         ui.label(RichText::new("전체 목표 · 환급 재투입 계산 내역")
-            .strong().color(SUCCESS).size(13.0));
+            .strong().color(MINT).size(13.0));
         ui.label(format!(
             "{}% 달성 필요: 환급 전 {}장 → 환급 재투입 후 {}장 · 현재 보유 환산 {}장 → 추가 {}장",
             gap.confidence, gap.raw_required_shared, gap.required_shared,
@@ -168,7 +168,7 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
         let difference = gap.quantile_change;
         ui.label(RichText::new(format!(
             "동일 달성률의 필요량 차이: {difference:+}장 (분위수 차이이며 실제 환급권 수량은 아님)"
-        )).color(if difference >= 0 { SUCCESS } else { GOLD }).size(11.0));
+        )).color(if difference >= 0 { MINT } else { GOLD }).size(11.0));
         ui.label(format!(
             "현재 보유량 기준 전체 목표 확률: 환급 전 {:.2}% → 환급 재투입 후 {:.2}%",
             gap.raw_probability * 100.0, gap.current_probability * 100.0
