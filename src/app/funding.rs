@@ -33,9 +33,19 @@ pub(crate) fn minimum_shared_pulls(
         .quantile(confidence)
 }
 
-/// The funding shortfall is always based on the latest completed calculation.
-/// A single-banner requirement is informative, not an amount to add to the
-/// other banner: the shared pool and recycled refunds fund both.
+/// One *actual* Monte Carlo path at the confidence boundary, not the
+/// difference between two independently selected distribution quantiles.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RefundBoundaryPath {
+    pub(crate) raw_pulls: usize,
+    pub(crate) dedicated_used: usize,
+    pub(crate) points_funded_pulls: usize,
+    pub(crate) initial_flexible_required: usize,
+}
+
+/// The overall shortfall is calculated from the same shared-ticket CDF used
+/// for the displayed success rate. Individual banners remain refund-free
+/// reference values and must never be summed into the total.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct GoalFunding {
     pub(crate) confidence: usize,
@@ -52,6 +62,17 @@ pub(crate) struct GoalFunding {
     pub(crate) dedicated_character: usize,
     pub(crate) dedicated_weapon: usize,
     pub(crate) required_shared: usize,
+    /// Exact no-refund comparison at the same confidence and same dedicated
+    /// inventory. Never derive this by summing standalone quantiles.
+    pub(crate) raw_required_shared: usize,
+    /// Difference in overall quantiles, not the number of redeemed tickets
+    /// in any one trial; can be negative under optional store strategies.
+    pub(crate) quantile_change: i64,
+    pub(crate) boundary_path: Option<RefundBoundaryPath>,
+    pub(crate) quantile_uncertainty: Option<(usize, Option<usize>, f64)>,
+    pub(crate) current_probability: f64,
+    pub(crate) raw_probability: f64,
+    pub(crate) probability_uncertainty: Option<(f64, f64)>,
     pub(crate) available_shared: usize,
     pub(crate) additional_shared: usize,
     pub(crate) additional_currency: usize,
@@ -67,18 +88,32 @@ impl GoalFunding {
         confidence: usize,
     ) -> Self {
         let probability = confidence as f64 / 100.0;
+        let raw_required_shared = results.exact_shared_required
+            .and_then(|thresholds| CONFIDENCE_LEVELS.iter()
+                .position(|&p| p == confidence).map(|i| thresholds[i]))
+            .unwrap_or_else(|| results.raw_shared.quantile(probability));
         let required_shared = results.feedback.as_ref()
-            .map_or_else(|| {
-                results.exact_shared_required
-                    .and_then(|thresholds| CONFIDENCE_LEVELS.iter()
-                        .position(|&p| p == confidence).map(|i| thresholds[i]))
-                    .unwrap_or_else(|| minimum_shared_pulls(
-                        &results.character, &results.weapon,
-                        setup.character_dedicated, setup.weapon_dedicated, probability))
-            }, |f| f.quantile(probability));
+            .map_or(raw_required_shared, |f| f.quantile(probability));
         let character_single_raw = results.character.quantile(probability);
         let weapon_single_raw = results.weapon.quantile(probability);
         let available_shared = setup.available_flexible();
+        let raw_probability = results.raw_shared.at(available_shared);
+        let (current_probability, probability_uncertainty) =
+            if let Some(refund) = results.feedback.as_ref() {
+                let (point, low, high) = refund.probability(available_shared);
+                (point, Some((low, high)))
+            } else { (raw_probability, None) };
+        let boundary_path = results.feedback.as_ref()
+            .and_then(|refund| refund.scenario_at_quantile(probability))
+            .map(|scenario| RefundBoundaryPath {
+                raw_pulls: scenario.raw_pulls,
+                dedicated_used: scenario.dedicated_used,
+                points_funded_pulls: scenario.points_funded_pulls,
+                initial_flexible_required: scenario.initial_flexible_required,
+            });
+        let quantile_uncertainty = results.feedback.as_ref()
+            .and_then(|refund| refund.quantile_confidence_band(probability, 0.95))
+            .map(|band| (band.lower, band.upper, band.cdf_tolerance));
         Self {
             confidence,
             character_target,
@@ -96,6 +131,13 @@ impl GoalFunding {
             dedicated_character: setup.character_dedicated,
             dedicated_weapon: setup.weapon_dedicated,
             required_shared,
+            raw_required_shared,
+            quantile_change: raw_required_shared as i64 - required_shared as i64,
+            boundary_path,
+            quantile_uncertainty,
+            current_probability,
+            raw_probability,
+            probability_uncertainty,
             available_shared,
             additional_shared: required_shared.saturating_sub(available_shared),
             additional_currency: setup.additional_currency_for(required_shared),
