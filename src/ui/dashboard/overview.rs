@@ -129,9 +129,6 @@ impl Calculator {
                 probability_card(ui, t(language, "Overall Result"),
                     format!("{}: {:.2}%", t(language, "Total Success"), chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
-            if stats.feedback.is_some() {
-                ui.small("개별 캐릭터·장비 그래프는 환급 전 단독 참고값입니다. 전체 그래프만 두 배너의 공동 재화 및 환급 재투입을 반영한 직접 비교입니다.");
-            }
 
         } else if self.calculating {
             dashboard_card(ui, t(language, "Probability Overview"), |ui| {
