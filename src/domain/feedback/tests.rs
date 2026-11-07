@@ -538,4 +538,3 @@
         assert_eq!(sequential.average_raw.to_bits(), active.average_raw.to_bits());
     }
 
-}
