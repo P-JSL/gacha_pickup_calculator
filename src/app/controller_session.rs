@@ -31,7 +31,7 @@ impl Calculator {
         // finished worker generation; it never forces automatic calculation.
         let ci_capture = std::env::var("GACHA_CI_SIMULATION_EVENTS").as_deref() == Ok("1");
         let initial_selection = GameSession::defaults(Game::StarRail);
-        let mut app = Self {
+        let app = Self {
             setup: GameSetup::new(Game::StarRail),
             mode: RateMode::PublishedOnly,
             target_eid: 0,

@@ -29,17 +29,18 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -euo pipefail -c '
     local game="$1" x y offset attempt
     # Bring the actual Run Simulation button into view; never infer when the
     # user has finished input from typing pauses or a game selection event.
-    xdotool mousemove 970 605 key ctrl+End
+    xdotool mousemove 600 630 key ctrl+End
     for attempt in $(seq 1 18); do
       sleep 0.15
       scrot -q 90 /tmp/gacha-run-button.png
       if read -r x y < <(python3 scripts/ui_capture_button.py /tmp/gacha-run-button.png 2>/dev/null); then
         break
       fi
-      xdotool mousemove 970 605 click --repeat 4 --delay 40 5
+      xdotool mousemove 600 630 click --repeat 6 --delay 40 5
     done
     if [[ -z "${x:-}" || -z "${y:-}" ]]; then
       echo "Cannot locate Run Simulation after scrolling to dashboard controls" >&2
+      python3 scripts/ui_capture_button.py /tmp/gacha-run-button.png >&2 || true
       exit 1
     fi
     offset=$(wc -l < "$log")

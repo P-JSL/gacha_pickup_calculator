@@ -24,14 +24,14 @@ def simulation_button(path: str | Path) -> tuple[int, int]:
             r, g, b = pixels[x, y]
             return 36 <= r <= 73 and 195 <= g <= 235 and 215 <= b <= 255
 
-        for y in range(210, min(835, height - 4), 2):
-            x = 670
-            while x < min(1490, width - 4):
+        for y in range(130, min(850, height - 4), 2):
+            x = 260
+            while x < min(1510, width - 4):
                 if not cyan(x, y):
                     x += 1
                     continue
                 left = x
-                while x < min(1490, width - 4) and cyan(x, y):
+                while x < min(1510, width - 4) and cyan(x, y):
                     x += 1
                 # A selected game tab is <=124px; the primary action is >=175px.
                 if 150 <= x - left <= 350:
@@ -42,7 +42,16 @@ def simulation_button(path: str | Path) -> tuple[int, int]:
             if len({y for _, _, y in values}) >= 4
         ]
         if not candidates:
-            raise ValueError(f"Run Simulation button is not visible: {path}")
+            # This error is displayed in CI after retries, so include the
+            # broadest solid-cyan run to distinguish scrolling from color drift.
+            largest = sorted((
+                (right - left, left, right, y)
+                for values in groups.values() for left, right, y in values
+            ), reverse=True)[:5]
+            raise ValueError(
+                f"Run Simulation button is not visible: {path}; "
+                f"cyan candidates={largest}; screenshot size={width}x{height}"
+            )
         best = max(candidates, key=lambda values: (
             len({y for _, _, y in values}),
             sum(right - left for left, right, _ in values),
