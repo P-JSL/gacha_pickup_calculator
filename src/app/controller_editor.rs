@@ -20,21 +20,15 @@ impl Calculator {
             }
         });
         ui.add_space(10.0);
-        section(ui, "01", t(language, "Auto calculation"), t(language, "Calculating in background. Previous results remain visible."), |ui| {
-            ui.checkbox(&mut self.ui_preferences.auto_recalculate,
-                t(language, "Update results automatically when input changes"));
-            ui.horizontal(|ui| {
-                ui.label(t(language, "Input debounce"));
-                ui.add(egui::Slider::new(&mut self.ui_preferences.debounce_ms, 100..=1000)
-                    .step_by(50.0).suffix(" ms"));
-            });
-            if !self.ui_preferences.auto_recalculate {
-                ui.label(RichText::new(
-                    "자동 계산을 꺼도 입력값은 즉시 모든 탭에 반영됩니다. Run Simulation 버튼으로 계산을 갱신하세요."
-                ).color(MUTED).size(11.0));
-                if self.input_needs_calculation && ui.button(t(language, "Run calculation now")).clicked() {
-                    self.manual_calculation_requested = true;
-                }
+        section(ui, "01", t(language, "Run Simulation"),
+            t(language, "Changes pending. Select Run Simulation to update."), |ui| {
+            ui.label(RichText::new(
+                "모든 목표·천장·보유 재화를 입력한 후 Run Simulation을 누르면 계산합니다. \
+                 입력 변경이나 게임 전환만으로는 계산을 시작하지 않습니다."
+            ).color(MUTED).size(11.0));
+            if ui.add_enabled(!self.calculating,
+                egui::Button::new(t(language, "Run Simulation"))).clicked() {
+                self.manual_calculation_requested = true;
             }
         });
         ui.add_space(10.0);

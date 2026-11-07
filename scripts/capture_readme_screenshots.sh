@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
-# Capture actual v0.1.15 desktop GUI screens with sanitized local PNG images.
-# Requires: xvfb-run, xdotool, scrot, Python3/Pillow; no generated mockups.
+# Capture real Windows/Linux-equivalent egui screens after explicit simulation.
+# No input-change auto detection or hardcoded computation sleeps are permitted.
 set -euo pipefail
 test -x target/release/gacha_pickup_calculator
 test -s target/release/Image/SHA256SUMS.txt
 mkdir -p ci-readme-shots
 
-# In the screenshot runner only, enable automatic calculation so each newly
-# selected game produces its own real probability curves. The user-facing
-# UiPreferences default remains OFF on Windows/Linux without this variable.
-xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
+xvfb-run -a -s "-screen 0 1536x864x24" bash -euo pipefail -c '
   export LIBGL_ALWAYS_SOFTWARE=1
-  export GACHA_CI_AUTO_REFRESH=1
-  ./target/release/gacha_pickup_calculator >/tmp/gacha-documentation-screens.log 2>&1 &
+  export GACHA_CI_SIMULATION_EVENTS=1
+  log=/tmp/gacha-documentation-screens.log
+  : > "$log"
+  ./target/release/gacha_pickup_calculator >"$log" 2>&1 &
   app=$!
   trap "kill $app 2>/dev/null || true" EXIT
+  python3 scripts/ui_capture_wait.py --log "$log" --game ui --timeout 30
 
   capture() {
-    sleep 2
-    kill -0 "$app" || { cat /tmp/gacha-documentation-screens.log; exit 1; }
+    kill -0 "$app" || { cat "$log"; exit 1; }
     xdotool mousemove 1490 110
     scrot -q 92 "ci-readme-shots/$1.png"
   }
@@ -26,33 +25,39 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
     xdotool mousemove 90 "$1" click 1
     sleep 2
   }
-  # Derive click coordinates from the preceding verified screenshot.
-  # Avoid creating/deleting a transient probe image, which intermittently
-  # vanished before Python could open it on the hosted virtual X11 runner.
-  last_tab_capture=dashboard-hsr-aha
-  game() {
-    local index="$1" file="$2" offset active_x active_y target_x
-    case "$index" in
-      1) offset=114 ;;
-      2) offset=228 ;;
-      3) offset=325 ;;
-      *) echo "Invalid game index $index" >&2; exit 1 ;;
-    esac
-    # Find the selected tab in the last captured real dashboard image.
-    read -r active_x active_y < <(
-      python3 scripts/ui_capture_tab.py "ci-readme-shots/$last_tab_capture.png"
-    )
-    target_x=$((hsr_x + offset))
-    xdotool mousemove "$target_x" "$active_y" click 1
-    sleep 11
-    capture "$file"
-    # Screenshot evidence must prove the new game is selected.
-    python3 scripts/ui_capture_tab.py "ci-readme-shots/$file.png" \
-      --expected-index "$index" --hsr-x "$hsr_x"
-    last_tab_capture="$file"
+  run_simulation() {
+    local game="$1" x y offset attempt
+    # Bring the actual Run Simulation button into view; never infer when the
+    # user has finished input from typing pauses or a game selection event.
+    offset=$(wc -l < "$log")
+    xdotool mousemove 600 630 key ctrl+End
+    x=""; y=""
+    for attempt in $(seq 1 12); do
+      if read -r x y < <(python3 scripts/ui_capture_wait.py --log "$log" \
+        --game "$game" --from-line "$offset" --button --timeout 1.5 2>/dev/null); then
+        break
+      fi
+      # Scroll only in the content panel; never guess pixel colors or click
+      # navigation/side-panel controls instead of the actual Run widget.
+      xdotool mousemove 600 630 click --repeat 5 --delay 35 5
+    done
+    if [[ -z "${x:-}" || -z "${y:-}" ]]; then
+      echo "Run Simulation widget was never visible after scrolling" >&2
+      tail -n 25 "$log" >&2
+      exit 1
+    fi
+    offset=$(wc -l < "$log")
+    xdotool mousemove "$x" "$y" click 1
+    # Match both STARTED and COMPLETED with the same generation from this click.
+    # A timed-out or failed calculation is a CI failure, never a stale screenshot.
+    python3 scripts/ui_capture_wait.py --log "$log" --game "$game" \
+      --from-line "$offset" --timeout 90 || { tail -n 40 "$log"; exit 1; }
+    xdotool mousemove 740 500 key ctrl+Home
+    sleep 0.2
   }
 
-  sleep 12
+  # The default game is preconfigured but must NOT compute until this click.
+  run_simulation StarRail
   capture dashboard-hsr-aha
   navigate 225; capture simulator-hsr-aha
   navigate 285; capture currency
@@ -60,22 +65,40 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -eu -c '
   navigate 400; capture weapons
   navigate 548; capture preferences
   navigate 168
-  # The dashboard can reopen at a different scroll offset after navigation.
-  # Recompute the active game tab from the CURRENT viewport, not the startup image.
+
+  # Refresh tab coordinates after navigation; the viewport can be scrolled.
   xdotool mousemove 740 500 key ctrl+Home
-  sleep 2
+  sleep 0.2
   scrot -q 92 ci-readme-shots/current-dashboard.png
   read -r hsr_x hsr_y < <(
     python3 scripts/ui_capture_tab.py ci-readme-shots/current-dashboard.png
   )
-  echo "Current dashboard game tab found at x=$hsr_x, y=$hsr_y"
   last_tab_capture=current-dashboard
-  game 1 dashboard-wuwa-latest
+  game() {
+    local index="$1" file="$2" expected="$3" offset active_x active_y target_x
+    case "$index" in
+      1) offset=114 ;;
+      2) offset=228 ;;
+      3) offset=325 ;;
+      *) echo "Invalid game index $index" >&2; exit 1 ;;
+    esac
+    read -r active_x active_y < <(
+      python3 scripts/ui_capture_tab.py "ci-readme-shots/$last_tab_capture.png"
+    )
+    target_x=$((hsr_x + offset))
+    xdotool mousemove "$target_x" "$active_y" click 1
+    # A game selection is an INPUT edit: it must never compute automatically.
+    run_simulation "$expected"
+    capture "$file"
+    python3 scripts/ui_capture_tab.py "ci-readme-shots/$file.png" \
+      --expected-index "$index" --hsr-x "$hsr_x"
+    last_tab_capture="$file"
+  }
+  game 1 dashboard-wuwa-latest WutheringWaves
   rm -f ci-readme-shots/current-dashboard.png
-  game 2 dashboard-stellasora-latest
-  game 3 dashboard-nte-latest
+  game 2 dashboard-stellasora-latest StellaSora
+  game 3 dashboard-nte-latest Neverness
 '
-
 python3 - <<'PY'
 from pathlib import Path
 from PIL import Image

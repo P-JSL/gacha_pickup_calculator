@@ -12,9 +12,9 @@
 
 1. 위의 **Windows 전체 ZIP**을 받아 **전체 압축을 해제**합니다.
 2. `gacha_pickup_calculator.exe`와 `Image/` 폴더가 같은 위치에 있도록 유지합니다.
-3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다.
+3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다. **이 안내는 현재 배포된 v1.0.3 바이너리에 적용됩니다.** 저장소 main의 개발 중 변경 사항이 자동 반영되지는 않습니다.
 4. 게임을 고른 다음 Dashboard 또는 Simulator에서 목표·기보유 수량을 입력하고, Currency에서 보유 뽑기권과 재화를 설정합니다.
-5. 시뮬레이션을 실행하거나 자동 계산을 활성화해 Analytics의 목표 성공 확률별 **추가 필요 뽑기권 환산량**을 확인합니다.
+5. **목표·천장·보유 재화 입력을 모두 마친 뒤 `Run Simulation` 버튼을 클릭**하면 확률·환급 계산이 시작됩니다. 작업이 완료되면 Analytics에서 성공 확률별 **추가 필요 뽑기권 환산량**을 확인합니다. *(이 수동 실행 변경은 저장소의 차기 빌드에 적용되며 현재 배포된 v1.0.3 바이너리에는 아직 반영되지 않았습니다.)*
 
 ```text
 gacha-pickup-calculator-windows-x64-v1.0.3.zip
@@ -110,6 +110,10 @@ python3 scripts/verify_release_contract.py
 ```
 
 이미지 수집은 일반 빌드에 포함되지 않습니다. 저장소에 포함된 `Image/` 파일을 사용하며, 외부 소스에서 이미지를 다시 받는 작업은 별도의 수동 [artwork refresh 워크플로](https://github.com/P-JSL/gacha_pickup_calculator/actions/workflows/refresh-artwork.yml)에서 검토합니다. Linux에서 이미지를 함께 실행하려면 빌드 후 `Image/` 폴더를 실행 파일 옆에 복사해야 합니다.
+
+### 개발 브랜치의 수동 실행 정책
+
+저장소의 차기 빌드에서는 **입력 변경 시 자동 계산을 중단**하고, 모든 목표·천장·재화 입력을 끝낸 다음 `Run Simulation`을 클릭해야 새 계산을 시작하도록 수정하고 있습니다. GUI CI도 실제 버튼 클릭과 계산 완료 이벤트를 연결하며, 기존 정식 배포 `v1.0.3`에는 이 변경이 아직 포함되지 않습니다. [CI 상세 설계](docs/CI_CHANGE_SCOPES.md).
 
 ### 구조·성능
 

@@ -2,6 +2,14 @@ use super::*;
 
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // The preceding frame already painted the new worker result. Report
+        // completion only for that same, still-current button-click generation.
+        if let Some(generation) = self.ci_ready_pending.take() {
+            if self.ci_capture && generation == self.generation && !self.calculating
+                && !self.input_needs_calculation && self.error.is_none() {
+                eprintln!("GACHA_CI_SIM_COMPLETED game={:?} generation={}", self.setup.game, generation);
+            }
+        }
         self.poll_results();
         if self.updates.poll(ctx) { self.catalog_ui.invalidate_after_update(); }
         self.catalog_ui.pump(ctx);
@@ -9,16 +17,7 @@ impl eframe::App for Calculator {
         // Reserve a full-height left rail first, as in the reference image.
         self.sidebar(ctx);
         if self.header(ctx) {
-            self.input_needs_calculation = true;
-            if self.ui_preferences.auto_recalculate {
-                self.schedule_recalculation();
-            } else {
-                // Game switching and navigation never start a new expensive
-                // simulation while automatic updates are disabled.
-                self.pending_since = None;
-                self.calculating = false;
-                self.generation = self.generation.wrapping_add(1);
-            }
+            self.invalidate_calculation();
         }
         // Reserve a usable central editing width. The optional right sidebar
         // collapses on smaller windows rather than overlapping input controls.
@@ -115,6 +114,13 @@ impl eframe::App for Calculator {
                                     ui.add_space(6.0);
                                     settings_changed |= self.feedback_controls(ui);
                                 }
+                                // The editor has its own explicit Run button so
+                                // finishing inputs never requires switching tabs.
+                                ui.add_space(9.0);
+                                if ui.add_enabled(!self.calculating, egui::Button::new(
+                                    t(self.language(), "Run Simulation"))).clicked() {
+                                    self.manual_calculation_requested = true;
+                                }
                             }
                             ViewMode::TrackerSources => {
                                 page_intro(ui, "TRACKER EVIDENCE",
@@ -131,32 +137,16 @@ impl eframe::App for Calculator {
                     });
             });
         if settings_changed {
-            self.input_needs_calculation = true;
-            if !self.ui_preferences.auto_recalculate {
-                // An edit invalidates any in-flight response, without starting
-                // heavy computations or changing focus on each keystroke.
-                self.generation = self.generation.wrapping_add(1);
-                self.pending_since = None;
-                self.calculating = false;
-            }
+            self.invalidate_calculation();
         }
         if self.manual_calculation_requested {
             self.manual_calculation_requested = false;
-            self.pending_since = None;
             self.recalculate();
-        } else if settings_changed && self.ui_preferences.auto_recalculate {
-            self.schedule_recalculation();
         }
-        if let Some(edited_at) = self.pending_since {
-            if edited_at.elapsed() >= Duration::from_millis(self.ui_preferences.debounce_ms) {
-                self.pending_since = None;
-                self.recalculate();
-            } else {
-                ctx.request_repaint_after(Duration::from_millis(80));
-            }
-        }
-        if self.calculating {
-            ctx.request_repaint_after(Duration::from_millis(120));
+        if self.calculating || self.ci_ready_pending.is_some() {
+            // Refresh while the worker is active, then paint one frame before
+            // CI receives the completion notification.
+            ctx.request_repaint_after(Duration::from_millis(50));
         }
         self.show_catalog_picker(ctx);
         if self.show_history {
@@ -195,6 +185,10 @@ impl eframe::App for Calculator {
                         ui.hyperlink_to(*title, *url);
                     }
                 });
+        }
+        if self.ci_capture && !self.ci_ui_ready_reported {
+            self.ci_ui_ready_reported = true;
+            eprintln!("GACHA_CI_UI_READY game={:?}", self.setup.game);
         }
     }
 }

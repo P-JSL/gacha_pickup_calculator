@@ -11,8 +11,6 @@ pub(crate) enum ViewMode { Calculator, Analytics, Settings, Preferences, Currenc
 /// Desktop display and interaction options. These never change the probability model.
 #[derive(Clone, Copy)]
 pub(crate) struct UiPreferences {
-    pub(crate) auto_recalculate: bool,
-    pub(crate) debounce_ms: u64,
     pub(crate) show_result_panel: bool,
     pub(crate) show_chart_fill: bool,
     pub(crate) show_hover_guides: bool,
@@ -21,8 +19,6 @@ pub(crate) struct UiPreferences {
 impl Default for UiPreferences {
     fn default() -> Self {
         Self {
-            auto_recalculate: false,
-            debounce_ms: 350,
             show_result_panel: true,
             show_chart_fill: true,
             show_hover_guides: true,
@@ -108,8 +104,11 @@ pub(crate) struct Calculator {
     pub(crate) worker: Sender<CalculationRequest>,
     pub(crate) results: Receiver<CalculationResponse>,
     pub(crate) generation: u64,
-    pub(crate) pending_since: Option<Instant>,
     pub(crate) calculating: bool,
+    // CI-only, generation-tagged evidence of real button-triggered computation.
+    pub(crate) ci_capture: bool,
+    pub(crate) ci_ui_ready_reported: bool,
+    pub(crate) ci_ready_pending: Option<u64>,
     pub(crate) observation_path: String,
     pub(crate) observation_expected_sha256: String,
     pub(crate) observation_data: Option<ObservationDataset>,
