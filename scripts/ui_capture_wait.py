@@ -13,10 +13,10 @@ import re
 import time
 
 EVENT = re.compile(
-    r"GACHA_CI_SIM_(STARTED|COMPLETED|FAILED) game=(\\w+) generation=(\\d+)"
+    r"GACHA_CI_SIM_(STARTED|COMPLETED|FAILED) game=(\w+) generation=(\d+)"
 )
 BUTTON = re.compile(
-    r"GACHA_CI_RUN_BUTTON game=(\\w+) x=(\\d+) y=(\\d+) visible=(true|false)"
+    r"GACHA_CI_RUN_BUTTON game=(\w+) x=(\d+) y=(\d+) visible=(true|false)"
 )
 
 

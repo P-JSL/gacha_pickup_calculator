@@ -33,7 +33,7 @@ xvfb-run -a -s "-screen 0 1536x864x24" bash -euo pipefail -c '
     xdotool mousemove 600 630 key ctrl+End
     x=""; y=""
     for attempt in $(seq 1 12); do
-      if read -r x y < <(python3 scripts/ui_capture_wait.py --log "$log" \\
+      if read -r x y < <(python3 scripts/ui_capture_wait.py --log "$log" \
         --game "$game" --from-line "$offset" --button --timeout 1.5 2>/dev/null); then
         break
       fi
