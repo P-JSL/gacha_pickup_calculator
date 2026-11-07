@@ -79,3 +79,33 @@ fn benchmark_dense_fft_and_binary_search_quantiles() {
         linear.as_nanos(), binary.as_nanos(),
         linear.as_secs_f64()/binary.as_secs_f64().max(f64::MIN_POSITIVE));
 }
+
+
+/// End-to-end throughput reference for the refund path. Measurements depend on
+/// CI runner load; numerical integrity is asserted, timing is informational.
+#[test]
+#[ignore = "Release-only Monte Carlo throughput reference"]
+fn benchmark_bounded_parallel_refunds() {
+    use gacha_pickup_calculator::feedback::{estimate, FeedbackConfig};
+    use gacha_pickup_calculator::games::{Game, GameSetup};
+    use gacha_pickup_calculator::RateMode;
+
+    let mut setup = GameSetup::new(Game::StarRail);
+    setup.set_targets(1, 1);
+    let mut config = FeedbackConfig::for_game(Game::StarRail);
+    config.samples = 100_000;
+    let start = Instant::now();
+    let result = black_box(estimate(&setup, RateMode::PublishedOnly, &config).unwrap());
+    let elapsed = start.elapsed();
+    assert_eq!(result.scenarios.len(), config.samples);
+    assert_eq!(result.raw_pulls.len(), config.samples);
+    assert_eq!(result.budgets.len(), config.samples);
+    assert!(result.average_raw.is_finite());
+    assert!(result.budgets.windows(2).all(|v| v[0] <= v[1]));
+    let retained_bytes = config.samples * (
+        std::mem::size_of::<gacha_pickup_calculator::feedback::RefundScenario>()
+        + 2 * std::mem::size_of::<usize>());
+    println!("PERF_MONTE_CARLO samples={} elapsed_ms={} retained_observation_bytes={} throughput_samples_per_s={:.0}",
+        config.samples, elapsed.as_millis(), retained_bytes,
+        config.samples as f64 / elapsed.as_secs_f64().max(f64::MIN_POSITIVE));
+}
