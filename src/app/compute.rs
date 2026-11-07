@@ -4,6 +4,9 @@ pub(crate) struct Computed {
     pub(crate) character: Distribution,
     pub(crate) weapon: Distribution,
     pub(crate) combined: Distribution,
+    /// Exact CDF of additional *shared* tickets after dedicated inventory.
+    /// Same X-axis units as the refund Monte Carlo CDF.
+    pub(crate) raw_shared: Distribution,
     pub(crate) feedback: Option<Arc<FeedbackEstimate>>,
     /// Prepared on the worker so the GUI never scans up to 1M paths per frame.
     pub(crate) successful_budget_means: Option<SuccessfulBudgetMeans>,
@@ -86,29 +89,25 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
         (None, None)
     };
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
-    let exact_shared_required = if feedback.is_none() {
-        // Construct the exact residual-ticket distribution once, then reuse
-        // its monotone CDF for all six O(log n) quantile lookups.
-        let demand = if request.setup.character_dedicated == 0
-            && request.setup.weapon_dedicated == 0
-        {
-            // Most new sessions have no dedicated tickets. The already-built
-            // combined PMF is exactly the residual demand, so reuse it.
-            combined.clone()
-        } else {
-            remaining_shared_distribution(
-                &character, &weapon, request.setup.character_dedicated,
-                request.setup.weapon_dedicated,
-            )
-        };
-        Some(CONFIDENCE_LEVELS.map(|confidence|
-            demand.quantile(confidence as f64 / 100.0)))
-    } else { None };
+    // Prepare the refund-free reference distribution even when recycling is
+    // enabled. Both exact and simulated curves now use *initial shared passes*
+    // as their X-axis; independently adding banner quantiles is not valid.
+    let raw_shared = if request.setup.character_dedicated == 0
+        && request.setup.weapon_dedicated == 0 {
+        combined.clone()
+    } else {
+        remaining_shared_distribution(
+            &character, &weapon, request.setup.character_dedicated,
+            request.setup.weapon_dedicated,
+        )
+    };
+    let exact_shared_required = Some(CONFIDENCE_LEVELS.map(|confidence|
+        raw_shared.quantile(confidence as f64 / 100.0)));
     let successful_budget_means = feedback.as_ref()
         .and_then(|estimate| estimate.successful_means(request.setup.available_flexible()));
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
     Ok(Computed {
-        character, weapon, combined, feedback, wuwa_strategies,
+        character, weapon, combined, raw_shared, feedback, wuwa_strategies,
         successful_budget_means, exact_shared_required,
     })
 }
@@ -118,6 +117,32 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
 #[cfg(test)]
 mod parallel_result_tests {
     use super::*;
+
+    #[test]
+    fn refund_enabled_worker_retains_an_exact_shared_ticket_baseline() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 1);
+        setup.character_dedicated = 3;
+        setup.weapon_dedicated = 2;
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 128;
+        let request = CalculationRequest {
+            generation: 3, setup, mode: RateMode::PublishedOnly,
+            feedback_config: config,
+            active_generation: Arc::new(AtomicU64::new(3)),
+        };
+        let stats = compute_with_cpu_budget(&request, 1).unwrap();
+        assert!(stats.feedback.is_some());
+        let thresholds = stats.exact_shared_required.unwrap();
+        for (i, target) in CONFIDENCE_LEVELS.iter().enumerate() {
+            assert_eq!(thresholds[i],
+                stats.raw_shared.quantile(*target as f64 / 100.0));
+        }
+        assert!((stats.raw_shared.at(0)
+            - optimal_allocation(&stats.character, &stats.weapon,
+                request.setup.character_dedicated,
+                request.setup.weapon_dedicated, 0).success_probability).abs() < 1e-10);
+    }
 
     #[test]
     fn chosen_wuwa_strategy_shares_trial_storage_without_cloning() {

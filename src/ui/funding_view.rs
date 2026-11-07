@@ -153,6 +153,52 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
         ui.separator();
         shortage(ui);
     }
+    if gap.uses_refunds {
+        // Keep the initial dashboard compact: the quick-settings game tabs
+        // must remain visible without scrolling in the supported CI viewport.
+        // Details remain accessible without losing any math or uncertainty.
+        ui.label(RichText::new(format!(
+            "{}% 전체 목표: 환급 전 {}장 → 환급 후 {}장 · 보유 {}장 → 추가 {}장",
+            gap.confidence, gap.raw_required_shared, gap.required_shared,
+            gap.available_shared, gap.additional_shared
+        )).strong().color(MINT).size(12.0));
+        egui::CollapsingHeader::new("환급 재투입 계산 상세 · 확률과 실제 경로")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.label(format!(
+                    "현재 보유량 기준 전체 목표 확률: 환급 전 {:.2}% → 환급 재투입 후 {:.2}%",
+                    gap.raw_probability * 100.0, gap.current_probability * 100.0
+                ));
+                let difference = gap.quantile_change;
+                ui.small(format!(
+                    "동일 성공률에서 필요량 차이: {difference:+}장 (두 분위수의 차이, 실제 환급권 수량과 별개)"
+                ));
+                if let Some((low, high)) = gap.probability_uncertainty {
+                    ui.small(format!(
+                        "환급 후 성공 확률의 Monte Carlo 95% Wilson 구간: {:.2}~{:.2}%",
+                        low * 100.0, high * 100.0
+                    ));
+                }
+                if let Some(path) = gap.boundary_path {
+                    debug_assert_eq!(path.raw_pulls, path.dedicated_used
+                        + path.points_funded_pulls + path.initial_flexible_required);
+                    ui.small(format!(
+                        "{}% 경계의 한 시뮬레이션 경로: 총 {}회 = 전용권 {}회 + 기존·환급 교환 포인트 {}회 + 최초 자유권 {}회",
+                        gap.confidence, path.raw_pulls, path.dedicated_used,
+                        path.points_funded_pulls, path.initial_flexible_required
+                    ));
+                }
+                if let Some((lower, upper, epsilon)) = gap.quantile_uncertainty {
+                    let upper_label = upper.map_or_else(
+                        || "상한 미확정".to_owned(), |n| format!("{n}장"));
+                    ui.small(format!(
+                        "최초 필요 자유권 표본 오차(95% 동시 대역): {}~{} · CDF ±{:.2}%p",
+                        lower, upper_label, epsilon * 100.0
+                    ));
+                }
+                ui.small("기보유 교환 포인트는 첫 결제부터, 새 환급은 다음 결제부터 사용합니다. 개별 캐릭터·장비 수량은 환급 전 단독 참고치이므로 합산하지 않습니다.");
+            });
+    }
     ui.add_space(5.0);
     if setup.game.shares_featured_ticket() {
         ui.label(RichText::new(format!(
@@ -179,8 +225,10 @@ pub(crate) fn render_goal_funding(ui: &mut egui::Ui, gap: &GoalFunding, setup: &
             setup.premium_currency / setup.game.cost_per_pull(), t(language, "Pulls"),
         )).color(MUTED).size(11.0));
     }
-    ui.label(RichText::new(t(language, "Solo ticket estimate excludes refunds"))
-        .color(MUTED).size(11.0));
+    ui.label(RichText::new(format!(
+        "{} · 전체 환급 시뮬레이션과 별개",
+        t(language, "Solo ticket estimate excludes refunds")
+    )).color(MUTED).size(11.0));
     ui.label(RichText::new(t(language, "Shared passes are allocated adaptively; do not add standalone requirements."))
         .color(MUTED).size(11.0));
     if setup.game == Game::StellaSora {

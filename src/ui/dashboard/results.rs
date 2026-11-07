@@ -28,9 +28,10 @@ impl Calculator {
                             let raw = optimal_allocation(&stats.character, &stats.weapon,
                                 self.setup.character_dedicated,
                                 self.setup.weapon_dedicated, available);
-                            let joint = stats.feedback.as_ref()
-                                .map(|f| f.probability(available).0)
-                                .unwrap_or(raw.success_probability);
+                            let joint = self.current_goal_funding()
+                                .map_or_else(|| stats.feedback.as_ref()
+                                    .map_or(raw.success_probability, |f| f.probability(available).0),
+                                    |funding| funding.current_probability);
                             (joint, stats.character.at(
                                 self.setup.character_dedicated.saturating_add(available)),
                                 stats.weapon.at(
@@ -58,6 +59,9 @@ impl Calculator {
                                 let value = bonus.map_or("—".to_owned(),
                                     |means| format!("+{:.1}", means.average_points_funded));
                                 ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
+                                if bonus.is_some() {
+                                    ui.small("현재 예산 내 성공한 경로 기준 평균");
+                                }
                             });
                         });
                         ui.add_space(7.0);
