@@ -13,7 +13,10 @@ import re
 import time
 
 EVENT = re.compile(
-    r"GACHA_CI_SIM_(STARTED|COMPLETED|FAILED) game=(\w+) generation=(\d+)"
+    r"GACHA_CI_SIM_(STARTED|COMPLETED|FAILED) game=(\\w+) generation=(\\d+)"
+)
+BUTTON = re.compile(
+    r"GACHA_CI_RUN_BUTTON game=(\\w+) x=(\\d+) y=(\\d+) visible=(true|false)"
 )
 
 
@@ -34,12 +37,30 @@ def assess(lines: list[str], expected_game: str) -> tuple[str, int | None]:
     return "waiting", started
 
 
-def wait(log: Path, *, game: str, from_line: int, seconds: float) -> None:
+def visible_button(lines: list[str], expected_game: str) -> tuple[int, int] | None:
+    for line in reversed(lines):
+        found = BUTTON.search(line)
+        if not found or found.group(1) != expected_game or found.group(4) != "true":
+            continue
+        x, y = int(found.group(2)), int(found.group(3))
+        # Pixel coordinates are real X11 screen coordinates at 1x CI scale.
+        if 240 < x < 1500 and 90 < y < 830:
+            return x, y
+    return None
+
+
+def wait(log: Path, *, game: str, from_line: int, seconds: float,
+         button: bool = False) -> None:
     start = time.monotonic()
     while time.monotonic() - start < seconds:
         lines = log.read_text(errors="replace").splitlines() if log.exists() else []
         fragment = lines[from_line:]
-        if game == "ui":
+        if button:
+            point = visible_button(fragment, game)
+            if point is not None:
+                print(*point)
+                return
+        elif game == "ui":
             if any("GACHA_CI_UI_READY game=StarRail" in x for x in fragment):
                 print("Application rendered: input remains uncomputed")
                 return
@@ -62,6 +83,9 @@ if __name__ == "__main__":
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--game", choices=["ui", "StarRail", "WutheringWaves", "StellaSora", "Neverness"], required=True)
     parser.add_argument("--from-line", type=int, default=0)
+    parser.add_argument("--button", action="store_true",
+                        help="Wait for real, visible egui button geometry")
     parser.add_argument("--timeout", type=float, default=90)
     args = parser.parse_args()
-    wait(args.log, game=args.game, from_line=args.from_line, seconds=args.timeout)
+    wait(args.log, game=args.game, from_line=args.from_line,
+         seconds=args.timeout, button=args.button)

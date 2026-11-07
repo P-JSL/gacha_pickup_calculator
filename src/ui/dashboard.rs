@@ -488,10 +488,22 @@ impl Calculator {
                 // width from the primary action or paint outside the center panel.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        if ui.add_enabled(!self.calculating, egui::Button::new(
+                        let run = ui.add_enabled(!self.calculating, egui::Button::new(
                             RichText::new(format!("▶  {}", t(language, "Run Simulation"))).size(14.0).strong().color(BG))
                             .fill(CYAN).corner_radius(11)
-                            .min_size(egui::vec2(175.0, 40.0))).clicked() {
+                            .min_size(egui::vec2(175.0, 40.0)));
+                        if self.ci_capture {
+                            // Report the *real* egui button geometry, including its
+                            // clip visibility. CI still has to click this widget.
+                            let center = run.rect.center() * ui.ctx().pixels_per_point();
+                            let visible = ui.clip_rect().contains(run.rect.center());
+                            eprintln!(
+                                "GACHA_CI_RUN_BUTTON game={:?} x={} y={} visible={}",
+                                self.setup.game, center.x.round() as i32,
+                                center.y.round() as i32, visible,
+                            );
+                        }
+                        if run.clicked() {
                             self.manual_calculation_requested = true;
                         }
                         if ui.add(egui::Button::new(format!("↻  {}", t(language, "Reset")))

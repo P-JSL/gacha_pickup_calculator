@@ -1,29 +1,21 @@
 #!/usr/bin/env python3
 """Pure status and screenshot-control regression tests for CI-only automation."""
-import tempfile
 import unittest
-from pathlib import Path
 
-from PIL import Image, ImageDraw
-
-from ui_capture_button import simulation_button
-from ui_capture_wait import assess
+from ui_capture_wait import assess, visible_button
 
 
 class CaptureControlTests(unittest.TestCase):
-    def test_run_button_excludes_narrow_game_tab(self):
-        with tempfile.TemporaryDirectory() as folder:
-            target = Path(folder) / "actual.png"
-            image = Image.new("RGB", (1536, 864), (8, 20, 32))
-            draw = ImageDraw.Draw(image)
-            draw.rectangle((470, 470, 575, 500), fill=(50, 218, 241))
-            draw.rectangle((360, 690, 534, 730), fill=(50, 218, 241))
-            image.save(target)
-            x, y = simulation_button(target)
-            self.assertGreaterEqual(x, 360)
-            self.assertLessEqual(x, 534)
-            self.assertGreaterEqual(y, 690)
-            self.assertLessEqual(y, 730)
+    def test_only_visible_real_button_is_clickable(self):
+        self.assertIsNone(visible_button([
+            "GACHA_CI_RUN_BUTTON game=StarRail x=750 y=1300 visible=false"
+        ], "StarRail"))
+        self.assertIsNone(visible_button([
+            "GACHA_CI_RUN_BUTTON game=Neverness x=1100 y=650 visible=true"
+        ], "StarRail"))
+        self.assertEqual(visible_button([
+            "GACHA_CI_RUN_BUTTON game=StarRail x=400 y=650 visible=true"
+        ], "StarRail"), (400, 650))
 
     def test_only_matching_clicked_generation_can_complete(self):
         self.assertEqual(assess([
