@@ -18,13 +18,13 @@
         let character = deterministic_distribution(setup.character.target_copies);
         let weapon = deterministic_distribution(setup.weapon.target_copies);
         let combined = character.combine(&weapon);
+        let raw_shared = remaining_shared_distribution(&character, &weapon,
+            setup.character_dedicated, setup.weapon_dedicated);
         let exact_shared_required = Some(CONFIDENCE_LEVELS.map(|confidence| {
-            minimum_shared_pulls(&character, &weapon,
-                setup.character_dedicated, setup.weapon_dedicated,
-                confidence as f64 / 100.0)
+            raw_shared.quantile(confidence as f64 / 100.0)
         }));
         Computed {
-            character, weapon, combined, feedback: None,
+            character, weapon, combined, raw_shared, feedback: None,
             successful_budget_means: None,
             wuwa_strategies: None, exact_shared_required,
         }
@@ -142,6 +142,7 @@
         let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
         let stats = Computed {
             combined: character.combine(&weapon),
+            raw_shared: remaining_shared_distribution(&character, &weapon, 0, 0),
             character, weapon, feedback: Some(Arc::new(feedback)),
             successful_budget_means: None,
             wuwa_strategies: None, exact_shared_required: None,
@@ -151,6 +152,93 @@
         assert_eq!(gap.required_shared, 1);
         assert_eq!(gap.additional_shared, 1);
         assert!(gap.uses_refunds);
+    }
+
+    #[test]
+    fn dashboard_refund_probability_and_ticket_shortfall_use_same_distribution() {
+        use gacha_pickup_calculator::{Banner, RateSchedule, SoftPity};
+        let mut setup = GameSetup::new(Game::StarRail);
+        let certain = BannerRule::Standard {
+            rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+            featured_share: 1.0,
+        };
+        setup.character = Banner {
+            rule: certain.clone(), pity: 0, guaranteed: false,
+            target_copies: 2, spark: None, any_rare_pity: 0,
+        };
+        setup.weapon = Banner {
+            rule: certain, pity: 0, guaranteed: false,
+            target_copies: 1, spark: None, any_rare_pity: 0,
+        };
+        // Three deterministic pulls, but each completed roll recycles
+        // a ticket for the NEXT roll. Only one initial shared ticket is needed.
+        setup.flexible = 1;
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 128;
+        config.points_per_ticket = 1;
+        config.featured_first = 1;
+        config.featured_duplicate = 1;
+        config.weapon_first = 1;
+        config.weapon_rare = 1;
+        config.four_star_reward = 0;
+        config.weapon_four_star_reward = 0;
+        let feedback = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
+        let character = setup.character.distribution(RateMode::PublishedOnly).unwrap();
+        let weapon = setup.weapon.distribution(RateMode::PublishedOnly).unwrap();
+        let raw_shared = remaining_shared_distribution(&character, &weapon, 0, 0);
+        let stats = Computed {
+            combined: character.combine(&weapon),
+            character, weapon, raw_shared,
+            feedback: Some(Arc::new(feedback)),
+            successful_budget_means: None, wuwa_strategies: None,
+            exact_shared_required: None,
+        };
+        let gap = GoalFunding::calculate(&setup, &stats, 2, 1, 90);
+        assert_eq!(gap.raw_required_shared, 3);
+        assert_eq!(gap.required_shared, 1);
+        assert_eq!(gap.quantile_change, 2);
+        assert_eq!(gap.additional_shared, 0);
+        assert_eq!(gap.additional_currency, 0);
+        assert_eq!(gap.raw_probability, 0.0);
+        assert_eq!(gap.current_probability, 1.0);
+        assert!(gap.probability_uncertainty.is_some());
+        let path = gap.boundary_path.unwrap();
+        assert_eq!(path.raw_pulls, 3);
+        assert_eq!(path.dedicated_used, 0);
+        assert_eq!(path.points_funded_pulls, 2);
+        assert_eq!(path.initial_flexible_required, 1);
+        assert_eq!(path.raw_pulls, path.dedicated_used
+            + path.points_funded_pulls + path.initial_flexible_required);
+        assert_eq!(gap.quantile_uncertainty.unwrap().1, Some(1));
+
+        // Increasing the pre-existing balance can never reduce the success
+        // probability, and no refund may subsidize the first payment.
+        setup.flexible = 0;
+        let no_balance = GoalFunding::calculate(&setup, &stats, 2, 1, 90);
+        assert_eq!(no_balance.additional_shared, 1);
+        assert_eq!(no_balance.current_probability, 0.0);
+        assert_eq!(no_balance.raw_probability, 0.0);
+        setup.flexible = 3;
+        let abundant = GoalFunding::calculate(&setup, &stats, 2, 1, 90);
+        assert_eq!(abundant.additional_shared, 0);
+        assert_eq!(abundant.raw_probability, 1.0);
+        assert_eq!(abundant.current_probability, 1.0);
+    }
+
+    #[test]
+    fn dashboard_disables_refund_difference_when_refunds_are_not_simulated() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(2, 1);
+        setup.flexible = 2;
+        let stats = deterministic_goals(&setup);
+        let gap = GoalFunding::calculate(&setup, &stats, 2, 1, 90);
+        assert!(!gap.uses_refunds);
+        assert_eq!(gap.required_shared, gap.raw_required_shared);
+        assert_eq!(gap.quantile_change, 0);
+        assert!(gap.boundary_path.is_none());
+        assert!(gap.quantile_uncertainty.is_none());
+        assert!(gap.probability_uncertainty.is_none());
+        assert_eq!(gap.current_probability, gap.raw_probability);
     }
 
     #[test]
