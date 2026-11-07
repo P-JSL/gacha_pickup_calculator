@@ -101,35 +101,14 @@ impl Calculator {
                     label: "환급 재투입 후", source: ChartSource::Refund(refund), color: PINK,
                 });
             }
-            // Position the overall refunded success curve directly below the
-            // KPI row. On wide screens it shares the funding row rather
-            // than pushing the interactive game selector farther down.
-            let overall_chart = |ui: &mut egui::Ui| {
-                probability_card(ui, t(language, "Overall Result"),
-                    format!("{overall_success_label}: {:.2}%", chance * 100.0),
-                    &chart_total, PINK, self.ui_preferences, language);
-            };
-            let funding_card = |ui: &mut egui::Ui| {
-                dashboard_card(ui, t(language, "Funding Gap"), |ui| {
-                    if let Some(gap) = funding {
-                        render_goal_funding(ui, &gap, &self.setup, language);
-                    } else {
-                        ui.label(RichText::new(t(language,
-                            "Recalculate to update funding estimate")).color(GOLD));
-                    }
-                });
-            };
+            // The refund-inclusive joint result is immediately below the
+            // summary KPIs, before long input and funding details. Retain
+            // its full width so the graph and probability tooltip remain
+            // readable at all supported desktop sizes.
             ui.add_space(9.0);
-            if ui.available_width() >= 1000.0 {
-                ui.columns(2, |columns| {
-                    overall_chart(&mut columns[0]);
-                    funding_card(&mut columns[1]);
-                });
-            } else {
-                overall_chart(ui);
-                ui.add_space(9.0);
-                funding_card(ui);
-            }
+            probability_card(ui, t(language, "Overall Result"),
+                format!("{overall_success_label}: {:.2}%", chance * 100.0),
+                &chart_total, PINK, self.ui_preferences, language);
 
         } else if self.calculating {
             dashboard_card(ui, t(language, "Probability Overview"), |ui| {
@@ -151,6 +130,18 @@ impl Calculator {
         // Keep the game controls ahead of the standalone banner charts;
         // the joint refunded probability is now visible above this section.
         if let Some(stats) = self.visible_stats() {
+            // Keep game tabs and Run Simulation reachable even when results
+            // are present: the long funding explanation follows the input
+            // controls instead of displacing them below the viewport.
+            ui.add_space(9.0);
+            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
+                if let Some(gap) = self.current_goal_funding() {
+                    render_goal_funding(ui, &gap, &self.setup, language);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
+            });
             let free_pulls = self.setup.available_flexible();
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
