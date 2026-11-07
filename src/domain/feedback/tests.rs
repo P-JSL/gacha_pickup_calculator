@@ -123,9 +123,9 @@
         cfg.character_four_star_pity = 9;
         let mut pity = cfg.character_four_star_pity;
         let mut rng = SplitMix64(17);
-        assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0));
+        assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0, true));
         assert_eq!(pity, 0);
-        assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0));
+        assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0, true));
     }
 
     #[test]
@@ -419,6 +419,55 @@
     }
 
     #[test]
+    fn nte_tenth_dice_awards_additional_a_rank_after_the_paid_roll() {
+        let mut setup = GameSetup::new(Game::Neverness);
+        setup.character.rule = BannerRule::Standard {
+            rarity: RateSchedule { base: 1.0, hard: 90, soft: SoftPity::None },
+            featured_share: 1.0
+        };
+        setup.character.target_copies = 1;
+        setup.weapon.target_copies = 0;
+        let mut config = FeedbackConfig::for_game(Game::Neverness);
+        config.samples = 20;
+        config.four_star_reward = 7;
+        config.weapon_four_star_reward = 7;
+        config.character_four_star_rate = 0.0;
+        config.featured_first = 0;
+        config.nte_one_die_chance = 0.0;
+        config.nte_five_dice_chance = 0.0;
+        config.character_four_star_pity = 9; // 9 board rolls toward an extra gift
+        let first = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
+        for trial in &first.scenarios {
+            assert_eq!(trial.raw_pulls, 1);
+            assert_eq!(trial.initial_flexible_required, 1);
+            assert_eq!(trial.earned_points, 7);
+        }
+        config.character_four_star_pity = 0;
+        let no_gift = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
+        assert_eq!(no_gift.scenarios[0].earned_points, 0);
+    }
+
+    #[test]
+    fn confidence_band_does_not_fabricate_a_ninety_ninth_percentile_bound() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 0);
+        let mut model = FeedbackConfig::for_game(Game::StarRail);
+        model.samples = 256;
+        let small = estimate(&setup, RateMode::PublishedOnly, &model).unwrap();
+        let band = small.quantile_confidence_band(0.99, 0.95).unwrap();
+        assert_eq!(band.upper, None);
+        assert!(band.lower <= small.quantile(0.99));
+        assert!(small.quantile_confidence_band(0.5, 1.0).is_none());
+        model.samples = 20_000;
+        let large = estimate(&setup, RateMode::PublishedOnly, &model).unwrap();
+        let band = large.quantile_confidence_band(0.99, 0.95).unwrap();
+        assert!(band.cdf_tolerance < 0.01);
+        assert!(band.upper.is_some());
+        assert!(band.lower <= large.quantile(0.99));
+        assert!(band.upper.unwrap() >= large.quantile(0.99));
+    }
+
+    #[test]
     fn stella_first_ten_uses_prepaid_gold_disc_bonus_not_expert_permits() {
         let mut setup = GameSetup::new(Game::StellaSora);
         setup.character.rule = BannerRule::FeaturedCounter {
@@ -476,7 +525,7 @@
             let rare = rng.hits(0.02);
             if rare { rare_count += 1; }
             if maybe_four_star(&mut rng, &config, BannerKind::Character,
-                               &mut pity, rare, 0.02) {
+                               &mut pity, rare, 0.02, true) {
                 four_count += 1;
             }
         }
