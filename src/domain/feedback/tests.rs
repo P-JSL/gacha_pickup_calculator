@@ -7,7 +7,6 @@
     fn extreme_refund_values_do_not_overflow_or_create_negative_balances() {
         let cfg = FeedbackConfig::for_game(Game::StellaSora);
         let mut wallet = Wallet::new(&cfg);
-        wallet.reward_multiplier = 3;
         wallet.refund(usize::MAX);
         assert_eq!(wallet.points, usize::MAX);
         wallet.refund(5);
@@ -124,7 +123,7 @@
         cfg.character_four_star_pity = 9;
         let mut pity = cfg.character_four_star_pity;
         let mut rng = SplitMix64(17);
-        assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false));
+        assert!(maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false, 0.0));
         assert_eq!(pity, 0);
         assert!(!maybe_four_star(&mut rng, &cfg, BannerKind::Character, &mut pity, false));
     }
@@ -420,20 +419,70 @@
     }
 
     #[test]
-    fn first_ten_multiplier_requires_explicit_account_remaining_count() {
+    fn stella_first_ten_uses_prepaid_gold_disc_bonus_not_expert_permits() {
+        let mut setup = GameSetup::new(Game::StellaSora);
+        setup.character.rule = BannerRule::FeaturedCounter {
+            featured_rate: 1.0, hard_featured: 160,
+        };
+        setup.weapon.rule = BannerRule::FeaturedCounter {
+            featured_rate: 1.0, hard_featured: 120,
+        };
+        setup.character.spark = None;
+        setup.character.target_copies = 1;
+        setup.weapon.target_copies = 1;
         let mut cfg = FeedbackConfig::for_game(Game::StellaSora);
+        cfg.samples = 16;
+        cfg.featured_first = 0;
+        cfg.featured_duplicate = 0;
+        cfg.featured_maxed = 0;
+        cfg.weapon_first = 0;
+        cfg.weapon_rare = 0;
+        cfg.off_banner_rare = 0;
+        cfg.character_other_five_star_rate = 0.0;
+        cfg.weapon_other_five_star_rate = 0.0;
+        cfg.four_star_reward = 0;
+        cfg.weapon_four_star_reward = 0;
+        cfg.stella_first_ten_remaining = 10;
+        let boosted = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        for trial in &boosted.scenarios {
+            // Paid 10-pull is indivisible even if the featured goal hits on draw 1.
+            assert_eq!(trial.raw_pulls, 11);
+            assert_eq!(trial.initial_flexible_required, 10);
+            assert_eq!(trial.record_disc_units_earned, 900);
+            assert_eq!(trial.earned_points, 0);
+            assert_eq!(trial.dedicated_used, 1);
+        }
+        cfg.stella_first_ten_remaining = 0;
+        let regular = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        assert_eq!(regular.scenarios[0].raw_pulls, 2);
+        assert_eq!(regular.scenarios[0].initial_flexible_required, 2);
+        assert_eq!(regular.scenarios[0].record_disc_units_earned, 30);
         cfg.stella_first_ten_remaining = 2;
-        let mut wallet = Wallet::new(&cfg);
-        wallet.begin_character_pull(&cfg);
-        wallet.refund(40);
-        wallet.begin_character_pull(&cfg);
-        wallet.refund(40);
-        wallet.begin_character_pull(&cfg);
-        wallet.refund(40);
-        assert_eq!(wallet.points, 280); // 3*40 + 3*40 + 40
-        assert_eq!(wallet.record_disc_units, 90);
+        assert!(cfg.validate().is_err());
         cfg.stella_first_ten_remaining = 11;
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn four_star_base_rate_is_unconditional_on_the_five_star_miss() {
+        let mut config = FeedbackConfig::for_game(Game::StellaSora);
+        config.four_star_hard = 1_000_000; // isolate the base 4★ probability
+        let mut rng = SplitMix64(0x449F_1234);
+        let mut pity = 0;
+        let mut rare_count = 0;
+        let mut four_count = 0;
+        let samples = 240_000;
+        for _ in 0..samples {
+            let rare = rng.hits(0.02);
+            if rare { rare_count += 1; }
+            if maybe_four_star(&mut rng, &config, BannerKind::Character,
+                               &mut pity, rare, 0.02) {
+                four_count += 1;
+            }
+        }
+        assert!((rare_count as f64 / samples as f64 - 0.02).abs() < 0.002);
+        assert!((four_count as f64 / samples as f64 - 0.04).abs() < 0.002);
+        assert!((config.weapon_four_star_rate - 0.08).abs() < f64::EPSILON);
     }
 
     #[test]
