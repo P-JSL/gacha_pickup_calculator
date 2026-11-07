@@ -128,7 +128,6 @@ fn simulate_chunk(slots: &mut [RefundScenario], start_index: usize, setup: &Game
                 BannerKind::Character => {
                     totals.character_raw += draws;
                     totals.character_points += points;
-                    wallet.reward_multiplier = 1;
                 }
                 BannerKind::Weapon => {
                     totals.weapon_raw += draws;
