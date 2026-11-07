@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Color32, RichText};
 use egui_plot::{Legend, Line, Plot, PlotPoints};
-use gacha_pickup_calculator::feedback::{estimate_with_options, FeedbackConfig, FeedbackEstimate};
+use gacha_pickup_calculator::feedback::{estimate_with_options, FeedbackConfig, FeedbackEstimate, SuccessfulBudgetMeans};
 use gacha_pickup_calculator::games::{Game, GameSetup};
 use gacha_pickup_calculator::{optimal_allocation, BannerRule, Distribution, RateMode};
 use gacha_pickup_calculator::tracker::{expected_for_banner, references, TrackedBanner};
@@ -83,6 +83,7 @@ mod chart_tests {
         }));
         Computed {
             character, weapon, combined, feedback: None,
+            successful_budget_means: None,
             wuwa_strategies: None, exact_shared_required,
         }
     }
@@ -200,6 +201,7 @@ mod chart_tests {
         let stats = Computed {
             combined: character.combine(&weapon),
             character, weapon, feedback: Some(Arc::new(feedback)),
+            successful_budget_means: None,
             wuwa_strategies: None, exact_shared_required: None,
         };
         let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
