@@ -18,7 +18,7 @@ const MIN_SAMPLES_PER_WORKER: usize = 4_096;
 #[path = "feedback/config.rs"] mod config;
 #[path = "feedback/results.rs"] mod results;
 pub use config::FeedbackConfig;
-pub use results::{FeedbackEstimate, RefundScenario, SuccessfulBudgetMeans};
+pub use results::{FeedbackEstimate, RefundScenario, SuccessfulBudgetMeans, QuantileConfidenceBand};
 
 struct SplitMix64(u64);
 impl SplitMix64 {
