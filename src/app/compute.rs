@@ -67,7 +67,7 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
             for max_wavebands in 0..3 {
                 let mut variant = request.feedback_config.clone();
                 variant.wuwa_waveband_max = max_wavebands;
-                strategies.push(Arc::new(crate::feedback::estimate_with_options(
+                strategies.push(Arc::new(estimate_with_options(
                     &request.setup, request.mode, &variant, cpu_budget, cancellation
                 )?));
             }
@@ -77,7 +77,7 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
         let selected = Arc::clone(&strategies[request.feedback_config.wuwa_waveband_max.min(2)]);
         (Some(selected), Some(strategies))
     } else if request.feedback_config.enabled {
-        (Some(Arc::new(crate::feedback::estimate_with_options(
+        (Some(Arc::new(estimate_with_options(
             &request.setup, request.mode, &request.feedback_config, cpu_budget, cancellation
         )?)), None)
     } else {
@@ -128,6 +128,7 @@ mod parallel_result_tests {
         let strategies = result.wuwa_strategies.as_ref().unwrap();
         assert_eq!(strategies.len(), 3);
         assert!(Arc::ptr_eq(result.feedback.as_ref().unwrap(), &strategies[1]));
+    }
 
     #[test]
     fn wuwa_strategies_match_bitwise_with_serial_and_shared_cpu_budget() {
@@ -164,6 +165,5 @@ mod parallel_result_tests {
             feedback_config: config, active_generation: Arc::new(AtomicU64::new(3)),
         };
         assert!(compute_with_cpu_budget(&request, 8).is_err());
-    }
     }
 }
