@@ -202,6 +202,22 @@ fn regular(base: f64, hard: usize, soft: SoftPity, featured_share: f64, pity: us
 #[cfg(test)]
 mod currency_tests {
     use super::*;
+
+    #[test]
+    fn stella_and_other_games_have_correct_full_upgrade_copy_bounds() {
+        assert_eq!(Game::StellaSora.max_character_copies(), 6);
+        assert_eq!(Game::StellaSora.max_weapon_copies(), 6);
+        assert_eq!(Game::StellaSora.weapon_upgrade_level(1), 0);
+        assert_eq!(Game::StellaSora.weapon_upgrade_level(6), 5);
+        let stella = GameSetup::new(Game::StellaSora);
+        assert_eq!(stella.character.target_copies, 6);
+        assert_eq!(stella.weapon.target_copies, 6);
+        for game in [Game::StarRail, Game::WutheringWaves, Game::Neverness] {
+            assert_eq!(game.max_character_copies(), 7);
+            assert_eq!(game.max_weapon_copies(), 5);
+            assert_eq!(game.weapon_upgrade_level(5), 5);
+        }
+    }
     #[test]
     fn native_currency_converts_only_in_complete_pulls_for_all_games() {
         for game in Game::ALL {
