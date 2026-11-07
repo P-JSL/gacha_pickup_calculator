@@ -78,15 +78,37 @@ impl Calculator {
                 overview_metric(&mut columns[3], 3, t(language, "Additional featured ticket equivalents"),
                     value, note, color);
             });
-            ui.add_space(9.0);
-            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
-                if let Some(gap) = funding {
-                    render_goal_funding(ui, &gap, &self.setup, language);
-                } else {
-                    ui.label(RichText::new(t(language,
-                        "Recalculate to update funding estimate")).color(GOLD));
+
+            // Make the refund-recycled value the visible primary result,
+            // including in the compact chart where hover labels were clipped.
+            let overall_success_label = if stats.feedback.is_some() {
+                match language {
+                    Language::Korean => "환급 포함 전체 성공",
+                    Language::English => "Overall success with refunds",
+                    Language::Japanese => "還元込み全体成功",
+                    Language::ChineseSimplified => "含返还的整体成功率",
+                    Language::ChineseTraditional => "含返還的整體成功率",
                 }
-            });
+            } else { t(language, "Total Success") };
+            // The overall chart and the success-rate KPI now both use shared
+            // initial tickets; the old total-pulls curve had a different X-axis
+            // and could falsely suggest refunds were not being applied.
+            let mut chart_total = vec![ChartSeries {
+                label: "환급 전", source: ChartSource::Exact(&stats.raw_shared), color: MUTED,
+            }];
+            if let Some(refund) = stats.feedback.as_ref() {
+                chart_total.push(ChartSeries {
+                    label: "환급 재투입 후", source: ChartSource::Refund(refund), color: PINK,
+                });
+            }
+            // The refund-inclusive joint result is immediately below the
+            // summary KPIs, before long input and funding details. Retain
+            // its full width so the graph and probability tooltip remain
+            // readable at all supported desktop sizes.
+            ui.add_space(9.0);
+            probability_card(ui, t(language, "Overall Result"),
+                format!("{overall_success_label}: {:.2}%", chance * 100.0),
+                &chart_total, PINK, self.ui_preferences, language);
 
         } else if self.calculating {
             dashboard_card(ui, t(language, "Probability Overview"), |ui| {
@@ -105,60 +127,40 @@ impl Calculator {
 
         ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
-        // Keep game choices and finished-input controls visible before the
-        // relatively tall charts. Expanding refund details cannot push the
-        // game selector below the desktop viewport.
+        // Keep the game controls ahead of the standalone banner charts;
+        // the joint refunded probability is now visible above this section.
         if let Some(stats) = self.visible_stats() {
+            // Keep game tabs and Run Simulation reachable even when results
+            // are present: the long funding explanation follows the input
+            // controls instead of displacing them below the viewport.
+            ui.add_space(9.0);
+            dashboard_card(ui, t(language, "Funding Gap"), |ui| {
+                if let Some(gap) = self.current_goal_funding() {
+                    render_goal_funding(ui, &gap, &self.setup, language);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Recalculate to update funding estimate")).color(GOLD));
+                }
+            });
             let free_pulls = self.setup.available_flexible();
-            let chance = self.current_goal_funding().map_or_else(
-                || stats.feedback.as_ref().map_or(
-                    stats.raw_shared.at(free_pulls),
-                    |f| f.probability(free_pulls).0
-                ),
-                |funding| funding.current_probability
-            );
             ui.add_space(13.0);
             let character_budget = self.setup.character_dedicated.saturating_add(free_pulls);
             let weapon_budget = self.setup.weapon_dedicated.saturating_add(free_pulls);
             let char_rate = stats.character.at(character_budget) * 100.0;
             let weapon_rate = stats.weapon.at(weapon_budget) * 100.0;
             let banner_name = i18n::banner_name(language, self.setup.game);
-            // Make the refund-recycled value the visible primary result,
-            // including in the compact chart where hover labels were clipped.
-            let overall_success_label = if stats.feedback.is_some() {
-                match language {
-                    Language::Korean => "환급 포함 전체 성공",
-                    Language::English => "Overall success with refunds",
-                    Language::Japanese => "還元込み全体成功",
-                    Language::ChineseSimplified => "含返还的整体成功率",
-                    Language::ChineseTraditional => "含返還的整體成功率",
-                }
-            } else { t(language, "Total Success") };
             let chart_char = [ChartSeries {
                 label: t(language, "Characters"), source: ChartSource::Exact(&stats.character), color: CYAN,
             }];
             let chart_weapon = [ChartSeries {
                 label: banner_name, source: ChartSource::Exact(&stats.weapon), color: YELLOW,
             }];
-            // The overall chart and the success-rate KPI now both use shared
-            // initial tickets; the old total-pulls curve had a different X-axis
-            // and could falsely suggest refunds were not being applied.
-            let mut chart_total = vec![ChartSeries {
-                label: "환급 전", source: ChartSource::Exact(&stats.raw_shared), color: MUTED,
-            }];
-            if let Some(refund) = stats.feedback.as_ref() {
-                chart_total.push(ChartSeries {
-                    label: "환급 재투입 후", source: ChartSource::Refund(refund), color: PINK,
-                });
-            }
             if ui.available_width() >= 900.0 {
-                ui.columns(3, |columns| {
+                ui.columns(2, |columns| {
                     probability_card(&mut columns[0], t(language, "Character Probability"),
                         format!("E{} {}: {:.2}%", self.target_eid, t(language, "Success"), char_rate), &chart_char, CYAN, self.ui_preferences, self.language());
                     probability_card(&mut columns[1], &format!("{banner_name} {}", t(language, "Probability")),
                         format!("S{} {}: {:.2}%", self.setup.game.weapon_upgrade_level(self.target_refine), t(language, "Success"), weapon_rate), &chart_weapon, YELLOW, self.ui_preferences, self.language());
-                    probability_card(&mut columns[2], t(language, "Overall Result"),
-                        format!("{overall_success_label}: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
                 });
             } else {
                 probability_card(ui, t(language, "Character Probability"),
@@ -166,9 +168,6 @@ impl Calculator {
                 ui.add_space(8.0);
                 probability_card(ui, &format!("{banner_name} {}", t(language, "Probability")),
                     format!("{}: {weapon_rate:.2}%", t(language, "Success")), &chart_weapon, YELLOW, self.ui_preferences, self.language());
-                ui.add_space(8.0);
-                probability_card(ui, t(language, "Overall Result"),
-                    format!("{overall_success_label}: {:.2}%", chance * 100.0), &chart_total, PINK, self.ui_preferences, self.language());
             }
 
         }

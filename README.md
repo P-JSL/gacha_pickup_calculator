@@ -2,9 +2,9 @@
 
 **붕괴: 스타레일 · 명조: 워더링 웨이브 · 이환 · 스텔라 소라**의 픽업 목표, 보유 캐릭터·장비, 천장, 게임별 재화와 환급 재투자를 계산하는 **Rust/egui 데스크톱 애플리케이션**입니다.
 
-**최신 버전: v1.0.10** (2026-11-07 KST) · Windows x64 · [릴리즈와 전체 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.10)
+**최신 버전: v1.0.11** (2026-11-07 KST) · Windows x64 · [릴리즈와 전체 다운로드](https://github.com/P-JSL/gacha_pickup_calculator/releases/tag/v1.0.11)
 
-[Windows 전체 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.10/gacha-pickup-calculator-windows-x64-v1.0.10.zip) · [실제 GUI 캡처 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.10/gacha-pickup-calculator-screenshots-v1.0.10.zip) · [SHA-256 체크섬](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.10/SHA256SUMS.txt)
+[Windows 전체 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.11/gacha-pickup-calculator-windows-x64-v1.0.11.zip) · [실제 GUI 캡처 ZIP](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.11/gacha-pickup-calculator-screenshots-v1.0.11.zip) · [SHA-256 체크섬](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.11/SHA256SUMS.txt)
 
 > **정확도 안내:** 배너 규칙에 대한 픽업 확률은 유한 상태 DP로 계산합니다. 환급·중복 획득·추가 뽑기 재투입은 보유 상태를 모두 알 수 없으므로 Monte Carlo 추정치가 포함됩니다. 비공개 소프트 천장, 베타 배너, 게임 규칙 변경은 공식 결과와 달라질 수 있습니다. **분석 결과는 실제 획득을 보증하지 않습니다.**
 
@@ -12,12 +12,12 @@
 
 1. 위의 **Windows 전체 ZIP**을 받아 **전체 압축을 해제**합니다.
 2. `gacha_pickup_calculator.exe`와 `Image/` 폴더가 같은 위치에 있도록 유지합니다.
-3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다. **이 안내는 v1.0.10 바이너리에 적용됩니다.** 저장소 main의 이후 변경 사항이 설치된 실행 파일에 자동 반영되지는 않습니다.
+3. `gacha_pickup_calculator.exe`를 실행합니다. 관리자 권한이나 API 키는 필요하지 않습니다. **이 안내는 v1.0.11 바이너리에 적용됩니다.** 저장소 main의 이후 변경 사항이 설치된 실행 파일에 자동 반영되지는 않습니다.
 4. 게임을 고른 다음 Dashboard 또는 Simulator에서 목표·기보유 수량을 입력하고, Currency에서 보유 뽑기권과 재화를 설정합니다.
 5. **목표·천장·보유 재화 입력을 모두 마친 뒤 `Run Simulation` 버튼을 클릭**하면 확률·환급 계산이 시작됩니다. 작업이 완료되면 Analytics에서 성공 확률별 **추가 필요 뽑기권 환산량**을 확인합니다.
 
 ```text
-gacha-pickup-calculator-windows-x64-v1.0.10.zip
+gacha-pickup-calculator-windows-x64-v1.0.11.zip
 ├── gacha_pickup_calculator.exe
 ├── Image/
 │   ├── HSR/
@@ -35,18 +35,18 @@ gacha-pickup-calculator-windows-x64-v1.0.10.zip
 Windows PowerShell에서 SHA-256을 확인할 수 있습니다.
 
 ```powershell
-Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.10.zip -Algorithm SHA256
+Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.11.zip -Algorithm SHA256
 ```
 
 공식 릴리즈의 체크섬과 비교한 뒤, GitHub CLI가 설치되어 있다면 **발급자 및 빌드 워크플로 출처**까지 확인하십시오.
 
 ```sh
-gh attestation verify gacha-pickup-calculator-windows-x64-v1.0.10.zip \
+gh attestation verify gacha-pickup-calculator-windows-x64-v1.0.11.zip \
   --repo P-JSL/gacha_pickup_calculator \
   --signer-workflow P-JSL/gacha_pickup_calculator/.github/workflows/rust.yml
 ```
 
-[릴리즈 서명·운영 가이드](docs/SECURE_RELEASE_v1_0_3.md)에 사용 방법과 한계를 설명했습니다. v1.0.3 Windows EXE는 Authenticode 미서명으로 확인되었습니다. v1.0.10은 실제 게시 자산의 서명 여부를 별도 확인해야 합니다. Sigstore 출처 증명은 Windows 코드 서명이나 SmartScreen 신뢰를 대체하지 않습니다.
+[릴리즈 서명·운영 가이드](docs/SECURE_RELEASE_v1_0_3.md)에 사용 방법과 한계를 설명했습니다. v1.0.3 Windows EXE는 Authenticode 미서명으로 확인되었습니다. v1.0.11은 실제 게시 자산의 서명 여부를 별도 확인해야 합니다. Sigstore 출처 증명은 Windows 코드 서명이나 SmartScreen 신뢰를 대체하지 않습니다.
 
 ## 주요 기능
 
@@ -121,7 +121,9 @@ Analytics에서 기본률·현재 모델의 장기 출현률·공개 종합률�
 
 **v1.0.9 환급 결과 표시:** 대시보드의 전체 성공률·환급 후 최초 필요 재화·90% 추가 부족분 및 전체 확률 그래프는 동일한 **공동 공유권 수요 분포**를 기준으로 합니다. 동일 달성률의 환급 전/후 공동 필요권을 비교하며, 실제 시뮬레이션 경로 한 건의 환급 포인트 충당 비중과 표본 오차를 별도로 표시합니다. 캐릭터·장비 각각의 단독 필요치는 환급 전 참고치로, 서로 더하면 안 됩니다. [계산 경계 및 회귀 테스트](RELEASE_NOTES_v1.0.9.md).
 
-**v1.0.10 확률 표기:** 전체 목표의 **기본 성공 확률은 이미 받은 환급 포인트를 이어지는 뽑기에 재사용하는 확률**입니다. 전체 그래프 툴팁에서도 **환급 포함 성공률을 첫 줄**, 환급 전 확률을 **둘째 줄 참고값**으로 표시합니다. `+171장` 같은 수치는 환급으로 획득한 티켓이 아니라 지정 성공률을 위해 **최초 보유 재화에 추가로 준비할 금액**입니다. 단독 캐릭터·장비 그래프는 환급 전 참고 계산이며 전체 목표와 더하거나 동일 확률로 취급하지 않습니다. [상세 수정 및 테스트](RELEASE_NOTES_v1.0.10.md).
+**v1.0.10부터의 확률 표기:** 전체 목표의 **기본 성공 확률은 이미 받은 환급 포인트를 이어지는 뽑기에 재사용하는 확률**입니다. 전체 그래프 툴팁에서도 **환급 포함 성공률을 첫 줄**, 환급 전 확률을 **둘째 줄 참고값**으로 표시합니다. `+171장` 같은 수치는 환급으로 획득한 티켓이 아니라 지정 성공률을 위해 **최초 보유 재화에 추가로 준비할 금액**입니다. 단독 캐릭터·장비 그래프는 환급 전 참고 계산이며 전체 목표와 더하거나 동일 확률로 취급하지 않습니다. [확률 툴팁 수정](RELEASE_NOTES_v1.0.10.md).
+
+**v1.0.11 대시보드 배치:** 상단 KPI 바로 아래에 환급 포함 **전체 목표 성공 확률 그래프**가 나옵니다. 전체 확률 그래프는 가로 전체 폭으로 표시하고, 게임 선택·Run Simulation 설정이 바로 뒤에 나오도록 배치합니다. 목표 필요 재화 상세와 환급 전 단독 참고용 캐릭터·장비 그래프는 설정 아래에 표시합니다. [위치 변경 상세](RELEASE_NOTES_v1.0.11.md).
 
 ### 수동 실행과 병렬 Monte Carlo 정책
 
@@ -139,7 +141,7 @@ v1.0.4부터 **입력 변경 시 자동 계산을 실행하지 않습니다.** �
 
 ## 보안·배포 상태
 
-| 항목 | v1.0.3 당시 확인 상태 (v1.0.10 확정 현황 아님) |
+| 항목 | v1.0.3 당시 확인 상태 (v1.0.11 확정 현황 아님) |
 |---|---|
 | Windows/Ubuntu 빌드·테스트, RustSec, 이미지 검사, GUI 캡처 | 성공 |
 | CodeQL (Rust / Python / Actions) | 분석 워크플로 성공 — 발견 경고 0건을 의미하지는 않음 |
@@ -153,6 +155,6 @@ v1.0.4부터 **입력 변경 시 자동 계산을 실행하지 않습니다.** �
 
 ## 문서·라이선스
 
-[변경 이력](docs/CHANGELOG.md) · [CI 변경 범위·검증 정책](docs/CI_CHANGE_SCOPES.md) · [v1.0.10 릴리즈 노트](RELEASE_NOTES_v1.0.10.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
+[변경 이력](docs/CHANGELOG.md) · [CI 변경 범위·검증 정책](docs/CI_CHANGE_SCOPES.md) · [v1.0.11 릴리즈 노트](RELEASE_NOTES_v1.0.11.md) · [보안 검토](docs/SECURITY_AUDIT.md) · [1.0 최초 출시 검토(역사적 기록)](docs/V1_RELEASE_READINESS.md) · [과거 v0.2.7 검토](docs/FOUR_PASS_AUDIT_v0.2.7.md)
 
 애플리케이션 코드에는 [MIT 라이선스](LICENSE)가 적용됩니다. **타사 게임 이미지와 제3자 리소스의 재배포 권리는 이 라이선스로 자동 부여되지 않습니다.** 배포·재사용 시 원저작권자의 조건을 별도로 확인하십시오.
