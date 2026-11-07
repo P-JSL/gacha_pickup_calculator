@@ -1,6 +1,6 @@
 [package]
 name = "gacha_pickup_calculator"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2021"
 license = "MIT"
 description = "Desktop probability and resource estimator for four gacha games"
