@@ -45,6 +45,50 @@ pub(crate) fn chart_tooltip_rect(graph: egui::Rect, cursor: egui::Pos2, desired_
     egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height))
 }
 
+/// The highlighted probability is always the *refund-recycled* joint CDF
+/// when present. The unrefunded CDF stays visible only as a labeled reference.
+/// Keep tooltip values on separate rows: combining both into one long line
+/// silently clipped the refund probability on narrow desktop cards.
+pub(crate) fn chart_tooltip_lines(
+    series: &[ChartSeries<'_>], x: usize, language: Language,
+) -> Vec<(String, Color32)> {
+    let pull_unit = match language {
+        Language::Korean => "뽑 이내",
+        Language::English => "pulls or fewer",
+        Language::Japanese => "連以内",
+        Language::ChineseSimplified => "抽以内",
+        Language::ChineseTraditional => "抽以內",
+    };
+    if let Some(recycled) = series.iter().find(|line| matches!(line.source, ChartSource::Refund(_))) {
+        let (primary, reference) = match language {
+            Language::Korean => ("환급 재투입 포함", "환급 전(참고)"),
+            Language::English => ("With recycled refunds", "Before refunds (reference)"),
+            Language::Japanese => ("還元再利用込み", "還元前（参考）"),
+            Language::ChineseSimplified => ("含返还再投入", "返还前（参考）"),
+            Language::ChineseTraditional => ("含返還再投入", "返還前（參考）"),
+        };
+        let mut rows = vec![(
+            format!("{x} {pull_unit} · {primary} {:.1}%", recycled.source.probability(x) * 100.0),
+            Color32::WHITE,
+        )];
+        rows.extend(series.iter()
+            .filter(|line| !matches!(line.source, ChartSource::Refund(_)))
+            .map(|line| (
+                format!("{reference} {:.1}%", line.source.probability(x) * 100.0),
+                MUTED,
+            )));
+        rows
+    } else {
+        series.iter().enumerate().map(|(i, line)| (
+            format!("{}{label} {:.1}%",
+                if i == 0 { format!("{x} {pull_unit} · ") } else { String::new() },
+                line.source.probability(x) * 100.0,
+                label = line.label),
+            Color32::WHITE,
+        )).collect()
+    }
+}
+
 /// Common Painter plot for all desktop OSs; it uses only egui logical points.
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
@@ -151,26 +195,24 @@ pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_
                 project(x, line.source.probability(x)), 3.5, line.color,
             );
         }
-        let pull_unit = match language {
-            Language::Korean => "뽑 이내", Language::English => "pulls or fewer",
-            Language::Japanese => "連以内", Language::ChineseSimplified => "抽以内",
-            Language::ChineseTraditional => "抽以內",
-        };
-        let tooltip = format!(
-            "{x} {pull_unit} · {}",
-            series.iter().map(|line| format!("{} {:.1}%", line.label,
-                line.source.probability(x) * 100.0)).collect::<Vec<_>>().join(" · ")
-        );
-        // Native egui hover popups can escape the chart; never use on_hover_text here.
+        let rows = chart_tooltip_lines(series, x, language);
+        // Native egui popups can escape the chart. Draw a compact multi-row
+        // overlay inside the plot instead, prioritizing recycled success.
         let tooltip_font = egui::FontId::proportional(10.5);
-        let text_width = ui.fonts(|fonts| fonts.layout_no_wrap(
-            tooltip.clone(), tooltip_font.clone(), Color32::WHITE).size().x);
-        let badge = chart_tooltip_rect(graph, pointer, text_width + 16.0, 22.0);
+        let text_width = ui.fonts(|fonts| rows.iter().map(|(label, _)| {
+            fonts.layout_no_wrap(label.clone(), tooltip_font.clone(), Color32::WHITE).size().x
+        }).fold(0.0_f32, f32::max));
+        let row_height = 16.0;
+        let badge_height = (rows.len() as f32 * row_height + 6.0).max(22.0);
+        let badge = chart_tooltip_rect(graph, pointer, text_width + 16.0, badge_height);
         painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
         let overlay = painter.with_clip_rect(badge.intersect(graph).shrink(3.0));
-        overlay.text(badge.left_center() + egui::vec2(7.0, 0.0),
-            egui::Align2::LEFT_CENTER, &tooltip,
-            tooltip_font, Color32::WHITE);
+        for (i, (label, color)) in rows.iter().enumerate() {
+            let y = badge.center().y
+                + (i as f32 - (rows.len() as f32 - 1.0) / 2.0) * row_height;
+            overlay.text(egui::pos2(badge.left() + 7.0, y),
+                egui::Align2::LEFT_CENTER, label, tooltip_font.clone(), *color);
+        }
         }
     }
     // The compact dashboard uses one line per card. Keep legends only where
