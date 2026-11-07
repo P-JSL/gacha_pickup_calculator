@@ -175,7 +175,7 @@ impl Calculator {
                     egui::ComboBox::from_id_salt("sample_count")
                         .selected_text(format!("{}회", self.feedback_cfg.samples))
                         .show_ui(ui, |ui| {
-                            for n in [5_000, 20_000, 50_000, 100_000] {
+                            for n in [5_000, 20_000, 50_000, 100_000, 250_000, 500_000, 1_000_000] {
                                 dirty |= ui.selectable_value(&mut self.feedback_cfg.samples, n,
                                     format!("{n}회")).changed();
                             }
