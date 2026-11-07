@@ -1,10 +1,10 @@
-# Rust 모듈 책임 및 공개 API 경계 (v1.0.3 기준)
+# Rust 모듈 책임 및 공개 API 경계 (v1.0.6 기준)
 
 ## 외부 계약
 
 - `src/lib.rs`의 `RateMode`, `RateSchedule`, `SoftPity`, `Banner`, `BannerRule`, `Spark`, `Distribution`, `Allocation`, `optimal_allocation`을 1.x 공개 API로 재수출합니다.
 - `games`, `feedback`, `tracker`, `observations`도 기존 공개 모듈 경로를 유지합니다.
-- `src/main.rs`는 기존 GUI 진입점, 애플리케이션 단위 테스트를 유지하며 앱/화면/계산 파일은 `#[path = "..."] mod`로 독립 컴파일됩니다.
+- `src/main.rs`는 기존 GUI 진입점만 유지하고 애플리케이션 회귀 테스트는 `src/app/tests.rs`로 분리합니다. 앱/화면/계산 파일은 `#[path = "..."] mod`로 독립 컴파일됩니다.
 - private 필드·메서드는 불필요한 외부 노출 없이 `pub(crate)`로 공유합니다. 임의의 `include!` 소스 병합을 하지 않습니다.
 
 ## 실제 책임
@@ -16,20 +16,36 @@
 | `src/probability/distributions.rs` | PMF/CDF, 분위수, 적응 배분 |
 | `src/probability/fft.rs` | 밀집 확률 분포의 O(N log N) 합성 |
 | `src/domain/games.rs` | 게임별 규칙과 재화 |
-| `src/domain/feedback.rs` | 환급 Monte Carlo 추정 |
-| `src/analysis/*` | 관측 자료·트래커 |
-| `src/data/*` | 카탈로그·보안·라이브 데이터 |
+| `src/domain/feedback.rs` | 환급 도메인 모듈 루트·난수/Wallet 공유 경계 및 기존 외부 API 재수출 |
+| `src/domain/feedback/config.rs` | 게임별 교환/환급 설정 및 입력 검증 |
+| `src/domain/feedback/results.rs` | 공개 결과 자료형·분위수/조건부 통계 |
+| `src/domain/feedback/rolls.rs` | 배너별 뽑기 경로와 환급 트랜잭션 규칙 |
+| `src/domain/feedback/runner.rs` | 취소 가능한 시뮬레이션 청크·CPU 예산·정수 합산·정렬 |
+| `src/domain/feedback/tests.rs` | 환급 재현성·수치 회귀·극단 값 검사 |
+| `src/analysis/observations.rs` | 관측 결과 자료형·Greenwood 오차 및 모델 비교 |
+| `src/analysis/observations/parser.rs` | CSV 입력/검열 데이터 검증 및 위험집합 구성 |
+| `src/analysis/observations/tests.rs`, `src/analysis/tracker.rs` | 실측 회귀 사례 및 트래커 출처/기대값 |
+| `src/data/catalog.rs`, `src/data/catalog/ui.rs` | 정적/실시간 카탈로그 색인과 이미지 디코딩/픽커 UI |
+| `src/data/runtime_updates.rs` | 비동기 업데이트 상태·완료 이벤트 |
+| `src/data/runtime_updates/network.rs` | 검증된 HTTPS·SHA 인증·릴리즈 메타데이터 |
+| `src/data/runtime_updates/cache.rs` | 제한된 로컬 캐시 읽기·원자적 쓰기·검증된 스테이징 |
+| `src/data/runtime_updates/bundle.rs` | 카탈로그/PNG 포맷·해시·매니페스트 검증 |
+| `src/data/security.rs` | 로컬 업데이트 및 이미지 신뢰 경계 |
 | `src/app/state.rs` | 게임별 세션과 Calculator 상태 |
 | `src/app/compute.rs` | 작업 요청/응답과 결과 집계 |
 | `src/app/funding.rs` | 목표 예산/전용권 계산, 순수 데이터 모델 |
 | `src/ui/funding_view.rs` | 목표 예산 위젯 및 전용권 입력 |
-| `src/app/controller_*.rs` | 게임 전환, 편집, 환급, 분석, 관측 |
+| `src/app/controller_session.rs` + `controller_session/*` | 게임별 세션·데이터 선택 / 작업 취소·결과 수신 / 내비게이션 |
+| `src/app/controller_editor.rs` + `controller_editor/*` | 환경 설정 / 캐릭터·무기·천장 편집 / 재화 입력 |
+| `src/app/controller_refunds.rs`, `controller_analytics.rs`, `controller_evidence.rs` | 환급 옵션, 분석 UI, 실측 근거 입력 |
 | `src/app/lifecycle.rs` | eframe 수명주기·렌더 루프·폰트 |
-| `src/ui/navigation.rs`, `src/ui/charts.rs`, `src/ui/dashboard.rs` | 내비게이션, 차트, 대시보드 |
+| `src/ui/navigation.rs`, `src/ui/charts.rs` | 내비게이션·공통 차트·프레임 스타일 |
+| `src/ui/dashboard.rs` + `src/ui/dashboard/*` | 공통 렌더링 프리미티브 / 개요 / 입력 설정 / 결과 패널 |
+| `src/lib.rs`, `src/main.rs` + `src/probability/tests.rs`, `src/app/tests.rs` | 외부 라이브러리·GUI 진입점과 독립 회귀 테스트 |
 
 ## 설계상의 현재 경계
 
-- 파일 수준뿐 아니라 Rust `mod` 경계는 적용했습니다. 그러나 일부 컨트롤러와 UI는 여전히 `Calculator`의 crate-private 상태에 접근합니다. 이 결합은 내부 상태를 무리하게 복제하거나 이벤트 순서를 바꾸지 않기 위해 보존한 부분이며, 완전한 도메인 독립성이 달성되었다고 주장하지 않습니다.
+- 각 구현 책임을 Rust `mod` 하위 경계로 추가 분리했습니다. 그러나 일부 컨트롤러와 UI는 여전히 `Calculator`의 crate-private 상태에 접근합니다. 이 결합은 내부 상태를 무리하게 복제하거나 이벤트 순서를 바꾸지 않기 위해 보존한 부분이며, 완전한 도메인 독립성이 달성되었다고 주장하지 않습니다.
 - `GoalFunding`은 egui를 사용하지 않으며, 렌더링은 `funding_view`가 담당합니다.
 - 계산 워커의 generation 검사, 게임별 세션, 캐릭터 전용 장비 자동 연동, 기존 공개 API를 변경하지 않습니다.
 - 확률 계산의 복잡도 및 정확도 조건은 [성능 설계](PERFORMANCE_V1_0_1.md)를 참고하십시오.
