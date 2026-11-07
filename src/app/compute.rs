@@ -4,8 +4,8 @@ pub(crate) struct Computed {
     pub(crate) character: Distribution,
     pub(crate) weapon: Distribution,
     pub(crate) combined: Distribution,
-    pub(crate) feedback: Option<FeedbackEstimate>,
-    pub(crate) wuwa_strategies: Option<Vec<FeedbackEstimate>>,
+    pub(crate) feedback: Option<Arc<FeedbackEstimate>>,
+    pub(crate) wuwa_strategies: Option<Vec<Arc<FeedbackEstimate>>>,
     pub(crate) exact_shared_required: Option<[usize; 6]>,
 }
 
@@ -32,12 +32,13 @@ pub(crate) fn compute(request: &CalculationRequest) -> Result<Computed, String> 
         for max_wavebands in 0..=2 {
             let mut variant = request.feedback_config.clone();
             variant.wuwa_waveband_max = max_wavebands;
-            strategies.push(estimate(&request.setup, request.mode, &variant)?);
+            strategies.push(Arc::new(estimate(&request.setup, request.mode, &variant)?));
         }
-        let selected = strategies[request.feedback_config.wuwa_waveband_max.min(2)].clone();
+        // Reuse the selected scenario set instead of cloning up to a million trials.
+        let selected = Arc::clone(&strategies[request.feedback_config.wuwa_waveband_max.min(2)]);
         (Some(selected), Some(strategies))
     } else if request.feedback_config.enabled {
-        (Some(estimate(&request.setup, request.mode, &request.feedback_config)?), None)
+        (Some(Arc::new(estimate(&request.setup, request.mode, &request.feedback_config)?)), None)
     } else {
         (None, None)
     };
