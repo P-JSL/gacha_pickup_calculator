@@ -355,7 +355,8 @@ jobs:
           fi
           test -s /usr/share/fonts/truetype/nanum/NanumGothic.ttf
           chmod +x target/release/gacha_pickup_calculator
-          echo "::notice title=GUI capture::Starting actual GUI screenshots with a 3-minute limit."
+          python3 -m unittest discover -s scripts -p 'test_ui_capture_controls.py' -v
+          echo "::notice title=GUI capture::Clicking Run Simulation and watching real worker completion."
           timeout --signal=TERM --kill-after=10s 180s bash scripts/capture_readme_screenshots.sh
           echo "::notice title=GUI capture::Screenshot capture and PNG checks completed."
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

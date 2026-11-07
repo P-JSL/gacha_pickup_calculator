@@ -114,6 +114,13 @@ impl eframe::App for Calculator {
                                     ui.add_space(6.0);
                                     settings_changed |= self.feedback_controls(ui);
                                 }
+                                // The editor has its own explicit Run button so
+                                // finishing inputs never requires switching tabs.
+                                ui.add_space(9.0);
+                                if ui.add_enabled(!self.calculating, egui::Button::new(
+                                    t(self.language(), "Run Simulation"))).clicked() {
+                                    self.manual_calculation_requested = true;
+                                }
                             }
                             ViewMode::TrackerSources => {
                                 page_intro(ui, "TRACKER EVIDENCE",

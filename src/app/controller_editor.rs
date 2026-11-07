@@ -26,7 +26,8 @@ impl Calculator {
                 "모든 목표·천장·보유 재화를 입력한 후 Run Simulation을 누르면 계산합니다. \
                  입력 변경이나 게임 전환만으로는 계산을 시작하지 않습니다."
             ).color(MUTED).size(11.0));
-            if ui.button(t(language, "Run Simulation")).clicked() {
+            if ui.add_enabled(!self.calculating,
+                egui::Button::new(t(language, "Run Simulation"))).clicked() {
                 self.manual_calculation_requested = true;
             }
         });
