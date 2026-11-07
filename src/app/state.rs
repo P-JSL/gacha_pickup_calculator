@@ -104,6 +104,7 @@ pub(crate) struct Calculator {
     pub(crate) worker: Sender<CalculationRequest>,
     pub(crate) results: Receiver<CalculationResponse>,
     pub(crate) generation: u64,
+    pub(crate) active_generation: Arc<AtomicU64>,
     pub(crate) calculating: bool,
     // CI-only, generation-tagged evidence of real button-triggered computation.
     pub(crate) ci_capture: bool,
