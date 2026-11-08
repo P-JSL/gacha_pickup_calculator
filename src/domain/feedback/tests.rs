@@ -236,8 +236,9 @@
         assert_eq!(cfg.weapon_first, 0);
         assert_eq!(cfg.featured_duplicate, 200);
         assert_eq!(cfg.weapon_rare, 200);
-        assert_eq!(cfg.four_star_reward, 40);
-        assert_eq!(cfg.weapon_four_star_reward, 40);
+        assert_eq!(cfg.four_star_reward, 40); // ordinary 4-star duplicate
+        assert_eq!(cfg.four_star_maxed, 70); // fully upgraded 4-star Trekker
+        assert_eq!(cfg.weapon_four_star_reward, 80); // fully upgraded 4-star record
     }
 
     #[test]
