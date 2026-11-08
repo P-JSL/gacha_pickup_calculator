@@ -54,7 +54,8 @@ impl Calculator {
             }
             if self.setup.game == Game::StarRail {
                 ui.colored_label(GOLD,
-                    "스타레일: 스타라이트 20개=전용 티켓 1장. 캐릭터 중복 5성 40개(풀돌 후 100개), 4성 8개(풀돌 후 20개); 광추 5성 40개, 4성 8개.");
+                    "스타레일: 스타라이트 20개=전용 티켓 1장. 캐릭터 중복 5성 40개(풀돌 후 100개), 4성 풀돌 20개; 광추 5성 40개, 4성 8개.");
+                ui.small("4성 픽업 보장: 캐릭터 50%, 광추 75%(픽업 실패 후 다음 4성 확정). 비픽업 4성의 캐릭터/광추 구성은 50:50 추정입니다.");
             }
             if self.setup.game == Game::StellaSora {
                 ui.colored_label(GOLD,
@@ -75,7 +76,7 @@ impl Calculator {
                 });
                 ui.small("캐릭터 1회당 골든 레코드 30개, 레코드 1회에 300개. 첫 10연(선택)은 10회분 300개 대신 900개 지급이며, 10회를 먼저 결제합니다. 전문가 증명서에 3배를 적용하지 않습니다.");
             } else {
-                ui.label(RichText::new("4성의 중복·보유 상태는 입력한 평균 보상 가정에 따라 계산합니다.")
+                ui.label(RichText::new("기본 가정: 모든 4성 캐릭터/A급은 최대 돌파 상태입니다. 장비는 별도 환급 보상을 사용하며, 비율은 고급 설정에서 수정할 수 있습니다.")
                     .color(MUTED).size(11.0));
             }
             if self.feedback_cfg.enabled {
@@ -120,7 +121,7 @@ impl Calculator {
                     ui.label("캐릭터 4성 평균 환급");
                     dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_reward)
                         .range(0..=100_000)).changed();
-                    if matches!(self.setup.game, Game::StarRail | Game::Neverness) {
+                    {
                         ui.label("풀돌 4성/A급 환급");
                         dirty |= ui.add(egui::DragValue::new(&mut self.feedback_cfg.four_star_maxed)
                             .range(0..=100_000)).changed();
@@ -203,7 +204,7 @@ impl Calculator {
                         if self.setup.game == Game::Neverness {
                     ui.small("보드 10회마다 자연 획득과 별개의 추가 A급 1개를 받는 규칙을 반영합니다. 보상은 캐릭터 20%/Arc 80%로 근사하며, 보드 타일별 A급 출현률·소유 중복률은 정확히 재현되지 않습니다.");
                 }
-                ui.colored_label(MUTED, "4성/A급 확률은 단일 뽑기 전체 기준입니다. 천장·보너스 지급은 별도로 처리하며, 중복 보유량을 모르는 환급은 조건부 추정입니다.");
+                ui.colored_label(MUTED, "4성/A급 확률은 단일 뽑기 기준입니다. 스타레일·명조는 픽업 4성 보장과 캐릭터/장비를 구분합니다. 비픽업 구성 50:50, 스텔라 소라·이환의 캐릭터 배너 내 4성 종류는 모델 가정입니다.");
                     });
             }
         });
