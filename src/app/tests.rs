@@ -181,6 +181,7 @@
         config.weapon_first = 1;
         config.weapon_rare = 1;
         config.four_star_reward = 0;
+        config.four_star_maxed = 0;
         config.weapon_four_star_reward = 0;
         let feedback = estimate(&setup, RateMode::PublishedOnly, &config).unwrap();
         let character = setup.character.distribution(RateMode::PublishedOnly).unwrap();

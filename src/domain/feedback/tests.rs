@@ -170,6 +170,11 @@
         assert_eq!(wuwa.points_per_ticket, 8);
         assert_eq!(nte.points_per_ticket, 24);
         assert_eq!(stella.points_per_ticket, 100);
+        for cfg in [&hsr, &wuwa, &nte, &stella] {
+            assert_eq!(cfg.four_star_maxed_share, 1.0);
+        }
+        assert_eq!(stella.four_star_maxed, 70);
+        assert_eq!(stella.weapon_four_star_reward, 80);
     }
 
     #[test]
@@ -185,6 +190,7 @@
         let mut cfg = FeedbackConfig::for_game(Game::StarRail);
         cfg.samples = 10;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         let sample = result.scenario_at_quantile(0.9).unwrap();
         assert_eq!(sample.initial_flexible_required, result.quantile(0.9));
@@ -212,6 +218,7 @@
         cfg.character_other_five_star_rate = 1.0;
         cfg.character_four_star_rate = 0.0;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         let result = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         let path = result.scenario_at_quantile(0.5).unwrap();
         assert_eq!(path.raw_pulls, 3);
@@ -229,8 +236,9 @@
         assert_eq!(cfg.weapon_first, 0);
         assert_eq!(cfg.featured_duplicate, 200);
         assert_eq!(cfg.weapon_rare, 200);
-        assert_eq!(cfg.four_star_reward, 40);
-        assert_eq!(cfg.weapon_four_star_reward, 40);
+        assert_eq!(cfg.four_star_reward, 40); // ordinary 4-star duplicate
+        assert_eq!(cfg.four_star_maxed, 70); // fully upgraded 4-star Trekker
+        assert_eq!(cfg.weapon_four_star_reward, 80); // fully upgraded 4-star record
     }
 
     #[test]
@@ -250,6 +258,7 @@
         cfg.points_per_ticket = 1;
         cfg.featured_duplicate = 1;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         cfg.samples = 20;
         let stats = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         let sample = stats.scenario_at_quantile(0.90).unwrap();
@@ -294,6 +303,7 @@
         cfg.wuwa_waveband_cost = 2;
         cfg.points_per_ticket = 2;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         cfg.character_four_star_rate = 0.0;
         let tickets = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         assert_eq!(tickets.quantile(1.0), 1);
@@ -327,6 +337,8 @@
         for (game, normal, maxed, weapon) in [(Game::StarRail, 8, 20, 8), (Game::Neverness, 6, 12, 4)] {
             let mut config = FeedbackConfig::for_game(game);
             let mut rng = SplitMix64(42);
+            assert_eq!(character_four_star_refund(&mut rng, &config), maxed);
+            config.four_star_maxed_share = 0.0;
             assert_eq!(character_four_star_refund(&mut rng, &config), normal);
             config.four_star_maxed_share = 1.0;
             assert_eq!(character_four_star_refund(&mut rng, &config), maxed);
@@ -334,6 +346,44 @@
             config.four_star_maxed_share = 1.01;
             assert!(config.validate().is_err());
         }
+    }
+
+    #[test]
+    fn featured_four_star_refunds_distinguish_characters_and_equipment() {
+        // Conditional on obtaining a 4-star, featured share = 1/(2 - p).
+        // Off-featured character/equipment results are approximated as 50:50.
+        for (game, kind, expected) in [
+            (Game::StarRail, BannerKind::Character, 18.0),
+            (Game::StarRail, BannerKind::Weapon, 9.2),
+            (Game::WutheringWaves, BannerKind::Character, 43.0 / 6.0),
+            (Game::WutheringWaves, BannerKind::Weapon, 23.0 / 6.0),
+        ] {
+            let cfg = FeedbackConfig::for_game(game);
+            let mut rng = SplitMix64(154);
+            let mut guaranteed = false;
+            let samples = 120_000;
+            let points: usize = (0..samples)
+                .map(|_| event_four_star_refund(
+                    &mut rng, &cfg, game, kind, &mut guaranteed))
+                .sum();
+            let average = points as f64 / samples as f64;
+            assert!((average - expected).abs() < 0.05,
+                "{game:?}: expected {expected}, got {average}");
+        }
+    }
+
+    #[test]
+    fn featured_four_star_guarantee_is_independent_of_five_star_pity() {
+        let cfg = FeedbackConfig::for_game(Game::StarRail);
+        let mut rng = SplitMix64(1);
+        let mut guaranteed = true;
+        assert_eq!(event_four_star_refund(&mut rng, &cfg, Game::StarRail,
+            BannerKind::Character, &mut guaranteed), 20);
+        assert!(!guaranteed);
+        guaranteed = true;
+        assert_eq!(event_four_star_refund(&mut rng, &cfg, Game::StarRail,
+            BannerKind::Weapon, &mut guaranteed), 8);
+        assert!(!guaranteed);
     }
 
     #[test]
@@ -408,6 +458,7 @@
         cfg.character_four_star_rate = 0.0;
         cfg.weapon_four_star_rate = 0.0;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         cfg.weapon_four_star_reward = 0;
         let actual = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
         assert_eq!(actual.average_record_disc_units_earned, 300.0);
@@ -447,6 +498,7 @@
         let mut config = FeedbackConfig::for_game(Game::Neverness);
         config.samples = 20;
         config.four_star_reward = 7;
+        config.four_star_maxed_share = 0.0;
         config.weapon_four_star_reward = 7;
         config.character_four_star_rate = 0.0;
         config.featured_first = 0;
@@ -496,6 +548,7 @@
         cfg.character_other_five_star_rate = 0.0;
         cfg.character_four_star_rate = 0.0;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         cfg.stella_record_discs_per_character_pull = 0;
         setup.character_owned = 5;
         setup.set_targets(6, 0);
@@ -533,6 +586,7 @@
         cfg.character_other_five_star_rate = 0.0;
         cfg.weapon_other_five_star_rate = 0.0;
         cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
         cfg.weapon_four_star_reward = 0;
         cfg.stella_first_ten_remaining = 10;
         let boosted = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
@@ -647,6 +701,7 @@
         let mut model = FeedbackConfig::for_game(Game::StarRail);
         model.samples = 25_000;
         model.four_star_reward = 0;
+        model.four_star_maxed = 0;
         model.four_star_maxed = 0;
         model.weapon_four_star_reward = 0;
         model.off_banner_rare = 0;

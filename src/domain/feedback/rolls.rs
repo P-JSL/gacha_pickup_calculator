@@ -55,6 +55,30 @@ pub(super) fn character_four_star_refund(rng: &mut SplitMix64, model: &FeedbackC
     }
 }
 
+/// On HSR/WuWa event banners, featured 4-star hits are characters on the
+/// character banner and equipment on the weapon banner. A missed 4-star
+/// featured roll guarantees the next 4-star is featured, separately from 5-star
+/// pity. The unfeatured character/equipment split is a 50:50 approximation.
+pub(super) fn event_four_star_refund(rng: &mut SplitMix64, model: &FeedbackConfig,
+    game: Game, kind: BannerKind, featured_guaranteed: &mut bool) -> usize {
+    let featured_rate = match (game, kind) {
+        (Game::StarRail, BannerKind::Weapon) => 0.75,
+        (Game::StarRail | Game::WutheringWaves, _) => 0.50,
+        _ => return match kind {
+            BannerKind::Character => character_four_star_refund(rng, model),
+            BannerKind::Weapon => model.weapon_four_star_reward,
+        },
+    };
+    let featured = *featured_guaranteed || rng.hits(featured_rate);
+    *featured_guaranteed = !featured;
+    let character = match kind {
+        BannerKind::Character => featured || rng.hits(0.50),
+        BannerKind::Weapon => !featured && rng.hits(0.50),
+    };
+    if character { character_four_star_refund(rng, model) }
+    else { model.weapon_four_star_reward }
+}
+
 pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (BannerKind, Game),
                  mode: RateMode, model: &FeedbackConfig, wallet: &mut Wallet,
                  (owned, dedicated, waveband_limit): (usize, &mut usize, usize)) {
@@ -71,6 +95,8 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
         BannerKind::Character => model.character_four_star_pity,
         BannerKind::Weapon => model.weapon_four_star_pity,
     };
+    // Starting 4-star featured guarantee is unclaimed; not yet an account input.
+    let mut four_featured_guaranteed = false;
     // NTE's every-10-dice A-rank gift is an EXTRA item, not a replacement
     // for the rarest/4★ outcome. The current saved count carries between
     // limited boards; the 20/80 character/Arc split is a published approximation.
@@ -103,10 +129,8 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
         let rare = rng.hits(rare_probability);
         if maybe_four_star(rng, model, kind, &mut four_pity, rare,
                            rare_probability, game != Game::Neverness) {
-            wallet.refund(match kind {
-                BannerKind::Character => character_four_star_refund(rng, model),
-                BannerKind::Weapon => model.weapon_four_star_reward,
-            });
+            wallet.refund(event_four_star_refund(
+                rng, model, game, kind, &mut four_featured_guaranteed));
         }
         if rare {
             pity = 0;

@@ -19,8 +19,8 @@ pub struct FeedbackConfig {
     pub four_star_reward: usize,
     /// Reward for a fully upgraded 4-star character (or A-rank character).
     pub four_star_maxed: usize,
-    /// Assumed share of 4-star character hits that are already fully upgraded.
-    /// Does not affect weapon / Arc outcomes; these retain their fixed payout.
+    /// Share of 4-star characters already at maximum upgrade.
+    /// Defaults to 100% for all games; weapon / Arc / record rewards are separate.
     pub four_star_maxed_share: f64,
     /// Average 4★ payout on the weapon / record banner.
     pub weapon_four_star_reward: usize,
@@ -57,7 +57,7 @@ impl FeedbackConfig {
                 enabled: true, points_per_ticket: 20, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40, featured_maxed: 100,
                 off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
-                four_star_reward: 8, four_star_maxed: 20, four_star_maxed_share: 0.0,
+                four_star_reward: 8, four_star_maxed: 20, four_star_maxed_share: 1.0,
                 weapon_four_star_reward: 8, character_four_star_rate: 0.051,
                 weapon_four_star_rate: 0.066,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -70,7 +70,7 @@ impl FeedbackConfig {
                 enabled: true, points_per_ticket: 8, initial_points: 0,
                 featured_first: 15, featured_duplicate: 15, featured_maxed: 40,
                 off_banner_rare: 45, weapon_first: 15, weapon_rare: 15,
-                four_star_reward: 3, four_star_maxed: 8, four_star_maxed_share: 0.0,
+                four_star_reward: 3, four_star_maxed: 8, four_star_maxed_share: 1.0,
                 weapon_four_star_reward: 3, character_four_star_rate: 0.06,
                 weapon_four_star_rate: 0.06,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -85,7 +85,7 @@ impl FeedbackConfig {
                 enabled: true, points_per_ticket: 24, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40, featured_maxed: 80,
                 off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
-                four_star_reward: 6, four_star_maxed: 12, four_star_maxed_share: 0.0,
+                four_star_reward: 6, four_star_maxed: 12, four_star_maxed_share: 1.0,
                 weapon_four_star_reward: 4,
                 character_four_star_rate: 0.06, weapon_four_star_rate: 0.07,
                 character_other_five_star_rate: 0.0, weapon_other_five_star_rate: 0.0,
@@ -102,8 +102,8 @@ impl FeedbackConfig {
                 enabled: true, points_per_ticket: 100, initial_points: 0,
                 featured_first: 0, featured_duplicate: 200, featured_maxed: 500,
                 off_banner_rare: 200, weapon_first: 0, weapon_rare: 200,
-                four_star_reward: 40, four_star_maxed: 70, four_star_maxed_share: 0.0,
-                weapon_four_star_reward: 40,
+                four_star_reward: 40, four_star_maxed: 70, four_star_maxed_share: 1.0,
+                weapon_four_star_reward: 80,
                 character_four_star_rate: 0.04, weapon_four_star_rate: 0.08,
                 character_other_five_star_rate: 0.01, weapon_other_five_star_rate: 0.005,
                 four_star_hard: 10, character_four_star_pity: 0,
