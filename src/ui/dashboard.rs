@@ -7,25 +7,6 @@ const PINK: Color32 = Color32::from_rgb(225, 112, 232);
 const SUCCESS: Color32 = Color32::from_rgb(141, 238, 117);
 const DEEP_CARD: Color32 = Color32::from_rgb(16, 43, 64);
 
-/// Subtle vertical gradient; the rounded base remains visible at the corners.
-fn wash(ui: &egui::Ui, rect: egui::Rect, upper: Color32, lower: Color32) {
-    ui.painter().rect_filled(rect, 14.0, upper);
-    let r = rect.shrink(9.0);
-    if r.width() <= 0.0 || r.height() <= 0.0 { return; }
-    let mut mesh = egui::Mesh::default();
-    for (point, color) in [
-        (r.left_top(), upper), (r.right_top(), upper),
-        (r.left_bottom(), lower), (r.right_bottom(), lower),
-    ] {
-        mesh.vertices.push(egui::epaint::Vertex {
-            pos: point, uv: egui::epaint::WHITE_UV, color,
-        });
-    }
-    mesh.indices.extend_from_slice(&[0, 2, 1, 1, 2, 3]);
-    ui.painter().add(egui::Shape::mesh(mesh));
-
-}
-
 fn dashboard_card(ui: &mut egui::Ui, title: &str, content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::group(ui.style())
         .fill(DEEP_CARD)
@@ -85,28 +66,83 @@ fn metric_icon(p: &egui::Painter, c: egui::Pos2, kind: usize, color: Color32) {
     }
 }
 
-/// Paint a card with fixed geometry so values cannot push other dashboard cards down.
+/// Native widgets automatically wrap long text rather than overpainting peers.
 fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, note: String, color: Color32) {
-    let (r, _) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width().max(90.0), 120.0), egui::Sense::hover(),
-    );
     let base = if kind == 1 { Color32::from_rgb(14, 59, 76) }
                else if kind == 2 { Color32::from_rgb(35, 57, 94) }
                else { Color32::from_rgb(28, 63, 96) };
-    wash(ui, r, base, Color32::from_rgb(17, 43, 67));
-    // Clip large text at the edge of its metric card, never paint over peers.
-    let paint = ui.painter().with_clip_rect(r.shrink(4.0));
-    metric_icon(&paint, egui::pos2(r.left()+34.0,r.top()+47.0), kind, color);
-    let left = r.left()+66.0;
-    paint.text(egui::pos2(left,r.top()+18.0),
-        egui::Align2::LEFT_TOP, label, egui::FontId::proportional(12.0),
-        Color32::WHITE);
-    paint.text(egui::pos2(left,r.top()+43.0),
-        egui::Align2::LEFT_TOP, value, egui::FontId::proportional(27.0),
-        Color32::WHITE);
-    paint.text(egui::pos2(left,r.top()+94.0),
-        egui::Align2::LEFT_TOP, note, egui::FontId::proportional(10.0),
-        MUTED);
+    egui::Frame::group(ui.style())
+        .fill(base)
+        .stroke(egui::Stroke::new(1.0, BORDER))
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(10)
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.set_min_height(114.0);
+            ui.horizontal(|ui| {
+                let (rect, _) = ui.allocate_exact_size(
+                    egui::vec2(42.0, 42.0), egui::Sense::hover());
+                metric_icon(ui.painter(), rect.center(), kind, color);
+                ui.vertical(|ui| {
+                    ui.add(egui::Label::new(RichText::new(label).size(11.0)).wrap());
+                    ui.add(egui::Label::new(RichText::new(value).size(23.0).strong()).wrap());
+                    ui.add(egui::Label::new(RichText::new(note).size(10.0).color(MUTED)).wrap());
+                });
+            });
+        });
+}
+
+/// Three mutually-exclusive stages from the SAME Monte Carlo samples.
+fn refund_stages_card(ui: &mut egui::Ui, result: &BudgetSuccessBreakdown,
+                      owned: usize, mean_raw: f64, average_refund_tickets: f64,
+                      language: Language) {
+    let (title, first, second, third, mean_title, all_refunds, subset) = match language {
+        Language::Korean => (
+            "보유권 소진 후 환급 재투입 결과", "기존 보유 뽑기권만으로 성공",
+            "기존권 소진 후 환급으로 추가 성공", "환급까지 사용했지만 실패",
+            "전체 평균 소요 뽑기", "전체 평균 생성 환급권", "환급 추가 성공 경로 평균 (추가 뽑기 / 생성 환급권)"),
+        _ => (
+            "Original tickets, then recycled refunds", "Success with original tickets",
+            "Additional success using refunds", "Failed after refunds",
+            "Mean raw draws", "Mean earned refund tickets", "Refund-only wins (extra draws / earned refund tickets)"),
+    };
+    dashboard_card(ui, title, |ui| {
+        ui.add(egui::Label::new(match language {
+            Language::Korean => format!(
+                "보유 뽑기권 {owned}장을 우선 사용하고, 누적 교환 포인트로 추가 뽑기를 진행하는 결과입니다. ({}회 동일 표본)",
+                result.samples),
+            _ => format!(
+                "Use {owned} original tickets first, then accumulated exchange points for extra draws ({} trials).",
+                result.samples),
+        }).wrap());
+        ui.add_space(5.0);
+        for (label, probability, color) in [
+            (first, result.original_probability(), SUCCESS),
+            (second, result.recycling_probability(), CYAN),
+            (third, result.failure_probability(), Color32::from_rgb(210, 149, 91)),
+        ] {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(label);
+                ui.label(RichText::new(format!("{:.2}%", probability * 100.0))
+                    .strong().color(color));
+            });
+            ui.add(egui::ProgressBar::new(probability as f32)
+                .fill(color).desired_height(9.0));
+            ui.add_space(4.0);
+        }
+        ui.separator();
+        ui.label(format!("{mean_title}: {mean_raw:.1}"));
+        ui.label(format!("{all_refunds}: {average_refund_tickets:.1}"));
+        if result.after_recycling > 0 {
+            ui.label(format!("{subset}: +{:.1} / {:.1}",
+                result.average_extra_recycled_draws,
+                result.average_refund_tickets_on_recycled_success));
+        }
+        ui.add(egui::Label::new(match language {
+            Language::Korean => "생성 환급권에는 목표 완료 후 미사용 잔액도 포함됩니다. 환급은 해당 뽑기 다음부터 사용 가능하며 초기 보유 교환 포인트는 두 번째 단계에 포함됩니다.",
+            _ => "Generated refunds include unspent rewards at completion. Returns fund only later draws; starting exchange points count toward stage two.",
+        }).wrap());
+    });
 }
 
 /// Compact 3-column chart panel: header, right-aligned result badge, area graph.
