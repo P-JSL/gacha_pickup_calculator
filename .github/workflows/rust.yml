@@ -492,15 +492,20 @@ jobs:
               for icon in icons:
                   zipped.write(icon, icon.relative_to("dist").as_posix())
               zipped.write("dist/Image/SHA256SUMS.txt", "Image/SHA256SUMS.txt")
+              # The ZIP contains an empty log/ folder, not a prior session log.
+              zipped.writestr("log/", "")
               zipped.writestr("README.txt",
                   "Gacha Pickup Calculator / Windows x64\n"
                   "Extract this entire ZIP, preserving the Image directory.\n"
                   "Run gacha_pickup_calculator.exe alongside the Image folder.\n"
+                  "Session log: log/session.log (created on launch, reset next launch).\n"
                   "Bundled images were hash-verified and malware-scanned in CI.\n"
                   "The app may fetch verified updated images over HTTPS.\n")
           with ZipFile(package) as zipped:
               assert zipped.testzip() is None
               assert executable.name in zipped.namelist()
+              assert "log/" in zipped.namelist()
+              assert "log/session.log" not in zipped.namelist()
               assert len([n for n in zipped.namelist()
                   if n.startswith("Image/") and n.endswith(".png")]) == len(icons)
               assert "Image/SHA256SUMS.txt" in zipped.namelist()
