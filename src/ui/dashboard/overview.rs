@@ -21,11 +21,15 @@ impl Calculator {
                 |f| format!("총 시도 평균 · 환급 후 최초 자유권 평균 {:.1}장",
                     f.average_initial_flexible),
             );
-            final_success_hero(ui, self.setup.game, self.target_eid,
-                self.setup.game.weapon_upgrade_level(self.target_refine),
-                chance, funding.map(|gap| gap.raw_probability),
-                stats.feedback.as_ref().map(|estimate| estimate.scenarios.len()),
-                free_pulls, language);
+            final_success_hero(ui, FinalSuccessHero {
+                game: self.setup.game,
+                eid: self.target_eid,
+                refine: self.setup.game.weapon_upgrade_level(self.target_refine),
+                probability: chance,
+                raw_probability: funding.map(|gap| gap.raw_probability),
+                sample_count: stats.feedback.as_ref().map(|estimate| estimate.scenarios.len()),
+                available: free_pulls,
+            }, language);
             ui.add_space(7.0);
             let (return_value, return_note) = if let Some(refund) = stats.feedback.as_ref() {
                 (format!("{:.1}", refund.total_returned_points_average
