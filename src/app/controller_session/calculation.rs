@@ -35,6 +35,13 @@ impl Calculator {
             self.feedback_cfg.enabled, self.feedback_cfg.samples,
             self.feedback_cfg.initial_points, self.feedback_cfg.points_per_ticket,
         ));
+        // Capture the exact simulation assumptions once per run so a
+        // differing outcome can be reproduced without storing RNG draws.
+        session_log::info("CALC_ASSUMPTIONS", format!(
+            "generation={} character_rule={:?} secondary_rule={:?} refund_config={:?}",
+            self.generation, self.setup.character.rule,
+            self.setup.weapon.rule, self.feedback_cfg
+        ));
         let request = CalculationRequest {
             generation: self.generation,
             setup: self.setup.clone(),
