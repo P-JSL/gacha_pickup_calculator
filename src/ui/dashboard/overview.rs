@@ -5,90 +5,65 @@ impl Calculator {
     pub(crate) fn workspace_dashboard(&mut self, ui: &mut egui::Ui) -> bool {
         let language = self.language();
         let mut dirty = false;
-        if let Some(stats) = self.visible_stats() {
+        if let Some(stats) = self.visible_stats()
+            .filter(|_| !self.input_needs_calculation && !self.calculating) {
             let free_pulls = self.setup.available_flexible();
             let funding = self.current_goal_funding();
-            let raw = optimal_allocation(
-                &stats.character,
-                &stats.weapon,
-                self.setup.character_dedicated,
-                self.setup.weapon_dedicated,
-                free_pulls,
+            // The final success rate is taken from the shared-ticket funding CDF.
+            let chance = funding.map_or_else(
+                || stats.feedback.as_ref().map_or(stats.raw_shared.at(free_pulls),
+                     |f| f.probability(free_pulls).0),
+                |gap| gap.current_probability,
             );
-            let chance = funding.map_or_else(|| stats.feedback.as_ref()
-                .map_or(raw.success_probability, |f| f.probability(free_pulls).0),
-                |gap| gap.current_probability);
             let expected = stats.feedback.as_ref().map_or(stats.combined.mean, |f| f.average_raw);
-            let meta = funding.map_or_else(
-                || if stats.feedback.is_some() {
-                    t(language, "Including recycled refunds").to_owned()
-                } else {
-                    t(language, "Accurate probability DP").to_owned()
-                },
-                |gap| if gap.uses_refunds {
-                    format!("환급 포함 {:.2}% · 환급 전(참고) {:.2}%",
-                        gap.current_probability * 100.0, gap.raw_probability * 100.0)
-                } else { t(language, "Accurate probability DP").to_owned() },
-            );
             let mean_note = stats.feedback.as_ref().map_or_else(
                 || t(language, "Average pulls to all targets").to_owned(),
                 |f| format!("총 시도 평균 · 환급 후 최초 자유권 평균 {:.1}장",
                     f.average_initial_flexible),
             );
-            if self.input_needs_calculation && !self.calculating {
-                ui.label(RichText::new(t(language, "Changes pending. Select Run Simulation to update."))
-                    .color(YELLOW).size(10.0));
-            } else if self.calculating {
-                ui.label(RichText::new(t(language, "Calculating in background. Previous results remain visible."))
-                    .color(YELLOW).size(10.0));
-            }
-            let (ticket_label, ticket_value, ticket_note) = if self.setup.game.shares_featured_ticket() {
-                (i18n::ticket_name(language, self.setup.game, false),
-                 format!("{}", self.setup.flexible),
-                 format!("{}: {} ({})", t(language, "Shared character/weapon ticket"),
-                     self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                     i18n::currency_name(language, self.setup.game)))
+            final_success_hero(ui, self.setup.game, self.target_eid,
+                self.setup.game.weapon_upgrade_level(self.target_refine),
+                chance, funding.map(|gap| gap.raw_probability),
+                stats.feedback.as_ref().map(|estimate| estimate.scenarios.len()),
+                free_pulls, language);
+            ui.add_space(7.0);
+            let (return_value, return_note) = if let Some(refund) = stats.feedback.as_ref() {
+                (format!("{:.1}", refund.total_returned_points_average
+                    / self.feedback_cfg.points_per_ticket.max(1) as f64),
+                 match language {
+                     Language::Korean => "목표 달성 후 미사용분도 포함 · 생성된 교환권 환산",
+                     _ => "Earned refunds, including unspent returns",
+                 })
             } else {
-                (t(language, "Character / Weapon Tickets"),
-                 format!("{} / {}", self.setup.character_dedicated, self.setup.weapon_dedicated),
-                 format!("{}: {}", t(language, "Shared Currency"), free_pulls))
+                ("—".to_owned(), t(language, "Refunds not included"))
             };
-            let (gap_value, gap_note, gap_color) = funding.map_or_else(
-                || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
-                |g| (format!("+{} {}", g.additional_shared,
-                              t(language, "Featured ticket equivalents")),
-                      format!("+{} {} · {} {}%", g.additional_currency,
-                              i18n::currency_name(language, self.setup.game),
-                              t(language, "Target confidence"), g.confidence),
-                      if g.additional_shared == 0 { SUCCESS } else { GOLD }),
-            );
             let cards = [
-                (0, ticket_label, ticket_value, ticket_note, CYAN),
-                (1, t(language, "Target Success Rate"), format!("{:.2}%", chance * 100.0), meta, SUCCESS),
                 (2, t(language, "Expected Pulls"), format!("{expected:.1}"), mean_note, PINK),
-                (3, t(language, "Additional featured ticket equivalents"), gap_value, gap_note, gap_color),
+                (0, match language {
+                    Language::Korean => "평균 전체 생성 환급권",
+                    _ => "Average earned refund tickets",
+                }, return_value, return_note.to_owned(), CYAN),
             ];
-            let width = ui.available_width();
-            if width >= 1120.0 {
-                ui.columns(4, |columns| {
+            if ui.available_width() >= 560.0 {
+                ui.columns(2, |columns| {
                     for (i, (kind, label, value, note, color)) in cards.iter().enumerate() {
                         overview_metric(&mut columns[i], *kind, label, value.clone(), note.clone(), *color);
                     }
                 });
-            } else if width >= 560.0 {
-                for pair in cards.chunks(2) {
-                    ui.columns(2, |columns| {
-                        for (i, (kind, label, value, note, color)) in pair.iter().enumerate() {
-                            overview_metric(&mut columns[i], *kind, label, value.clone(), note.clone(), *color);
-                        }
-                    });
-                    ui.add_space(5.0);
-                }
             } else {
                 for (kind, label, value, note, color) in &cards {
                     overview_metric(ui, *kind, label, value.clone(), note.clone(), *color);
                     ui.add_space(5.0);
                 }
+            }
+            if let (Game::StarRail, Some(stages), Some(refund)) =
+                (self.setup.game, stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
+                ui.add_space(9.0);
+                refund_stages_card(ui, stages, free_pulls, refund.average_raw,
+                    refund.total_returned_points_average
+                        / self.feedback_cfg.points_per_ticket.max(1) as f64,
+                    language);
+                debug_assert!((chance - stages.final_probability()).abs() < 1e-10);
             }
 
             // Make the refund-recycled value the visible primary result,
@@ -140,25 +115,10 @@ impl Calculator {
 
         ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
-        // Preserve the game tabs and Run Simulation button ahead of detailed
-        // results, even when the center panel is narrow or scaled on Windows.
-        if self.setup.game == Game::StarRail
-            && !dirty && !self.input_needs_calculation && !self.calculating {
-            if let Some(stats) = self.visible_stats() {
-                if let (Some(stage), Some(refund)) =
-                    (stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
-                    ui.add_space(9.0);
-                    refund_stages_card(ui, stage, self.setup.available_flexible(),
-                        refund.average_raw,
-                        refund.total_returned_points_average
-                            / self.feedback_cfg.points_per_ticket.max(1) as f64,
-                        language);
-                }
-            }
-        }
         // Keep the game controls ahead of the standalone banner charts;
         // the joint refunded probability is now visible above this section.
-        if let Some(stats) = self.visible_stats() {
+        if let Some(stats) = self.visible_stats()
+            .filter(|_| !self.input_needs_calculation && !self.calculating) {
             // Keep game tabs and Run Simulation reachable even when results
             // are present: the long funding explanation follows the input
             // controls instead of displacing them below the viewport.
@@ -200,7 +160,8 @@ impl Calculator {
             }
 
         }
-        if let Some(stats) = self.visible_stats() {
+        if let Some(stats) = self.visible_stats()
+            .filter(|_| !self.input_needs_calculation && !self.calculating) {
             if let Some(strategies) = &stats.wuwa_strategies {
                 ui.add_space(10.0);
                 wuwa_strategy_table(ui, strategies, &self.setup, self.confidence);
