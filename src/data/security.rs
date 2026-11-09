@@ -16,6 +16,10 @@ pub(crate) const MAX_IMAGE_BYTES: u64 = 512 * 1024;
 pub(crate) const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
 const IMAGE_MANIFEST: &str = include_str!("../../Image/SHA256SUMS.txt");
+// The release builder provides a separately pinned manifest for physically
+// compacted PNGs. Ordinary source builds have an empty optional manifest.
+const PACKAGED_MANIFEST: &str =
+    include_str!(concat!(env!("OUT_DIR"), "/packaged_image_hashes.txt"));
 
 fn parse_sha256(value: &str) -> Option<[u8; 32]> {
     if value.len() != 64 || !value.is_ascii() { return None; }
@@ -32,6 +36,17 @@ fn image_digests() -> &'static HashMap<&'static str, [u8; 32]> {
     static DATA: OnceLock<HashMap<&'static str, [u8; 32]>> = OnceLock::new();
     DATA.get_or_init(|| {
         IMAGE_MANIFEST.lines().filter_map(|line| {
+            let (hash, path) = line.split_once("  ")?;
+            let expected = parse_sha256(hash)?;
+            approved_image_key(path).then_some((path, expected))
+        }).collect()
+    })
+}
+
+fn packaged_image_digests() -> &'static HashMap<&'static str, [u8; 32]> {
+    static DATA: OnceLock<HashMap<&'static str, [u8; 32]>> = OnceLock::new();
+    DATA.get_or_init(|| {
+        PACKAGED_MANIFEST.lines().filter_map(|line| {
             let (hash, path) = line.split_once("  ")?;
             let expected = parse_sha256(hash)?;
             approved_image_key(path).then_some((path, expected))
@@ -73,11 +88,20 @@ pub(crate) fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'s
         .or_else(|| baseline_digest(relative))
         .ok_or("Image is not in a verified asset manifest.")?;
     let actual = Sha256::digest(bytes);
-    if actual.as_slice() != expected {
-        return Err("Local artwork differs from the signed-release source snapshot.");
+    if actual.as_slice() == expected {
+        return Ok(());
     }
-    Ok(())
-}
+    // New catalog revisions supersede both forms of the original icon.
+    // Package hashes are immutable bytes embedded into this executable;
+    // an untrusted local package manifest cannot authorize an alteration.
+    if Some(expected) == baseline_digest(relative)
+        && packaged_image_digests().get(relative)
+            .is_some_and(|digest| actual.as_slice() == digest)
+    {
+        return Ok(());
+    }
+    Err("Local artwork differs from the signed-release source snapshot.")
+
 
 /// Open once, validate the actual file handle, read a bounded amount of data,
 /// and optionally require a caller-provided trusted SHA-256 fingerprint.
@@ -130,6 +154,11 @@ mod tests {
         assert!(!approved_image_key("HSR/../c-1001.png"));
         assert!(!approved_image_key("HSR/c-1001.png/extra"));
         assert!(!approved_image_key("Other/c-1001.png"));
+        if !PACKAGED_MANIFEST.is_empty() {
+            assert_eq!(packaged_image_digests().len(), image_digests().len());
+            assert!(packaged_image_digests().keys()
+                .all(|key| image_digests().contains_key(key)));
+        }
     }
 
     #[test]

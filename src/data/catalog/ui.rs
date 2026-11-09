@@ -83,7 +83,25 @@ impl CatalogUi {
                 limits.max_image_height = Some(MAX_ICON_SIDE);
                 limits.max_alloc = Some(8 * 1024 * 1024);
                 reader.limits(limits);
-                let image = reader.decode().ok()?.thumbnail(112, 112).to_rgba8();
+                let decoded = reader.decode().ok()?;
+                // Compact release images may be stored below the original
+                // 112px source size. Expand only once on the image worker,
+                // using high-quality Lanczos3 followed by gentle edge sharpening;
+                // texture upload and UI repaint never repeat this work.
+                // Resampling improves perceived clarity but cannot recreate
+                // details removed by lossy quantization.
+                let image = if decoded.width().max(decoded.height()) < 112 {
+                    let original_max = decoded.width().max(decoded.height()) as f64;
+                    let target_width = ((decoded.width() as f64 * 112.0 / original_max)
+                        .round() as u32).max(1);
+                    let target_height = ((decoded.height() as f64 * 112.0 / original_max)
+                        .round() as u32).max(1);
+                    let upscaled = image::imageops::resize(&decoded.to_rgba8(),
+                        target_width, target_height, image::imageops::FilterType::Lanczos3);
+                    image::imageops::unsharpen(&upscaled, 0.55, 3)
+                } else {
+                    decoded.thumbnail(112, 112).to_rgba8()
+                };
                 Some(egui::ColorImage::from_rgba_unmultiplied(
                     [image.width() as usize, image.height() as usize], image.as_raw(),
                 ))

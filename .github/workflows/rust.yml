@@ -99,6 +99,28 @@ jobs:
       - name: Check local links, release version and module references
         run: python3 scripts/verify_release_contract.py
 
+  compact_images:
+    name: Build quality-checked compact release images
+    needs: classify
+    if: needs.classify.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Quantize from immutable, SHA-256-checked sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/compact-image-venv"
+          "$RUNNER_TEMP/compact-image-venv/bin/pip" install --disable-pip-version-check -r requirements-image.txt
+          "$RUNNER_TEMP/compact-image-venv/bin/python" scripts/compact_release_images.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: gacha-compact-images
+          path: dist/Image/
+          if-no-files-found: error
+          retention-days: 7
+
   verify:
     name: Verify (${{ matrix.os }})
     needs: classify
@@ -136,11 +158,16 @@ jobs:
         run: cargo doc --locked --no-deps --lib
   build_linux:
     name: Build Linux GUI executable
-    needs: classify
+    needs: [classify, compact_images]
     if: needs.classify.outputs.build == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Embed hashes of exact compact distribution PNGs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: gacha-compact-images
+          path: dist/Image
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
       - name: Linux windowing prerequisites
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev
@@ -175,11 +202,16 @@ jobs:
 
   build_windows:
     name: Build Windows release executable
-    needs: classify
+    needs: [classify, compact_images]
     if: needs.classify.outputs.build == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Embed hashes of exact compact distribution PNGs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: gacha-compact-images
+          path: dist/Image
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
       - name: Build release
         run: cargo build --locked --release
@@ -293,11 +325,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Verify immutable checked-in PNG assets
         run: python3 scripts/verify_embedded_assets.py
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: gacha-offline-images
-          path: Image/
-          if-no-files-found: error
 
   images:
     name: Audit and scan checked-in offline images
@@ -324,7 +351,7 @@ jobs:
 
   ui_docs:
     name: Capture latest-character GUI for README
-    needs: [classify, build_linux]
+    needs: [classify, build_linux, compact_images]
     if: needs.classify.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     # Screenshot capture is never allowed to hang and block release forever.
@@ -337,9 +364,12 @@ jobs:
         with:
           name: gacha-linux-release-executable
           path: target/release/
-      # Use checked-in, previously validated images instead of a duplicate download.
-      - name: Use checked-in image assets for screenshots
-        run: cp -a Image target/release/Image
+      # Render the actual compressed release art, not untouched git PNGs.
+      - name: Use exact compact images for UI capture
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: gacha-compact-images
+          path: target/release/Image
       - name: Actual Linux UI with packaged images
         shell: bash
         run: |
@@ -371,7 +401,7 @@ jobs:
     name: Publish versioned release
     # New releases cannot publish until ALL parallel security, numeric, image
     # and GUI gates succeed. Docs-only / existing-version pushes skip safely.
-    needs: [classify, docs, verify, build_linux, build_windows, rustsec, performance, image_integrity, images, ui_docs]
+    needs: [classify, docs, verify, compact_images, build_linux, build_windows, rustsec, performance, image_integrity, images, ui_docs]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.classify.outputs.release == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -412,7 +442,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
         with:
-          name: gacha-offline-images
+          name: gacha-compact-images
           path: dist/Image
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         if: steps.version.outputs.publish == 'true'
@@ -437,6 +467,7 @@ jobs:
           import os
           from pathlib import Path
           from zipfile import ZipFile, ZIP_DEFLATED
+          import hashlib
           version = os.environ["VERSION"]
           executable = Path("dist/gacha_pickup_calculator.exe")
           if executable.stat().st_size < 100_000:
@@ -447,6 +478,15 @@ jobs:
               encoding="utf-8").splitlines() if len(line.split("\t")) == 6)
           if len(icons) != expected or expected < 670:
               raise SystemExit(f"Incomplete sanitized assets: {len(icons)}/{expected}")
+          digests = {key: digest for digest, key in (
+              line.split("  ", 1) for line in
+              Path("dist/Image/SHA256SUMS.txt").read_text(encoding="utf-8").splitlines())}
+          if set(digests) != {p.relative_to("dist/Image").as_posix() for p in icons}:
+              raise SystemExit("Compact image set differs from embedded SHA-256 manifest")
+          for icon in icons:
+              key = icon.relative_to("dist/Image").as_posix()
+              if hashlib.sha256(icon.read_bytes()).hexdigest() != digests[key]:
+                  raise SystemExit(f"Compact asset hash mismatch: {key}")
           with ZipFile(package, "w", compression=ZIP_DEFLATED, compresslevel=9) as zipped:
               zipped.write(executable, executable.name)
               for icon in icons:
