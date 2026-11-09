@@ -1,3 +1,4 @@
-# Used only by the opt-in artwork refresh procedure.
-# The standard release build uses the checked-in Image/ files and needs no Pillow.
+# The version-pinned Pillow encoder is used only by GitHub Actions when
+# generating compact, quality-checked release PNGs from verified source assets.
+# The GUI and its local Rust build require no Python or Pillow installation.
 Pillow==13.0.0
