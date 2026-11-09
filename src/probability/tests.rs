@@ -36,6 +36,38 @@
     }
 
     #[test]
+    fn star_rail_e6s5_first_guarantee_changes_only_the_first_character_five_star() {
+        let mut setup = games::GameSetup::new(games::Game::StarRail);
+        let character_five_star_mean = match &setup.character.rule {
+            BannerRule::Standard { rarity, .. } => rarity
+                .expected_first_rare_pulls(RateMode::CommunityEstimate).unwrap(),
+            _ => panic!("expected standard character banner"),
+        };
+        let cone_five_star_mean = match &setup.weapon.rule {
+            BannerRule::Standard { rarity, .. } => rarity
+                .expected_first_rare_pulls(RateMode::CommunityEstimate).unwrap(),
+            _ => panic!("expected standard Light Cone banner"),
+        };
+        setup.character.guaranteed = true;
+        let character = setup.character.distribution(RateMode::CommunityEstimate).unwrap();
+        let cone = setup.weapon.distribution(RateMode::CommunityEstimate).unwrap();
+        let total = character.mean + cone.mean;
+        // First character pickup costs one five-star, next six each average
+        // 1.5; five cones each average 1.25 five-stars at 75:25.
+        let expected = 10.0 * character_five_star_mean + 6.25 * cone_five_star_mean;
+        assert!((total - expected).abs() < 1e-6);
+        assert!((total - 956.79).abs() < 0.1);
+
+        setup.character.guaranteed = false;
+        let without_guarantee = setup.character
+            .distribution(RateMode::CommunityEstimate).unwrap().mean + cone.mean;
+        let ordinary_expected =
+            10.5 * character_five_star_mean + 6.25 * cone_five_star_mean;
+        assert!((without_guarantee - ordinary_expected).abs() < 1e-6);
+        assert!((without_guarantee - total - 0.5 * character_five_star_mean).abs() < 1e-6);
+    }
+
+    #[test]
     fn zero_goal_completes_without_a_pull() {
         let result = always_rare(0.5, false, 0).distribution(RateMode::PublishedOnly).unwrap();
         assert!((result.at(0) - 1.0).abs() < 1e-12);

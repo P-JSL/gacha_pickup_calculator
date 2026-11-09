@@ -56,7 +56,9 @@ impl FeedbackConfig {
             Game::StarRail => Self {
                 enabled: true, points_per_ticket: 20, initial_points: 0,
                 featured_first: 0, featured_duplicate: 40, featured_maxed: 100,
-                off_banner_rare: 40, weapon_first: 40, weapon_rare: 40,
+                // Assumption from the E6S5 calculation: off-banner 5-star characters are new.
+                // Their first acquisition yields no Starlight; Light Cones always yield 40.
+                off_banner_rare: 0, weapon_first: 40, weapon_rare: 40,
                 four_star_reward: 8, four_star_maxed: 20, four_star_maxed_share: 1.0,
                 weapon_four_star_reward: 8, character_four_star_rate: 0.051,
                 weapon_four_star_rate: 0.066,

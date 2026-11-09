@@ -139,7 +139,16 @@ pub(super) fn roll_standard(rng: &mut SplitMix64, rule: &Banner, (kind, game): (
                 won += 1;
                 guaranteed = false;
             } else {
-                wallet.refund(model.off_banner_rare);
+                // Star Rail: an off-banner 5-star character uses the account's
+                // character ownership assumption; every 5-star Light Cone
+                // instead awards Starlight regardless of prior ownership.
+                let refund = if game == Game::StarRail
+                    && matches!(kind, BannerKind::Weapon) {
+                    model.weapon_rare
+                } else {
+                    model.off_banner_rare
+                };
+                wallet.refund(refund);
                 guaranteed = true;
             }
         } else { pity += 1; }

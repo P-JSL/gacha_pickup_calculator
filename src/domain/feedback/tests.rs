@@ -315,6 +315,50 @@
         assert_eq!(wavebands.scenarios[0].initial_flexible_required, 2);
     }
     #[test]
+    fn star_rail_new_off_banner_characters_and_five_star_cones_refund_separately() {
+        let cfg = FeedbackConfig::for_game(Game::StarRail);
+        assert_eq!(cfg.off_banner_rare, 0);
+        assert_eq!(cfg.weapon_rare, 40);
+        let banner = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 0.5,
+            },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        // SplitMix64(1) loses the first 50:50, then wins on the guarantee.
+        // With 100% rarity both attempts are always five-star outcomes.
+        let mut character_wallet = Wallet::new(&cfg);
+        let mut character_dedicated = 0;
+        roll_standard(&mut SplitMix64(1), &banner,
+            (BannerKind::Character, Game::StarRail), RateMode::PublishedOnly,
+            &cfg, &mut character_wallet, (0, &mut character_dedicated, 0));
+        assert_eq!(character_wallet.raw_pulls, 2);
+        assert_eq!(character_wallet.points, 0);
+
+        let mut cone_wallet = Wallet::new(&cfg);
+        let mut cone_dedicated = 0;
+        roll_standard(&mut SplitMix64(1), &banner,
+            (BannerKind::Weapon, Game::StarRail), RateMode::PublishedOnly,
+            &cfg, &mut cone_wallet, (0, &mut cone_dedicated, 0));
+        assert_eq!(cone_wallet.raw_pulls, 2);
+        assert_eq!(cone_wallet.points, 80); // Off-banner + featured: 40 each.
+        assert_eq!(cone_wallet.initial_flexible_required, 1);
+
+        // The existing advanced setting still supports already-owned
+        // off-banner characters, without changing Light Cone payouts.
+        let mut owned_cfg = cfg.clone();
+        owned_cfg.off_banner_rare = 40;
+        let mut owned_wallet = Wallet::new(&owned_cfg);
+        let mut owned_dedicated = 0;
+        roll_standard(&mut SplitMix64(1), &banner,
+            (BannerKind::Character, Game::StarRail), RateMode::PublishedOnly,
+            &owned_cfg, &mut owned_wallet, (0, &mut owned_dedicated, 0));
+        assert_eq!(owned_wallet.points, 40);
+    }
+
+    #[test]
     fn fully_upgraded_character_rewards_use_correct_copy_boundary() {
         for (game, regular, maxed) in [(Game::StarRail, 40, 100), (Game::Neverness, 40, 80)] {
             let config = FeedbackConfig::for_game(game);
