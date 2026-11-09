@@ -94,9 +94,21 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
 
 /// Full-width final joint success figure; both goals must complete in each
 /// same Monte Carlo path (never multiply standalone banner percentages).
-fn final_success_hero(ui: &mut egui::Ui, game: Game, eid: usize,
-                      refine: usize, probability: f64, raw_probability: Option<f64>,
-                      sample_count: Option<usize>, available: usize, language: Language) {
+#[derive(Clone, Copy)]
+struct FinalSuccessHero {
+    game: Game,
+    eid: usize,
+    refine: usize,
+    probability: f64,
+    raw_probability: Option<f64>,
+    sample_count: Option<usize>,
+    available: usize,
+}
+
+fn final_success_hero(ui: &mut egui::Ui, result: FinalSuccessHero, language: Language) {
+    let FinalSuccessHero {
+        game, eid, refine, probability, raw_probability, sample_count, available,
+    } = result;
     let title = match language {
         Language::Korean => "캐릭터 + 전용 장비 최종 목표 달성 확률",
         Language::English => "Final character + signature success probability",
