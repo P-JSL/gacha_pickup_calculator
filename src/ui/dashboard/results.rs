@@ -37,32 +37,27 @@ impl Calculator {
                                 stats.weapon.at(
                                     self.setup.weapon_dedicated.saturating_add(available)))
                         });
-                        ui.horizontal(|ui| {
+                        ui.horizontal_wrapped(|ui| {
                             ui.label(RichText::new(format!("◌  {}", t(language, "Refund Loop"))).size(12.0));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let msg = if self.feedback_cfg.enabled {
-                                    t(language, "Refunds recycled")
-                                } else {
-                                    "Off"
-                                };
-                                ui.label(RichText::new(msg).color(SUCCESS).size(11.0).strong());
-                            });
+                            let msg = if self.feedback_cfg.enabled {
+                                t(language, "Refunds recycled")
+                            } else { "Off" };
+                            ui.label(RichText::new(msg).color(SUCCESS).size(11.0).strong());
                         });
                         ui.add_space(6.0);
                         ui.separator();
                         ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!("◇  {}", t(language, "Extra Pulls from Refund"))).size(11.5));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let bonus = self.visible_stats()
-                                    .and_then(|stats| stats.successful_budget_means.as_ref());
-                                let value = bonus.map_or("—".to_owned(),
-                                    |means| format!("+{:.1}", means.average_points_funded));
-                                ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
-                                if bonus.is_some() {
-                                    ui.small("현재 예산 내 성공한 경로 기준 평균");
-                                }
-                            });
+                        ui.vertical(|ui| {
+                            ui.add(egui::Label::new(RichText::new(format!(
+                                "◇  {}", t(language, "Extra Pulls from Refund"))).size(11.5)).wrap());
+                            let bonus = self.visible_stats()
+                                .and_then(|stats| stats.successful_budget_means.as_ref());
+                            let value = bonus.map_or("—".to_owned(),
+                                |means| format!("+{:.1}", means.average_points_funded));
+                            ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
+                            if bonus.is_some() {
+                                ui.small("현재 예산 내 성공한 경로 기준 평균");
+                            }
                         });
                         ui.add_space(7.0);
                         egui::Frame::default()
@@ -81,14 +76,11 @@ impl Calculator {
                             (&format!("{} · {}", t(language, "Target Weapon"), i18n::banner_name(language, self.setup.game)), results.map(|(_,_,wp)|
                                 format!("S{} · {:.2}%", self.setup.game.weapon_upgrade_level(self.target_refine),wp*100.0))),
                         ] {
-                            ui.horizontal(|ui| {
+                            ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new("☑").color(SUCCESS).size(13.0));
                                 ui.label(RichText::new(title).size(11.0));
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        ui.label(RichText::new(value.as_deref().unwrap_or(t(language, "Calculating")))
-                                            .size(11.0).color(SUCCESS).strong());
-                                    });
+                                ui.label(RichText::new(value.as_deref().unwrap_or(t(language, "Calculating")))
+                                    .size(11.0).color(SUCCESS).strong());
                             });
                             ui.add_space(3.0);
                         }
@@ -99,7 +91,7 @@ impl Calculator {
                             .inner_margin(9)
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
-                                ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
                                     let title = if self.visible_stats()
                                         .and_then(|stats| stats.feedback.as_ref()).is_some()
                                     {
@@ -115,14 +107,11 @@ impl Calculator {
                                         "★ {} (E{}S{})", title, self.target_eid,
                                         self.setup.game.weapon_upgrade_level(self.target_refine)
                                     )).size(11.0).strong());
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                            let value = results.map(|(joint,_,_)|
-                                                format!("{:.2}%", joint*100.0))
-                                                .unwrap_or_else(|| "—".to_owned());
-                                            ui.label(RichText::new(value)
-                                                .size(17.0).color(YELLOW).strong());
-                                        });
+                                    let value = results.map(|(joint,_,_)|
+                                        format!("{:.2}%", joint*100.0))
+                                        .unwrap_or_else(|| "—".to_owned());
+                                    ui.label(RichText::new(value)
+                                        .size(17.0).color(YELLOW).strong());
                                 });
                             });
                     });
@@ -147,7 +136,7 @@ impl Calculator {
                         ui.separator();
                         ui.add_space(7.0);
                         for i in 0..5 {
-                            ui.horizontal(|ui| {
+                            ui.horizontal_wrapped(|ui| {
                                 let (rect, _) = ui.allocate_exact_size(
                                     egui::vec2(36.0, 36.0), egui::Sense::hover());
                                 let tint = if self.history.get(i).is_some() {
