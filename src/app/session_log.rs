@@ -162,6 +162,10 @@ pub(crate) struct LogViewer {
 impl LogViewer {
     pub(crate) fn show(&mut self, ctx: &egui::Context, logger: &SessionLogger) {
         if !self.open { return; }
+        // Worker writes arrive independently of egui events. Poll the window
+        // at low frequency while open so progress appears before computation
+        // finishes even when no other widget is animating.
+        ctx.request_repaint_after(std::time::Duration::from_millis(200));
         if self.cached_revision != logger.revision() {
             let (revision, lines, warning) = logger.snapshot();
             self.cached_revision = revision;
