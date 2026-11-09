@@ -28,6 +28,26 @@ class CaptureControlTests(unittest.TestCase):
             "GACHA_CI_SIM_COMPLETED game=StarRail generation=3",
         ], "StarRail"), ("completed", 3))
 
+
+    def test_game_tab_finder_handles_final_probability_hero_above_controls(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from PIL import Image, ImageDraw
+        from ui_capture_tab import selected_game_tab
+
+        # The first-screen hero can shift quick settings above or below y=450.
+        with TemporaryDirectory() as directory:
+            filename = Path(directory) / "dashboard.png"
+            for y in (300, 560):
+                frame = Image.new("RGB", (1200, 860), (16, 43, 64))
+                draw = ImageDraw.Draw(frame)
+                draw.rectangle((480, y, 570, y + 31), fill=(50, 218, 241))
+                frame.save(filename)
+                x, detected_y = selected_game_tab(filename)
+                self.assertAlmostEqual(x, 525, delta=10)
+                self.assertAlmostEqual(detected_y, y + 15, delta=10)
+
     def test_failed_generation_is_not_success(self):
         self.assertEqual(assess([
             "GACHA_CI_SIM_STARTED game=StellaSora generation=6",

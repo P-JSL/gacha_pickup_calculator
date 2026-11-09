@@ -462,7 +462,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s dist/gacha_pickup_calculator.exe
-          git archive --format=zip -o "dist/gacha-pickup-calculator-source-v$VERSION.zip" HEAD
+          # Source stays public in git; it is intentionally not duplicated in release assets.
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -518,19 +518,17 @@ jobs:
           cd dist
           sha256sum gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" \
             "gacha-pickup-calculator-screenshots-v$VERSION.zip" > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       # OIDC/Sigstore provenance signs build identity without a repository PFX.
       # Sign and verify *final* packaged bytes before the assets are published.
-      - name: Attest five release artifacts with GitHub OIDC and Sigstore
+      - name: Attest four release artifacts with GitHub OIDC and Sigstore
         if: steps.version.outputs.publish == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: |
             dist/gacha_pickup_calculator.exe
             dist/gacha-pickup-calculator-windows-x64-v${{ steps.version.outputs.version }}.zip
-            dist/gacha-pickup-calculator-source-v${{ steps.version.outputs.version }}.zip
             dist/gacha-pickup-calculator-screenshots-v${{ steps.version.outputs.version }}.zip
             dist/SHA256SUMS.txt
       - name: Verify signed provenance before publishing
@@ -543,7 +541,6 @@ jobs:
           set -euo pipefail
           for file in dist/gacha_pickup_calculator.exe \
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-screenshots-v$VERSION.zip" \
             dist/SHA256SUMS.txt; do
             gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
@@ -563,7 +560,6 @@ jobs:
           gh release create "$TAG" --draft \
             dist/gacha_pickup_calculator.exe \
             "dist/gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "dist/gacha-pickup-calculator-source-v$VERSION.zip" \
             "dist/gacha-pickup-calculator-screenshots-v$VERSION.zip" \
             dist/SHA256SUMS.txt \
             --target "$(git rev-parse HEAD)" \
@@ -572,14 +568,13 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort > actual-assets.txt
           for asset in gacha_pickup_calculator.exe \
             "gacha-pickup-calculator-windows-x64-v$VERSION.zip" \
-            "gacha-pickup-calculator-source-v$VERSION.zip" \
             "gacha-pickup-calculator-screenshots-v$VERSION.zip" SHA256SUMS.txt; do
             grep -Fx -- "$asset" actual-assets.txt >/dev/null || {
               echo "::error::Missing release asset: $asset"
               exit 1
             }
           done
-          echo "::notice title=Draft complete::$TAG has all five expected assets; publishing now."
+          echo "::notice title=Draft complete::$TAG has all four expected assets; publishing now."
           gh release edit "$TAG" --draft=false
           gh release view "$TAG" --json isDraft --jq '.isDraft' | grep -Fx false >/dev/null
-          echo "::notice title=Release published::$TAG has all five expected assets."
+          echo "::notice title=Release published::$TAG has all four expected assets."

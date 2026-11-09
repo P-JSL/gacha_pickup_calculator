@@ -92,6 +92,58 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
         });
 }
 
+/// Full-width final joint success figure; both goals must complete in each
+/// same Monte Carlo path (never multiply standalone banner percentages).
+#[derive(Clone, Copy)]
+struct FinalSuccessHero {
+    game: Game,
+    eid: usize,
+    refine: usize,
+    probability: f64,
+    raw_probability: Option<f64>,
+    sample_count: Option<usize>,
+    available: usize,
+}
+
+fn final_success_hero(ui: &mut egui::Ui, result: FinalSuccessHero, language: Language) {
+    let FinalSuccessHero {
+        game, eid, refine, probability, raw_probability, sample_count, available,
+    } = result;
+    let title = match language {
+        Language::Korean => "캐릭터 + 전용 장비 최종 목표 달성 확률",
+        Language::English => "Final character + signature success probability",
+        Language::Japanese => "キャラクター＋専用装備の最終達成確率",
+        Language::ChineseSimplified => "角色＋专属装备最终达成概率",
+        Language::ChineseTraditional => "角色＋專屬裝備最終達成機率",
+    };
+    dashboard_card(ui, title, |ui| {
+        ui.add(egui::Label::new(format!(
+            "E{eid} + {} S{refine}", i18n::banner_name(language, game)
+        )).wrap());
+        ui.label(RichText::new(format!("{:.2}%", probability * 100.0))
+            .size(39.0).strong().color(SUCCESS));
+        let info = match (sample_count, language) {
+            (Some(n), Language::Korean) =>
+                format!("{n}회 Monte Carlo · 최초 사용 가능 뽑기권 {available}장 · 환급 재투입 포함"),
+            (Some(n), _) =>
+                format!("{n} Monte Carlo trials · {available} initial tickets · refunds included"),
+            (None, Language::Korean) =>
+                format!("최초 사용 가능 뽑기권 {available}장 · 환급 미적용, 정확 DP 기준"),
+            (None, _) =>
+                format!("{available} initial tickets · no refunds (exact DP)"),
+        };
+        ui.add(egui::Label::new(RichText::new(info).color(MUTED).size(11.0)).wrap());
+        if sample_count.is_some() {
+            if let Some(raw) = raw_probability {
+                ui.add(egui::Label::new(RichText::new(match language {
+                    Language::Korean => format!("환급 전 참고 확률: {:.2}%", raw * 100.0),
+                    _ => format!("Without-refund comparison: {:.2}%", raw * 100.0),
+                }).color(MUTED).size(10.0)).wrap());
+            }
+        }
+    });
+}
+
 /// Three mutually-exclusive stages from the SAME Monte Carlo samples.
 fn refund_stages_card(ui: &mut egui::Ui, result: &BudgetSuccessBreakdown,
                       owned: usize, mean_raw: f64, average_refund_tickets: f64,

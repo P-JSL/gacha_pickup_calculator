@@ -18,3 +18,7 @@ sha2 = "0.10.9"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+# Strip native symbol/debug metadata. The public repository still contains source;
+# this executable hardening is not encryption or reverse-engineering prevention.
+strip = "symbols"
+debug = 0

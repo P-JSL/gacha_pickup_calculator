@@ -24,7 +24,10 @@ impl Calculator {
                         ui.separator();
                         ui.add_space(5.0);
                         let available = self.setup.available_flexible();
-                        let results = self.visible_stats().map(|stats| {
+                        // Never display a previous generation against edited inputs.
+                        let results = self.visible_stats()
+                            .filter(|_| !self.input_needs_calculation && !self.calculating)
+                            .map(|stats| {
                             let raw = optimal_allocation(&stats.character, &stats.weapon,
                                 self.setup.character_dedicated,
                                 self.setup.weapon_dedicated, available);
@@ -67,6 +70,7 @@ impl Calculator {
                                 }
                             } else {
                                 let bonus = self.visible_stats()
+                                    .filter(|_| !self.input_needs_calculation && !self.calculating)
                                     .and_then(|stats| stats.successful_budget_means.as_ref());
                                 let value = bonus.map_or("—".to_owned(),
                                     |means| format!("+{:.1}", means.average_points_funded));
@@ -109,8 +113,8 @@ impl Calculator {
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
                                 ui.vertical(|ui| {
-                                    let title = if self.visible_stats()
-                                        .and_then(|stats| stats.feedback.as_ref()).is_some()
+                                    let title = if self.current_goal_funding()
+                                        .is_some_and(|gap| gap.uses_refunds)
                                     {
                                         match language {
                                             Language::Korean => "전체 목표 · 환급 포함",

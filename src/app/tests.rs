@@ -202,6 +202,13 @@
         assert_eq!(gap.additional_currency, 0);
         assert_eq!(gap.raw_probability, 0.0);
         assert_eq!(gap.current_probability, 1.0);
+        // The headline and stage bars use this exact same trial population.
+        let stages = stats.feedback.as_ref().unwrap()
+            .success_breakdown(setup.available_flexible(), config.points_per_ticket);
+        assert_eq!(stages.final_probability(), gap.current_probability);
+        assert_eq!(stages.original_probability(), 0.0);
+        assert_eq!(stages.recycling_probability(), 1.0);
+        assert_eq!(stages.failure_probability(), 0.0);
         // Dashboard's overall curves must be on the same shared-ticket
         // funding axis as the displayed success-rate metric.
         assert_eq!(ChartSource::Exact(&stats.raw_shared).probability(setup.flexible),
