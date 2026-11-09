@@ -101,7 +101,7 @@ pub(crate) fn verify_image_bytes(relative: &str, bytes: &[u8]) -> Result<(), &'s
         return Ok(());
     }
     Err("Local artwork differs from the signed-release source snapshot.")
-
+}
 
 /// Open once, validate the actual file handle, read a bounded amount of data,
 /// and optionally require a caller-provided trusted SHA-256 fingerprint.
