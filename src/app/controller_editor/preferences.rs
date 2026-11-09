@@ -60,6 +60,19 @@ impl Calculator {
                  캐릭터-전용 장비 관계는 임의로 추론하지 않습니다."
             ).color(MUTED).size(11.0));
         });
+        ui.add_space(10.0);
+        section(ui, "04", "실행 로그 · 진단", "앱 시작부터 종료까지 현재 세션의 이벤트와 모든 계산 단계를 기록합니다.", |ui| {
+            if let Some(logger) = session_log::current() {
+                ui.add(egui::Label::new(format!(
+                    "로그 파일 (재시작 시 초기화): {}", logger.path().display()
+                )).wrap());
+            }
+            if ui.button("현재 실행 로그 열기").clicked() {
+                self.log_view.open = true;
+                session_log::info("LOG_VIEW_OPEN", "Opened log from application settings");
+            }
+            ui.small("로그는 UTC 시각과 계산 세대번호를 포함하며, 몬테카를로 개별 추첨 대신 계산 단계와 집계 결과를 기록합니다.");
+        });
         ui.add_space(12.0);
         if ui.button(t(language, "Restore defaults")).clicked() {
             self.ui_preferences = UiPreferences::default();
