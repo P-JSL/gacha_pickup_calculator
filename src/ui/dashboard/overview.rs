@@ -121,16 +121,7 @@ impl Calculator {
             probability_card(ui, t(language, "Overall Result"),
                 format!("{overall_success_label}: {:.2}%", chance * 100.0),
                 &chart_total, PINK, self.ui_preferences, language);
-            if !self.input_needs_calculation && !self.calculating {
-                if let (Some(stage), Some(refund)) =
-                    (stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
-                    ui.add_space(9.0);
-                    refund_stages_card(ui, stage, free_pulls, refund.average_raw,
-                        refund.total_returned_points_average
-                            / self.feedback_cfg.points_per_ticket.max(1) as f64,
-                        language);
-                }
-            }
+
 
         } else if self.calculating {
             dashboard_card(ui, t(language, "Probability Overview"), |ui| {
@@ -149,6 +140,21 @@ impl Calculator {
 
         ui.add_space(11.0);
         dirty |= self.workspace_quick_settings(ui);
+        // Preserve the game tabs and Run Simulation button ahead of detailed
+        // results, even when the center panel is narrow or scaled on Windows.
+        if !dirty && !self.input_needs_calculation && !self.calculating {
+            if let Some(stats) = self.visible_stats() {
+                if let (Some(stage), Some(refund)) =
+                    (stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
+                    ui.add_space(9.0);
+                    refund_stages_card(ui, stage, self.setup.available_flexible(),
+                        refund.average_raw,
+                        refund.total_returned_points_average
+                            / self.feedback_cfg.points_per_ticket.max(1) as f64,
+                        language);
+                }
+            }
+        }
         // Keep the game controls ahead of the standalone banner charts;
         // the joint refunded probability is now visible above this section.
         if let Some(stats) = self.visible_stats() {
