@@ -18,10 +18,11 @@ def selected_game_tab(path: str | Path) -> tuple[int, int]:
     with Image.open(path) as source:
         image = source.convert("RGB")
         width, height = image.size
-        # The quick-settings tab row is in the central content panel. Exclude
-        # left navigation, top cards/plots and the far-right Run button.
+        # Scan the visible central content area. The final-probability hero
+        # changes the quick-settings row position, so do not assume y >= 450.
+        # Full-width solid selected tabs remain distinct from thin chart strokes.
         x_min, x_max = 430, min(970, width - 1)
-        y_min, y_max = 450, min(830, height - 1)
+        y_min, y_max = 180, height - 1
         runs: dict[int, list[tuple[int, int, int]]] = defaultdict(list)
         px = image.load()
 
