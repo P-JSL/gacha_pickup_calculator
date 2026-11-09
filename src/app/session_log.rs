@@ -46,14 +46,26 @@ pub(crate) struct SessionLogger {
 
 impl SessionLogger {
     pub(crate) fn start_default() -> Self {
-        let base = if cfg!(windows) {
-            std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
-        } else {
-            std::env::var_os("XDG_STATE_HOME").map(PathBuf::from)
-                .or_else(|| std::env::var_os("HOME")
-                    .map(|home| PathBuf::from(home).join(".local").join("state")))
-        }.unwrap_or_else(std::env::temp_dir);
-        Self::start_at(base.join("gacha_pickup_calculator").join("session.log"))
+        // Always resolve relative to the installed executable, not the shell's
+        // working directory, so opening the EXE from another folder or shortcut
+        // still writes <extracted ZIP root>/log/session.log.
+        match std::env::current_exe() {
+            Ok(executable) => Self::start_at(Self::path_for_executable(&executable)),
+            Err(error) => {
+                // If the OS cannot locate the executable, keep logging usable
+                // rather than aborting startup; make the fallback explicit.
+                let logger = Self::start_at(PathBuf::from("log").join("session.log"));
+                logger.warn("LOG_PATH_FALLBACK", format!(
+                    "실행 파일 위치를 확인할 수 없어 작업 디렉터리의 log 폴더에 기록합니다: {error}"
+                ));
+                logger
+            }
+        }
+    }
+
+    fn path_for_executable(executable: &Path) -> PathBuf {
+        executable.parent().unwrap_or_else(|| Path::new("."))
+            .join("log").join("session.log")
     }
 
     /// Do not follow a preexisting symlink while truncating last session's file.
@@ -61,7 +73,12 @@ impl SessionLogger {
         if path.symlink_metadata().is_ok_and(|meta| meta.file_type().is_symlink()) {
             return Err(io::Error::other("Refusing to truncate a symbolic-link log"));
         }
-        if let Some(parent) = path.parent() { fs::create_dir_all(parent)?; }
+        if let Some(parent) = path.parent() {
+            if parent.symlink_metadata().is_ok_and(|meta| meta.file_type().is_symlink()) {
+                return Err(io::Error::other("Refusing to write logs through a symbolic-link directory"));
+            }
+            fs::create_dir_all(parent)?;
+        }
         OpenOptions::new().create(true).write(true).truncate(true).open(path)
     }
 
@@ -254,6 +271,29 @@ mod tests {
         assert!(!fs::read_to_string(&path).unwrap().contains("CALC_STARTED"));
         drop(second);
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn portable_log_uses_executable_parent_and_clears_only_that_file() {
+        let root = std::env::temp_dir().join(format!(
+            "gacha-portable-log-{}-{}", std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let executable = root.join("gacha_pickup_calculator.exe");
+        let log_path = SessionLogger::path_for_executable(&executable);
+        assert_eq!(log_path, root.join("log").join("session.log"));
+        assert!(!log_path.exists());
+        let first = SessionLogger::start_at(log_path.clone());
+        first.info("TEST_CALC", "one run");
+        assert!(log_path.is_file());
+        assert!(fs::read_to_string(&log_path).unwrap().contains("[TEST_CALC]"));
+        drop(first);
+        let second = SessionLogger::start_at(log_path.clone());
+        let current = fs::read_to_string(&log_path).unwrap();
+        assert!(current.contains("[SESSION_START]"));
+        assert!(!current.contains("[TEST_CALC]"));
+        drop(second);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
