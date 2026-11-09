@@ -87,6 +87,15 @@ impl Calculator {
                                 self.view_mode = ViewMode::Preferences;
                             }
 
+                            // Persistent in-process diagnostics remain available
+                            // without opening a console or leaving this program.
+                            if ui.add(egui::Button::new("로그")
+                                .fill(CARD).corner_radius(10)
+                                .min_size(egui::vec2(48.0, 39.0))).clicked() {
+                                self.log_view.open = true;
+                                session_log::info("LOG_VIEW_OPEN", "User opened live session log");
+                            }
+
                             if ui.add(egui::Button::new("?")
                                 .fill(CARD).corner_radius(10)
                                 .min_size(egui::vec2(39.0, 39.0))).clicked() {

@@ -6,6 +6,7 @@ impl Calculator {
         // preference could otherwise switch the UI back to Light on Windows.
         configure_dark_desktop(&cc.egui_ctx);
         install_korean_font(&cc.egui_ctx);
+        session_log::info("UI_INITIALIZE", "Installing theme, fonts, catalogs, and background worker");
         // All potentially costly Markov-DP and refund simulations run off the GUI thread.
         // The worker drops queued stale requests before each calculation; the UI also
         // rejects out-of-generation responses to avoid showing outdated probabilities.
@@ -14,23 +15,53 @@ impl Calculator {
         let active_generation = Arc::new(AtomicU64::new(0));
         let repaint = cc.egui_ctx.clone();
         std::thread::spawn(move || {
+            session_log::info("WORKER_READY", "Background calculation worker is ready");
             while let Ok(mut request) = work_rx.recv() {
+                let mut superseded = 0usize;
                 while let Ok(newer) = work_rx.try_recv() {
                     request = newer;
+                    superseded += 1;
+                }
+                if superseded > 0 {
+                    session_log::warn("CALC_QUEUE_SUPERSEDED", format!(
+                        "{superseded} obsolete queued calculations replaced by generation={}",
+                        request.generation
+                    ));
                 }
                 // Skip queued work invalidated while the previous run was active.
                 if request.active_generation.load(Ordering::Relaxed) != request.generation {
+                    session_log::info("CALC_SKIPPED", format!(
+                        "generation={} invalidated before worker start", request.generation
+                    ));
                     continue;
                 }
+                let started = std::time::Instant::now();
+                session_log::info("CALC_WORKER_START", format!(
+                    "generation={} game={:?}", request.generation, request.setup.game
+                ));
                 let result = compute(&request);
+                match &result {
+                    Ok(stats) => session_log::info("CALC_WORKER_DONE", format!(
+                        "generation={} elapsed_ms={} avg_raw_pulls={:.2} samples={}",
+                        request.generation, started.elapsed().as_millis(),
+                        stats.feedback.as_ref().map_or(stats.combined.mean, |f| f.average_raw),
+                        stats.feedback.as_ref().map_or(0, |f| f.scenarios.len())
+                    )),
+                    Err(message) => session_log::error("CALC_WORKER_FAILED", format!(
+                        "generation={} elapsed_ms={} error={message}",
+                        request.generation, started.elapsed().as_millis()
+                    )),
+                }
                 if result_tx.send(CalculationResponse {
                     generation: request.generation,
                     result,
                 }).is_err() {
+                    session_log::info("WORKER_STOP", "UI receiver closed");
                     break;
                 }
                 repaint.request_repaint();
             }
+            session_log::info("WORKER_EXIT", "Calculation request channel closed");
         });
         // CI observes an explicit Run Simulation click and the corresponding
         // finished worker generation; it never forces automatic calculation.
@@ -55,6 +86,7 @@ impl Calculator {
             language_save_error: None,
             error: None,
             show_help: false,
+            log_view: session_log::LogViewer::default(),
             view_mode: ViewMode::Calculator,
             worker,
             results,
@@ -82,6 +114,9 @@ impl Calculator {
         };
         // Inputs remain editable. No worker request exists until the user
         // clicks Run Simulation after finishing the configuration.
+        session_log::info("UI_READY", format!(
+            "Initial game={:?}; manual Run Simulation required", app.setup.game
+        ));
         app
     }
 
@@ -209,6 +244,10 @@ impl Calculator {
             self.selected_character_id = defaults.character_id;
             self.selected_weapon_id = defaults.weapon_id;
         }
+        session_log::info("GAME_SELECTION", format!(
+            "Switched or reset current game={:?}; targets E{} / secondary copies={}",
+            self.setup.game, self.target_eid, self.target_refine
+        ));
         self.picker_kind = None;
         self.picker_filter.clear();
         self.observation_data = None;

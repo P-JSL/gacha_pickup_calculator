@@ -100,6 +100,7 @@ pub(crate) struct Calculator {
     pub(crate) language_save_error: Option<String>,
     pub(crate) error: Option<String>,
     pub(crate) show_help: bool,
+    pub(crate) log_view: session_log::LogViewer,
     pub(crate) view_mode: ViewMode,
     pub(crate) worker: Sender<CalculationRequest>,
     pub(crate) results: Receiver<CalculationResponse>,
@@ -127,3 +128,12 @@ pub(crate) struct Calculator {
     pub(crate) game_sessions: HashMap<Game, GameSession>,
 }
 
+
+impl Drop for Calculator {
+    fn drop(&mut self) {
+        self.active_generation.store(self.generation.wrapping_add(1), Ordering::Relaxed);
+        session_log::info("UI_SHUTDOWN", format!(
+            "Window closing; any active generation {} has been invalidated", self.generation
+        ));
+    }
+}

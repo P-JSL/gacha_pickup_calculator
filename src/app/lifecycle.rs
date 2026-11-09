@@ -2,6 +2,8 @@ use super::*;
 
 impl eframe::App for Calculator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let previous_view = self.view_mode;
+        let previous_game = self.setup.game;
         // The preceding frame already painted the new worker result. Report
         // completion only for that same, still-current button-click generation.
         if let Some(generation) = self.ci_ready_pending.take() {
@@ -11,7 +13,12 @@ impl eframe::App for Calculator {
             }
         }
         self.poll_results();
-        if self.updates.poll(ctx) { self.catalog_ui.invalidate_after_update(); }
+        if self.updates.poll(ctx) {
+            session_log::info("DATA_UPDATE", format!(
+                "Update manager status changed: {}", self.updates.message
+            ));
+            self.catalog_ui.invalidate_after_update();
+        }
         self.catalog_ui.pump(ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
@@ -185,6 +192,19 @@ impl eframe::App for Calculator {
                         ui.hyperlink_to(*title, *url);
                     }
                 });
+        }
+        if self.view_mode != previous_view {
+            session_log::info("NAVIGATION", format!(
+                "view={:?} -> {:?}", previous_view, self.view_mode
+            ));
+        }
+        if self.setup.game != previous_game {
+            session_log::info("GAME_CHANGE", format!(
+                "game={:?} -> {:?}", previous_game, self.setup.game
+            ));
+        }
+        if let Some(logger) = session_log::current() {
+            self.log_view.show(ctx, logger);
         }
         if self.ci_capture && !self.ci_ui_ready_reported {
             self.ci_ui_ready_reported = true;

@@ -40,12 +40,40 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
     let cpu_budget = budget.clamp(1, 8);
     let cancelled = || request.active_generation.load(Ordering::Relaxed) != request.generation;
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
+    session_log::info("CALC_CHARACTER_DP", format!(
+        "generation={} calculating character probability distribution", request.generation
+    ));
     let character = request.setup.character.distribution(request.mode)?;
+    session_log::info("CALC_CHARACTER_DP_DONE", format!(
+        "generation={} mean_raw={:.3} support={}",
+        request.generation, character.mean, character.pmf.len()
+    ));
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
+    session_log::info("CALC_WEAPON_DP", format!(
+        "generation={} calculating secondary probability distribution", request.generation
+    ));
     let weapon = request.setup.weapon.distribution(request.mode)?;
+    session_log::info("CALC_WEAPON_DP_DONE", format!(
+        "generation={} mean_raw={:.3} support={}",
+        request.generation, weapon.mean, weapon.pmf.len()
+    ));
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
+    session_log::info("CALC_COMBINE", format!(
+        "generation={} composing joint distribution", request.generation
+    ));
     let combined = character.combine(&weapon);
     let cancellation = Some((&*request.active_generation, request.generation));
+    if request.feedback_config.enabled {
+        session_log::info("CALC_REFUND_START", format!(
+            "generation={} samples={} cpu_workers={} game={:?}; iterative refund recycling",
+            request.generation, request.feedback_config.samples,
+            cpu_budget, request.setup.game
+        ));
+    } else {
+        session_log::info("CALC_REFUND_DISABLED", format!(
+            "generation={} exact DP without recycling", request.generation
+        ));
+    }
     let (feedback, wuwa_strategies) = if request.feedback_config.enabled
         && request.setup.game == Game::WutheringWaves
     {
@@ -91,6 +119,14 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
         (None, None)
     };
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
+    if let Some(refund) = &feedback {
+        session_log::info("CALC_REFUND_DONE", format!(
+            "generation={} scenarios={} avg_raw={:.3} avg_initial_shared={:.3}              avg_earned_points={:.3} strategies={}",
+            request.generation, refund.scenarios.len(), refund.average_raw,
+            refund.average_initial_flexible, refund.total_returned_points_average,
+            wuwa_strategies.as_ref().map_or(1, Vec::len)
+        ));
+    }
     // Prepare the refund-free reference distribution even when recycling is
     // enabled. Both exact and simulated curves now use *initial shared passes*
     // as their X-axis; independently adding banner quantiles is not valid.
@@ -103,6 +139,10 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
             request.setup.weapon_dedicated,
         )
     };
+    session_log::info("CALC_SHARED_CDF", format!(
+        "generation={} shared_support={} available_shared={}",
+        request.generation, raw_shared.pmf.len(), request.setup.available_flexible()
+    ));
     let exact_shared_required = Some(CONFIDENCE_LEVELS.map(|confidence|
         raw_shared.quantile(confidence as f64 / 100.0)));
     let successful_budget_means = feedback.as_ref()

@@ -36,6 +36,7 @@ use i18n::{Language, LanguagePreference, t};
 #[path = "app/controller_analytics.rs"] mod controller_analytics;
 #[path = "app/controller_evidence.rs"] mod controller_evidence;
 #[path = "app/lifecycle.rs"] mod lifecycle;
+#[path = "app/session_log.rs"] mod session_log;
 
 use navigation::*;
 use charts::*;
@@ -47,6 +48,19 @@ use controller_evidence::sampled_cdf;
 use lifecycle::{configure_dark_desktop, install_korean_font};
 
 fn main() -> eframe::Result {
+    // Reset only the previous process's log, never while the app is running.
+    let logger = Arc::new(session_log::SessionLogger::start_default());
+    session_log::install(Arc::clone(&logger));
+    let previous_hook = std::panic::take_hook();
+    let panic_logger = Arc::clone(&logger);
+    std::panic::set_hook(Box::new(move |panic| {
+        let source = panic.location().map_or_else(
+            || "unknown".to_owned(),
+            |location| format!("{}:{}", location.file(), location.line()));
+        panic_logger.error("PANIC", format!("Uncaught panic at {source}"));
+        previous_hook(panic);
+    }));
+    logger.info("APPLICATION_START", "Starting native UI and calculation worker");
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1536.0, 864.0])
@@ -54,8 +68,13 @@ fn main() -> eframe::Result {
             .with_title("Gacha Pickup Calculator"),
         ..Default::default()
     };
-    eframe::run_native("Gacha Lab", options,
-        Box::new(|cc| Ok(Box::new(Calculator::new(cc)))))
+    let outcome = eframe::run_native("Gacha Lab", options,
+        Box::new(|cc| Ok(Box::new(Calculator::new(cc)))));
+    match &outcome {
+        Ok(()) => logger.info("SESSION_END", "Native application exited normally"),
+        Err(error) => logger.error("SESSION_END", format!("Native runtime failed: {error}")),
+    }
+    outcome
 }
 // Regression tests use the binary's actual private UI/application interfaces.
 #[cfg(test)]
