@@ -73,7 +73,7 @@ fn overview_metric(ui: &mut egui::Ui, kind: usize, label: &str, value: String, n
                else { Color32::from_rgb(28, 63, 96) };
     egui::Frame::group(ui.style())
         .fill(base)
-        .stroke(egui::Stroke::new(1.0, BORDER))
+        .stroke(egui::Stroke::new(1.0_f32, BORDER))
         .corner_radius(egui::CornerRadius::same(12))
         .inner_margin(10)
         .show(ui, |ui| {
