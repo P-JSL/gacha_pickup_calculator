@@ -1,14 +1,14 @@
 # Gacha Pickup Calculator
 
-**현재 버전: v1.0.16** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
+**현재 버전: v1.0.17** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
 
 캐릭터와 전용 장비를 목표 수량까지 획득하는 데 필요한 뽑기권·재화, 목표 달성 확률, **환급 재투입 후 성공률**을 계산하는 데스크톱 프로그램입니다.
 
 ## 다운로드 및 설치
 
-- [v1.0.16 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.16/gacha-pickup-calculator-windows-x64-v1.0.16.zip)
-- [v1.0.16 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.16/gacha_pickup_calculator.exe)
-- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.16/gacha-pickup-calculator-screenshots-v1.0.16.zip)
+- [v1.0.17 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.17/gacha-pickup-calculator-windows-x64-v1.0.17.zip)
+- [v1.0.17 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.17/gacha_pickup_calculator.exe)
+- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.17/gacha-pickup-calculator-screenshots-v1.0.17.zip)
 - [최신 배포 및 변경 사항](https://github.com/P-JSL/gacha_pickup_calculator/releases/latest)
 
 1. **전체 패키지 ZIP**을 내려받아 압축을 해제합니다. EXE와 `Image` 폴더를 같은 위치에 둡니다.
@@ -31,6 +31,16 @@
 
 **주의:** 스타레일·명조의 비픽업 4성 캐릭터/장비 구성, 소프트 천장 일부 및 이환 보드 보상 등은 근사 모델입니다. **환급률을 고정 비율로 일괄 적용하지 않고**, 획득 결과별 환급을 시뮬레이션합니다. 결과는 기대값/확률이며 실제 획득을 보장하지 않습니다.
 
+## 실행 로그 확인
+
+프로그램 시작 시 이전 세션의 `session.log`를 자동으로 비우고, 시작부터 종료까지 이벤트를 기록합니다. 로그는 **헤더의 `로그` 버튼** 또는 **Settings → 실행 로그 · 진단**에서 프로그램을 종료하지 않고 볼 수 있습니다. 검색·표시된 로그 복사를 지원합니다.
+
+- **Windows:** `%LOCALAPPDATA%\gacha_pickup_calculator\session.log`
+- **Linux:** `$XDG_STATE_HOME/gacha_pickup_calculator/session.log` 또는 `~/.local/state/gacha_pickup_calculator/session.log`
+- 로그는 UTC 시각·프로그램 시작 후 경과시간·레벨·세대번호와 함께 기록하며, 파일은 계산 시작·단계별 진행·성공률/환급·실패·종료까지 실시간 저장합니다.
+- GUI는 최신 20,000줄을 표시하고 **전체 현재 세션 로그는 파일**에 보관합니다. 로그 파일에 쓸 수 없을 때에는 메모리에 임시 기록하고 화면에 오류를 표시합니다.
+- 한 번의 시뮬레이션은 최대 백만 건 이상의 난수 추첨을 포함할 수 있으므로 매 추첨의 개별 RNG 값은 기록하지 않습니다. 대신 DP 모델, 입력 조건, Monte Carlo 샘플 수, 환급 집계, 최종 확률과 오류를 기록합니다.
+
 ## 릴리즈 바이너리와 코드 보호
 
 배포용 Windows EXE는 Rust 릴리즈 빌드에서 네이티브 코드로 컴파일하며, Thin LTO와 심벌/디버그 정보 제거로 파일을 경량화합니다. 별도 평문 소스 ZIP은 릴리즈 자산에 중복 첨부하지 않습니다. 다만 이 프로젝트는 **공개 저장소**이므로 GitHub의 소스와 자동 생성 소스 아카이브는 공개됩니다. 심벌 제거는 **암호화가 아니며** 바이너리 역공학을 완전히 차단하지 못합니다.
@@ -39,7 +49,7 @@
 
 프로그램은 새 버전이 있으면 알려주지만 **EXE를 자동으로 교체하지 않습니다.** 게임 카탈로그·이미지는 검증된 GitHub 데이터가 있을 때 별도로 갱신될 수 있습니다. 오프라인에서는 기존 데이터로 동작합니다.
 
-다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.16/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.16.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
+다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.17/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.17.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
 
 문제 제보 및 기능 요청은 [GitHub Issues](https://github.com/P-JSL/gacha_pickup_calculator/issues)에 남길 수 있습니다.
 
