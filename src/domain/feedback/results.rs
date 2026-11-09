@@ -59,6 +59,31 @@ pub struct QuantileConfidenceBand {
     pub cdf_tolerance: f64,
 }
 
+/// Disjoint original-ticket, refund-assisted, and failed outcomes from one sample set.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BudgetSuccessBreakdown {
+    pub original_only: usize,
+    pub after_recycling: usize,
+    pub failed: usize,
+    pub samples: usize,
+    pub average_extra_recycled_draws: f64,
+    pub average_refund_tickets_on_recycled_success: f64,
+}
+impl BudgetSuccessBreakdown {
+    pub fn original_probability(&self) -> f64 {
+        self.original_only as f64 / self.samples.max(1) as f64
+    }
+    pub fn recycling_probability(&self) -> f64 {
+        self.after_recycling as f64 / self.samples.max(1) as f64
+    }
+    pub fn failure_probability(&self) -> f64 {
+        self.failed as f64 / self.samples.max(1) as f64
+    }
+    pub fn final_probability(&self) -> f64 {
+        (self.original_only + self.after_recycling) as f64 / self.samples.max(1) as f64
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FeedbackEstimate {
     /// Sorted minimum additional flexible tickets needed beyond dedicated tickets.
@@ -81,6 +106,40 @@ pub struct FeedbackEstimate {
 }
 
 impl FeedbackEstimate {
+    /// Original tickets are exhausted first; only previously earned returns
+    /// can finance additional draws. The prefix-maximal funding deficit stored
+    /// in each path is equivalent to this payment order.
+    pub fn success_breakdown(&self, available_flexible: usize, points_per_ticket: usize)
+                             -> BudgetSuccessBreakdown {
+        let samples = self.scenarios.len();
+        let mut result = BudgetSuccessBreakdown { samples, ..Default::default() };
+        let mut extra = 0_u128;
+        let mut earned = 0_u128;
+        for trial in &self.scenarios {
+            let shared_draws = trial.raw_pulls.saturating_sub(trial.dedicated_used);
+            if shared_draws <= available_flexible {
+                result.original_only += 1;
+            } else if trial.initial_flexible_required <= available_flexible {
+                result.after_recycling += 1;
+                extra += (shared_draws - available_flexible) as u128;
+                earned += trial.earned_points as u128;
+            } else {
+                result.failed += 1;
+            }
+        }
+        if result.after_recycling > 0 {
+            result.average_extra_recycled_draws =
+                extra as f64 / result.after_recycling as f64;
+            result.average_refund_tickets_on_recycled_success =
+                earned as f64 / result.after_recycling as f64
+                    / points_per_ticket.max(1) as f64;
+        }
+        debug_assert_eq!(result.original_only + result.after_recycling + result.failed, samples);
+        debug_assert_eq!(result.original_only + result.after_recycling,
+            self.budgets.partition_point(|&needed| needed <= available_flexible));
+        result
+    }
+
     /// Empirical CDF, with the standard binomial Wilson 95% uncertainty interval.
     pub fn probability(&self, available_flexible: usize) -> (f64, f64, f64) {
         let count = self.budgets.partition_point(|&n| n <= available_flexible);

@@ -25,7 +25,7 @@
         }));
         Computed {
             character, weapon, combined, raw_shared, feedback: None,
-            successful_budget_means: None,
+            successful_budget_means: None, budget_breakdown: None,
             wuwa_strategies: None, exact_shared_required,
         }
     }
@@ -144,7 +144,7 @@
             combined: character.combine(&weapon),
             raw_shared: remaining_shared_distribution(&character, &weapon, 0, 0),
             character, weapon, feedback: Some(Arc::new(feedback)),
-            successful_budget_means: None,
+            successful_budget_means: None, budget_breakdown: None,
             wuwa_strategies: None, exact_shared_required: None,
         };
         let gap = GoalFunding::calculate(&setup, &stats, 2, 0, 90);
@@ -191,7 +191,7 @@
             combined: character.combine(&weapon),
             character, weapon, raw_shared,
             feedback: Some(Arc::new(feedback)),
-            successful_budget_means: None, wuwa_strategies: None,
+            successful_budget_means: None, budget_breakdown: None, wuwa_strategies: None,
             exact_shared_required: None,
         };
         let gap = GoalFunding::calculate(&setup, &stats, 2, 1, 90);

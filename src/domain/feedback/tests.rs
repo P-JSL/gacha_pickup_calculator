@@ -778,3 +778,56 @@
         assert_eq!(sequential.average_raw.to_bits(), active.average_raw.to_bits());
     }
 
+
+    #[test]
+    fn original_tickets_then_recycled_refunds_partition_same_trials() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 4,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        setup.character_dedicated = 1;
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.samples = 32;
+        cfg.points_per_ticket = 1;
+        cfg.featured_duplicate = 1;
+        cfg.four_star_reward = 0;
+        cfg.four_star_maxed = 0;
+        let estimate = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let none = estimate.success_breakdown(0, cfg.points_per_ticket);
+        assert_eq!((none.original_only, none.after_recycling, none.failed), (0, 0, 32));
+        let refunded = estimate.success_breakdown(1, cfg.points_per_ticket);
+        assert_eq!((refunded.original_only, refunded.after_recycling, refunded.failed), (0, 32, 0));
+        assert_eq!(refunded.average_extra_recycled_draws, 2.0);
+        assert_eq!(refunded.average_refund_tickets_on_recycled_success, 3.0);
+        assert_eq!(refunded.final_probability(), estimate.probability(1).0);
+        let original = estimate.success_breakdown(3, cfg.points_per_ticket);
+        assert_eq!((original.original_only, original.after_recycling, original.failed), (32, 0, 0));
+        assert_eq!(original.final_probability(), estimate.probability(3).0);
+    }
+
+    #[test]
+    fn finishing_draw_return_cannot_pay_for_that_draw() {
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.character = Banner {
+            rule: BannerRule::Standard {
+                rarity: RateSchedule { base: 1.0, hard: 1, soft: SoftPity::None },
+                featured_share: 1.0,
+            },
+            pity: 0, guaranteed: false, target_copies: 1,
+            spark: None, any_rare_pity: 0,
+        };
+        setup.weapon.target_copies = 0;
+        let mut cfg = FeedbackConfig::for_game(Game::StarRail);
+        cfg.samples = 16;
+        cfg.featured_first = 20;
+        let estimate = estimate(&setup, RateMode::PublishedOnly, &cfg).unwrap();
+        let stages = estimate.success_breakdown(0, cfg.points_per_ticket);
+        assert_eq!(stages.failed, 16);
+        assert_eq!(stages.final_probability(), 0.0);
+    }
