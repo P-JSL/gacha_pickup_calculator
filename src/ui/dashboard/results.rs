@@ -53,16 +53,27 @@ impl Calculator {
                             // Original tickets are spent before recycling:
                             // the formerly displayed "points-funded" mean also
                             // counted refunds that merely preserved spare tickets.
-                            let stages = if self.input_needs_calculation || self.calculating {
-                                None
+                            if self.setup.game == Game::StarRail {
+                                let stages = if self.input_needs_calculation || self.calculating {
+                                    None
+                                } else {
+                                    self.visible_stats().and_then(|stats| stats.budget_breakdown.as_ref())
+                                };
+                                let value = stages.map_or("—".to_owned(),
+                                    |stage| format!("+{:.1}", stage.average_extra_recycled_draws));
+                                ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
+                                if stages.is_some() {
+                                    ui.small("보유권 소진 후 환급으로 추가 성공한 경로의 평균");
+                                }
                             } else {
-                                self.visible_stats().and_then(|stats| stats.budget_breakdown.as_ref())
-                            };
-                            let value = stages.map_or("—".to_owned(),
-                                |stage| format!("+{:.1}", stage.average_extra_recycled_draws));
-                            ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
-                            if stages.is_some() {
-                                ui.small("보유권 소진 후 환급으로 추가 성공한 경로의 평균");
+                                let bonus = self.visible_stats()
+                                    .and_then(|stats| stats.successful_budget_means.as_ref());
+                                let value = bonus.map_or("—".to_owned(),
+                                    |means| format!("+{:.1}", means.average_points_funded));
+                                ui.label(RichText::new(value).color(SUCCESS).size(12.0).strong());
+                                if bonus.is_some() {
+                                    ui.small("현재 예산 내 성공한 경로 기준 평균");
+                                }
                             }
                         });
                         ui.add_space(7.0);

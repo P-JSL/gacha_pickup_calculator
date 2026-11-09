@@ -142,7 +142,8 @@ impl Calculator {
         dirty |= self.workspace_quick_settings(ui);
         // Preserve the game tabs and Run Simulation button ahead of detailed
         // results, even when the center panel is narrow or scaled on Windows.
-        if !dirty && !self.input_needs_calculation && !self.calculating {
+        if self.setup.game == Game::StarRail
+            && !dirty && !self.input_needs_calculation && !self.calculating {
             if let Some(stats) = self.visible_stats() {
                 if let (Some(stage), Some(refund)) =
                     (stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {

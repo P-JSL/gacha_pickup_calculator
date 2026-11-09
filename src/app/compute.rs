@@ -107,9 +107,14 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
         raw_shared.quantile(confidence as f64 / 100.0)));
     let successful_budget_means = feedback.as_ref()
         .and_then(|estimate| estimate.successful_means(request.setup.available_flexible()));
-    let budget_breakdown = feedback.as_ref().map(|estimate|
-        estimate.success_breakdown(request.setup.available_flexible(),
-            request.feedback_config.points_per_ticket));
+    // Only Star Rail has the simple original-ticket then Starlight-funded
+    // continuation represented by the three-stage UI. Other games may have
+    // independent record credits or waveband exchanges.
+    let budget_breakdown = if request.setup.game == Game::StarRail {
+        feedback.as_ref().map(|estimate|
+            estimate.success_breakdown(request.setup.available_flexible(),
+                request.feedback_config.points_per_ticket))
+    } else { None };
     if cancelled() { return Err("계산 요청이 취소되었습니다.".to_owned()); }
     Ok(Computed {
         character, weapon, combined, raw_shared, feedback, wuwa_strategies,
