@@ -60,6 +60,36 @@ impl Calculator {
                     ui.add_space(5.0);
                 }
             }
+
+
+        } else if self.calculating {
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
+            });
+        } else {
+            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
+                if let Some(error) = &self.error {
+                    ui.colored_label(Color32::LIGHT_RED, error);
+                } else {
+                    ui.label(RichText::new(t(language,
+                        "Changes pending. Select Run Simulation to update.")).color(YELLOW));
+                }
+            });
+        }
+
+        ui.add_space(11.0);
+        dirty |= self.workspace_quick_settings(ui);
+        // Keep the game selector and Run Simulation button above expandable
+        // result explanations, while the final success probability stays first.
+        if !dirty {
+            if let Some(stats) = self.visible_stats()
+                .filter(|_| !self.input_needs_calculation && !self.calculating) {
+                let free_pulls = self.setup.available_flexible();
+                let chance = self.current_goal_funding().map_or_else(
+                    || stats.feedback.as_ref().map_or(stats.raw_shared.at(free_pulls),
+                        |f| f.probability(free_pulls).0),
+                    |gap| gap.current_probability,
+                );
             if let (Game::StarRail, Some(stages), Some(refund)) =
                 (self.setup.game, stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
                 ui.add_space(9.0);
@@ -101,26 +131,10 @@ impl Calculator {
                 format!("{overall_success_label}: {:.2}%", chance * 100.0),
                 &chart_total, PINK, self.ui_preferences, language);
 
-
-        } else if self.calculating {
-            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
-                ui.horizontal(|ui| { ui.spinner(); ui.label(t(language, "Calculating probability and refunds...")); });
-            });
-        } else {
-            dashboard_card(ui, t(language, "Probability Overview"), |ui| {
-                if let Some(error) = &self.error {
-                    ui.colored_label(Color32::LIGHT_RED, error);
-                } else {
-                    ui.label(RichText::new(t(language,
-                        "Changes pending. Select Run Simulation to update.")).color(YELLOW));
-                }
-            });
+            }
         }
-
-        ui.add_space(11.0);
-        dirty |= self.workspace_quick_settings(ui);
-        // Keep the game controls ahead of the standalone banner charts;
-        // the joint refunded probability is now visible above this section.
+        // The detailed funding and standalone curves follow the quick editor.
+        if !dirty {
         if let Some(stats) = self.visible_stats()
             .filter(|_| !self.input_needs_calculation && !self.calculating) {
             // Keep game tabs and Run Simulation reachable even when results
@@ -164,12 +178,15 @@ impl Calculator {
             }
 
         }
+        }
+        if !dirty {
         if let Some(stats) = self.visible_stats()
             .filter(|_| !self.input_needs_calculation && !self.calculating) {
             if let Some(strategies) = &stats.wuwa_strategies {
                 ui.add_space(10.0);
                 wuwa_strategy_table(ui, strategies, &self.setup, self.confidence);
             }
+        }
         }
         dirty
     }
