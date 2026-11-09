@@ -212,9 +212,12 @@ impl LogViewer {
                     .show_rows(ui, 19.0, self.matching.len(), |ui, range| {
                         for index in range {
                             let line = &self.entries[self.matching[index]];
+                            // Virtualized rows must retain a fixed height:
+                            // wrapped multi-line labels would overlap following
+                            // rows. Full content is accessible on hover/copy/file.
                             ui.add(egui::Label::new(
                                 egui::RichText::new(line).monospace().size(11.0)
-                            ).wrap());
+                            ).truncate()).on_hover_text(line);
                         }
                     });
             });
