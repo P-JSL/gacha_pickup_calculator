@@ -42,42 +42,54 @@ impl Calculator {
                 ui.label(RichText::new(t(language, "Calculating in background. Previous results remain visible."))
                     .color(YELLOW).size(10.0));
             }
-            ui.columns(4, |columns| {
-                let (label, value, detail) = if self.setup.game.shares_featured_ticket() {
-                    (i18n::ticket_name(language, self.setup.game, false), format!("{}", self.setup.flexible),
-                        format!("{}: {} ({})", t(language, "Shared character/weapon ticket"),
-                            self.setup.premium_currency / self.setup.game.cost_per_pull(),
-                            i18n::currency_name(language, self.setup.game)))
-                } else {
-                    (t(language, "Character / Weapon Tickets"),
-                        format!("{} / {}", self.setup.character_dedicated,
-                            self.setup.weapon_dedicated),
-                        if self.setup.game == Game::StellaSora {
-                            format!("{} / {}: {}",
-                                i18n::ticket_name(language, self.setup.game, false),
-                                i18n::ticket_name(language, self.setup.game, true),
-                                self.setup.weapon_ticket_inventory())
-                        } else {
-                            format!("{}: {}", t(language, "Shared Currency"), free_pulls)
-                        })
-                };
-                overview_metric(&mut columns[0], 0, label, value, detail, CYAN);
-                overview_metric(&mut columns[1], 1, t(language, "Target Success Rate"),
-                    format!("{:.2}%", chance * 100.0), meta, SUCCESS);
-                overview_metric(&mut columns[2], 2, t(language, "Expected Pulls"),
-                    format!("{expected:.1}"), mean_note, PINK);
-                let (value, note, color) = funding.map_or_else(
-                    || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
-                    |g| (format!("+{} {}", g.additional_shared,
-                                 t(language, "Featured ticket equivalents")),
-                          format!("+{} {} · {} {}%",
-                                  g.additional_currency, i18n::currency_name(language, self.setup.game),
-                                  t(language, "Target confidence"), g.confidence),
-                          if g.additional_shared == 0 { SUCCESS } else { GOLD }),
-                );
-                overview_metric(&mut columns[3], 3, t(language, "Additional featured ticket equivalents"),
-                    value, note, color);
-            });
+            let (ticket_label, ticket_value, ticket_note) = if self.setup.game.shares_featured_ticket() {
+                (i18n::ticket_name(language, self.setup.game, false),
+                 format!("{}", self.setup.flexible),
+                 format!("{}: {} ({})", t(language, "Shared character/weapon ticket"),
+                     self.setup.premium_currency / self.setup.game.cost_per_pull(),
+                     i18n::currency_name(language, self.setup.game)))
+            } else {
+                (t(language, "Character / Weapon Tickets"),
+                 format!("{} / {}", self.setup.character_dedicated, self.setup.weapon_dedicated),
+                 format!("{}: {}", t(language, "Shared Currency"), free_pulls))
+            };
+            let (gap_value, gap_note, gap_color) = funding.map_or_else(
+                || ("—".to_owned(), t(language, "Recalculate to update funding estimate").to_owned(), MUTED),
+                |g| (format!("+{} {}", g.additional_shared,
+                              t(language, "Featured ticket equivalents")),
+                      format!("+{} {} · {} {}%", g.additional_currency,
+                              i18n::currency_name(language, self.setup.game),
+                              t(language, "Target confidence"), g.confidence),
+                      if g.additional_shared == 0 { SUCCESS } else { GOLD }),
+            );
+            let cards = [
+                (0, ticket_label, ticket_value, ticket_note, CYAN),
+                (1, t(language, "Target Success Rate"), format!("{:.2}%", chance * 100.0), meta, SUCCESS),
+                (2, t(language, "Expected Pulls"), format!("{expected:.1}"), mean_note, PINK),
+                (3, t(language, "Additional featured ticket equivalents"), gap_value, gap_note, gap_color),
+            ];
+            let width = ui.available_width();
+            if width >= 1120.0 {
+                ui.columns(4, |columns| {
+                    for (i, (kind, label, value, note, color)) in cards.iter().enumerate() {
+                        overview_metric(&mut columns[i], *kind, label, value.clone(), note.clone(), *color);
+                    }
+                });
+            } else if width >= 560.0 {
+                for pair in cards.chunks(2) {
+                    ui.columns(2, |columns| {
+                        for (i, (kind, label, value, note, color)) in pair.iter().enumerate() {
+                            overview_metric(&mut columns[i], *kind, label, value.clone(), note.clone(), *color);
+                        }
+                    });
+                    ui.add_space(5.0);
+                }
+            } else {
+                for (kind, label, value, note, color) in &cards {
+                    overview_metric(ui, *kind, label, value.clone(), note.clone(), *color);
+                    ui.add_space(5.0);
+                }
+            }
 
             // Make the refund-recycled value the visible primary result,
             // including in the compact chart where hover labels were clipped.
@@ -109,6 +121,16 @@ impl Calculator {
             probability_card(ui, t(language, "Overall Result"),
                 format!("{overall_success_label}: {:.2}%", chance * 100.0),
                 &chart_total, PINK, self.ui_preferences, language);
+            if !self.input_needs_calculation && !self.calculating {
+                if let (Some(stage), Some(refund)) =
+                    (stats.budget_breakdown.as_ref(), stats.feedback.as_ref()) {
+                    ui.add_space(9.0);
+                    refund_stages_card(ui, stage, free_pulls, refund.average_raw,
+                        refund.total_returned_points_average
+                            / self.feedback_cfg.points_per_ticket.max(1) as f64,
+                        language);
+                }
+            }
 
         } else if self.calculating {
             dashboard_card(ui, t(language, "Probability Overview"), |ui| {
