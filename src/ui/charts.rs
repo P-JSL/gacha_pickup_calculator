@@ -199,19 +199,25 @@ pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_
         // Native egui popups can escape the chart. Draw a compact multi-row
         // overlay inside the plot instead, prioritizing recycled success.
         let tooltip_font = egui::FontId::proportional(10.5);
-        let text_width = ui.fonts(|fonts| rows.iter().map(|(label, _)| {
-            fonts.layout_no_wrap(label.clone(), tooltip_font.clone(), Color32::WHITE).size().x
-        }).fold(0.0_f32, f32::max));
-        let row_height = 16.0;
-        let badge_height = (rows.len() as f32 * row_height + 6.0).max(22.0);
+        // Wrap hover text at the available chart width instead of drawing
+        // unbroken CJK labels past the plot's right edge.
+        let available_width = (graph.width() - 22.0).max(24.0);
+        let galleys: Vec<_> = rows.iter().map(|(label, color)| {
+            ui.fonts(|fonts| fonts.layout(label.clone(), tooltip_font.clone(),
+                *color, available_width))
+        }).collect();
+        let text_width = galleys.iter().map(|galley| galley.size().x)
+            .fold(0.0_f32, f32::max);
+        let badge_height = galleys.iter().map(|galley| galley.size().y + 3.0)
+            .sum::<f32>() + 8.0;
         let badge = chart_tooltip_rect(graph, pointer, text_width + 16.0, badge_height);
         painter.rect_filled(badge, 5.0, Color32::from_rgb(18, 48, 69));
-        let overlay = painter.with_clip_rect(badge.intersect(graph).shrink(3.0));
-        for (i, (label, color)) in rows.iter().enumerate() {
-            let y = badge.center().y
-                + (i as f32 - (rows.len() as f32 - 1.0) / 2.0) * row_height;
-            overlay.text(egui::pos2(badge.left() + 7.0, y),
-                egui::Align2::LEFT_CENTER, label, tooltip_font.clone(), *color);
+        let overlay = painter.with_clip_rect(badge.intersect(graph).shrink(2.0));
+        let mut y = badge.top() + 4.0;
+        for ((_, color), galley) in rows.iter().zip(galleys) {
+            let height = galley.size().y;
+            overlay.galley(egui::pos2(badge.left() + 7.0, y), galley, *color);
+            y += height + 3.0;
         }
         }
     }
