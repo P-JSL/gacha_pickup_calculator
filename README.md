@@ -1,14 +1,14 @@
 # Gacha Pickup Calculator
 
-**현재 버전: v1.0.13** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
+**현재 버전: v1.0.14** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
 
 캐릭터와 전용 장비를 목표 수량까지 획득하는 데 필요한 뽑기권·재화, 목표 달성 확률, **환급 재투입 후 성공률**을 계산하는 데스크톱 프로그램입니다.
 
 ## 다운로드 및 설치
 
-- [v1.0.13 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.13/gacha-pickup-calculator-windows-x64-v1.0.13.zip)
-- [v1.0.13 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.13/gacha_pickup_calculator.exe)
-- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.13/gacha-pickup-calculator-screenshots-v1.0.13.zip)
+- [v1.0.14 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.14/gacha-pickup-calculator-windows-x64-v1.0.14.zip)
+- [v1.0.14 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.14/gacha_pickup_calculator.exe)
+- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.14/gacha-pickup-calculator-screenshots-v1.0.14.zip)
 - [최신 배포 및 변경 사항](https://github.com/P-JSL/gacha_pickup_calculator/releases/latest)
 
 1. **전체 패키지 ZIP**을 내려받아 압축을 해제합니다. EXE와 `Image` 폴더를 같은 위치에 둡니다.
@@ -23,7 +23,7 @@
 |---|---|
 | 게임별 뽑기 규칙 | 5성 기본 확률, 천장, 픽업 확정, 목표 중복 획득 |
 | 보유 자원 | 전용 뽑기권, 게임 재화, 교환 포인트 및 잔여 단위 |
-| 환급 재투입 | 획득한 환급 포인트를 뒤이은 뽑기에 재사용 |
+| 환급 재투입 | 보유권만으로 성공 / 환급 추가 성공 / 최종 실패의 3단계를 동일 표본으로 계산 |
 | 4성/A급 최대 돌파 | **기본값은 모든 4성 캐릭터/A급의 최대 돌파 보유**이며 고급 설정에서 변경 가능 |
 | 시뮬레이션 결과 | 전체 목표 성공 확률, 필요 재화의 구간·분위수, 추정 오차 |
 
@@ -33,7 +33,7 @@
 
 프로그램은 새 버전이 있으면 알려주지만 **EXE를 자동으로 교체하지 않습니다.** 게임 카탈로그·이미지는 검증된 GitHub 데이터가 있을 때 별도로 갱신될 수 있습니다. 오프라인에서는 기존 데이터로 동작합니다.
 
-다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.13/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.13.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
+다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.14/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.14.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
 
 문제 제보 및 기능 요청은 [GitHub Issues](https://github.com/P-JSL/gacha_pickup_calculator/issues)에 남길 수 있습니다.
 
