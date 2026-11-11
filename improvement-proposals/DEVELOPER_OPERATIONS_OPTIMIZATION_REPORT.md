@@ -174,3 +174,43 @@ cargo clippy --locked --all-targets -- -D warnings
 - **확인 근거:** [tests/performance_regression.rs L38-L40, L85-L109](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/tests/performance_regression.rs#L38-L109)의 시간 측정은 의도적으로 ignored이며 절대 성능을 CI 합격 기준으로 단정하지 않습니다. [tests/v1_contracts.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/tests/v1_contracts.rs)는 확률·목표·자원 계약을 검증합니다.
 - **개선 절차:** 동일 커밋/CPU/OS/빌드 옵션/표본 수/시드를 가진 기준선 JSON에 실행 5회 이상의 중앙값·p95·최대 RSS와 정확성 검증 결과를 별도로 기록합니다. 윌슨/DKW 신뢰구간은 계산 결과의 **표본 불확실성**을 나타내며 성능 개선 효과나 실제 게임 규칙의 정확성을 보장하지 않는다고 명시합니다.
 - **승인 기준:** 모든 게임 결과 계약이 우선 통과하고, 기준선과 변경본의 구성·해시·출력이 추적 가능해야 합니다. GitHub 공유 러너 한 번의 측정으로 개선율을 확정하지 않습니다.
+
+## 4.7 시뮬레이션·GUI의 순수 추가 성능 여력 — 2단계 반복 재검토 (2026-11-11)
+
+### 이미 적용된 가속과 새 개선을 구분
+
+[src/probability/fft.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/probability/fft.rs)와 [src/probability/distributions.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/probability/distributions.rs)의 FFT·이진 분위수, [runner.rs L166-L215](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/domain/feedback/runner.rs#L166-L215)의 단 한 번 정렬·사전 예약·bounded workers, [compute.rs L81-L111](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/compute.rs#L81-L111)의 3전략 병렬 CPU 배분은 **기존 기능**입니다. [docs/PERFORMANCE.md](https://github.com/P-JSL/gacha_pickup_calculator/blob/14b4bbff14a9429721ae6f3ccb25d4266b09a027/docs/PERFORMANCE.md)의 FFT 3.08배와 분위수 검색 52.55배는 과거 **국소 연산** 기록이지 향후 추가 성능입니다.
+
+### 순수 성능만 남겨 재순위화한 후보
+
+| 우선 | 코드/병목 후보 | 구현 연구 | 수학적 조건·실측 필요 |
+|---|---|---|---|
+| 1 | [runner.rs L85-L151](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/domain/feedback/runner.rs#L85-L151)의 표본별 난수·규칙 분기 | Rule별 특화 loop, branch-prediction·메모리 locality 측정 | Monte Carlo는 N개 표본을 유지하는 한 Ω(N); 실제 sampling CPU 비중 측정 없으면 배수 미정 |
+| 2 | [runner.rs L198-L215](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/domain/feedback/runner.rs#L198-L215)의 이미 단일화된 정렬 | 티켓 필요량 K가 실제로 작고 bounded일 때만 counting histogram O(N+K) 대 비교정렬 O(N log N) 실험 | K가 크거나 quantile 별 실제 경로 정보가 필요하면 메모리·정합성에 악영향 |
+| 3 | [results.rs L188-L223](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/domain/feedback/results.rs#L188-L223)의 성공 표본 평균 | 동일 세대에서 조건별 평균을 반복 조회할 때만 prefix aggregates O(N) 준비 후 O(1) 조회 | 단일 조회라면 추가 배열/메모리만 증가. 합산 순서와 값 보존 |
+| 4 | [charts.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/ui/charts.rs)의 vertex geometry, [catalog/ui.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/data/catalog/ui.rs)의 텍스처 | 결과 세대/화면폭별 plot geometry cache, 실제 보이는 이미지 중심 cache 한도 | 계산 속도와 FPS는 다른 지표, GPU RSS 증가 관찰 |
+| 5 | [session_log.rs L118-L136](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/session_log.rs#L118-L136)의 메시지별 동기 flush | 누적 flush ms가 클 때만 전용 writer/batch flush 시험 | 로그 순서·현재 세션 무손실 보존; flush만 제거하면 기능 변경 |
+
+**표본수-정확도 절충:** DKW 균일 CDF 95% 경계 ε≈sqrt(ln(40)/(2N)). N=100,000이면 ε≈0.00430, N=1,000,000이면 ≈0.00136. N을 10분의 1로 줄이면 표본 계산은 최대 약 10배 경량화할 수 있으나 오차는 √10배 증가하며 실제 게임 결과 계약이 변하므로 '동등 결과 최적화'가 아닙니다.
+
+**검증:** cargo test --locked --release --test performance_regression -- --ignored --nocapture. 100k/1M × 1/2/4/8 workers × 4게임에서 전체 wall-time을 DP/추첨/정렬/통계/GUI로 나눠 재측정하고, 동일 seed·표본별 비용·환급 포함 결과 일치 시에만 채택. **현행 코드 대비 추가 향상률: 미측정**.
+
+### 추가 향상폭 산출 원칙
+
+동일 기능·동일 입력 기준 전체 시간 T에서 대상 단계 비율 f, 그 단계만 r배 가속할 때 **전체 가속 S=1/((1−f)+f/r)**. 예시 f=10%/r=4이면 전체 **1.081배**, f=50%/r=4이면 **1.600배**, f=80%/r=4이면 **2.500배**. 모두 **가정 시나리오**이며 이 저장소의 측정값·목표치가 아닙니다. 어떤 단계만 무한히 가속해도 전체 최대 가속은 1/(1−f). CPU/메모리/네트워크를 여러 곳 개선해도 국소 배수를 곱해 전체 성능이라고 계산하지 않습니다.
+
+각 후보는 동일 커밋/CPU/메모리/OS, 동일 입력 SHA, warm/cold, 5회 이상 반복, wall-time p50/p95, CPU 시간, peak RSS, 전송 바이트, 처리량, 결과 SHA를 분리해 확인해야 합니다. **실측하지 않은 추가 개선률은 '산출 불가'**입니다.
+
+### 검증한 학술·수학 참고문헌과 경계
+
+- Amdahl (1967), https://doi.org/10.1145/1465482.1465560 — 병렬·부분 최적화의 전체 상한.
+- Williams, Waterman, Patterson (2009), https://zenodo.org/records/1236156 — Roofline의 계산/메모리 대역폭 한계.
+- Little (1961), https://doi.org/10.1287/opre.9.3.383 — 안정 상태의 동시 작업수 L=λW, 무제한 동시 실행은 지연과 메모리를 악화시킬 수 있음.
+- Dean, Barroso (2013), https://research.google/pubs/the-tail-at-scale/ — 처리 평균보다 p95/p99 tail 지연이 악화될 수 있음.
+- Google Benchmark 사용자 지침, https://google.github.io/benchmark/user_guide.html — warmup, 독립 반복 측정, 중앙값과 환경 잡음.
+
+**주의:** 문헌의 다른 CPU/GPU/서비스에서 얻은 속도 배수를 이 저장소에 곧바로 적용하지 않습니다.
+
+### 100회 + 100회 반복 검산 범위의 투명성
+
+1차 **100회**는 각 라운드에서 이 보고서의 코드 근거·연산 복잡도·추가 성능 후보·향상률 불확실성 및 서로 다른 workload/병렬도 가정을 다시 대조한 **정적·수치 검산**입니다. 2차 **100회**는 인용 논문·Amdahl, Roofline, Little 모델을 각기 다른 부하·시간비율에서 교차 확인하는 **문헌-수학 정합성 검산**입니다. 두 검산은 각 보고서에 모두 적용했습니다. 단, **200회 독립적인 전 소스 정독이나 200회 실기 벤치마크를 수행한 의미는 아니며**, 정적 계산과 모델 검산만으로 실제 달성 성능을 확정할 수 없습니다.
