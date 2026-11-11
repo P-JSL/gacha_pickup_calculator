@@ -151,3 +151,26 @@ cargo clippy --locked --all-targets -- -D warnings
 ```
 
 **계측 기록:** 표본 수 / 고정 시드·게임·환급 구성 / worker 수 / generation·sort·summary 단계 ms / Peak RSS / GUI frame p95 / 성공률·Wilson/DKW 구간 / 전후 CDF 최대 절대 오차. **즉시 원복:** 예산 차원의 뜻 변경, 표본 재현성 실패, 4개 게임의 천장/환급 차이, 중단한 계산의 오래된 결과가 UI에 표시되는 경우.
+
+
+## 4.6 추가 보완 과제 — 관측성·정확성·회귀 안전성 (2026-11-11)
+
+기존 IMP-G01~G04의 자료구조·차트 가속과 별개로, **실행 로그 비용과 계산 세대 안전성, 통계적 검증 증거**를 우선 보강할 필요가 있습니다. 아래 항목은 아직 코드에 반영하지 않은 개선안이며 실제 병목 또는 결함으로 확정한 내용이 아닙니다.
+
+### IMP-G05 · 계산 중 동기 로그 flush 영향 측정 및 무손실 기록 정책 (P1 계측)
+
+- **확인 근거:** [src/app/session_log.rs L118-L136](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/session_log.rs#L118-L136)에서 각 메시지마다 공유 Mutex를 잡고 파일에 한 줄 기록 후 flush합니다. 계산 요청과 결과는 [src/app/controller_session/calculation.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/controller_session/calculation.rs)에서 기록합니다.
+- **개선 절차:** ① SSD/느린 디스크에서 1회 계산의 로그 행 수·잠금 대기·flush 누적 ms를 측정합니다. ② 지연이 유의미할 때만 기록 큐 + 전용 writer 또는 제한된 batch flush를 실험합니다. ③ 순서, 오류 기록, 현재 실행 log/session.log 경로, 새 실행 시 초기화, 종료 시 마지막 기록이 사라지지 않는 계약을 유지합니다. ④ 강제 종료와 정상 종료의 로그 내구성 차이를 명시하고 성능 때문에 무조건 flush를 삭제하지 않습니다.
+- **검증/원복:** [session_log.rs L249-L318](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/session_log.rs#L249-L318)의 다중 스레드 로그 순서·재실행 초기화 테스트를 유지합니다. 수집된 행 수 또는 최종 SESSION_END가 누락되거나 디스크 장애 시 UI 표시가 악화되면 원복합니다.
+
+### IMP-G06 · 입력 변경/연속 실행/취소가 겹치는 부하 회귀 시험 (P1)
+
+- **확인 근거:** [calculation.rs L4-L25, L70-L72](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/controller_session/calculation.rs#L4-L25)는 세대 증가로 결과를 폐기하며, [compute.rs L40-L42, L158](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/src/app/compute.rs#L40-L42)는 취소 여부를 검사합니다.
+- **개선 절차:** 시뮬레이션 실행 → 즉시 설정 변경 → 재실행 → 0.1초·0.5초 간격 반복 → 종료 순서로 테스트를 추가합니다. 중단된 스레드가 계속 장시간 CPU를 점유하지 않는지, 이전 세대 결과가 UI나 로그에서 최신 결과로 표시되지 않는지 검증합니다. 4개 게임 × 환급 ON/OFF × 작은/큰 표본 수를 분리합니다.
+- **합격/원복:** 마지막 세대만 표시, 이전 요청의 결과·오류가 현재 상태를 덮어쓰지 않음, cancellation latency와 Peak RSS 악화 없음. 세대번호 검증을 성능 개선 대상으로 제거하는 것은 금지합니다.
+
+### IMP-G07 · 성능 비교와 확률 검증의 증거를 분리해 보관 (P2)
+
+- **확인 근거:** [tests/performance_regression.rs L38-L40, L85-L109](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/tests/performance_regression.rs#L38-L109)의 시간 측정은 의도적으로 ignored이며 절대 성능을 CI 합격 기준으로 단정하지 않습니다. [tests/v1_contracts.rs](https://github.com/P-JSL/gacha_pickup_calculator/blob/eedc576b2d67e04976ecf475341721a4dcce1a2b/tests/v1_contracts.rs)는 확률·목표·자원 계약을 검증합니다.
+- **개선 절차:** 동일 커밋/CPU/OS/빌드 옵션/표본 수/시드를 가진 기준선 JSON에 실행 5회 이상의 중앙값·p95·최대 RSS와 정확성 검증 결과를 별도로 기록합니다. 윌슨/DKW 신뢰구간은 계산 결과의 **표본 불확실성**을 나타내며 성능 개선 효과나 실제 게임 규칙의 정확성을 보장하지 않는다고 명시합니다.
+- **승인 기준:** 모든 게임 결과 계약이 우선 통과하고, 기준선과 변경본의 구성·해시·출력이 추적 가능해야 합니다. GitHub 공유 러너 한 번의 측정으로 개선율을 확정하지 않습니다.
