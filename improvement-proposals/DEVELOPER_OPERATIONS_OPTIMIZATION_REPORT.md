@@ -214,3 +214,58 @@ cargo clippy --locked --all-targets -- -D warnings
 ### 100회 + 100회 반복 검산 범위의 투명성
 
 1차 **100회**는 각 라운드에서 이 보고서의 코드 근거·연산 복잡도·추가 성능 후보·향상률 불확실성 및 서로 다른 workload/병렬도 가정을 다시 대조한 **정적·수치 검산**입니다. 2차 **100회**는 인용 논문·Amdahl, Roofline, Little 모델을 각기 다른 부하·시간비율에서 교차 확인하는 **문헌-수학 정합성 검산**입니다. 두 검산은 각 보고서에 모두 적용했습니다. 단, **200회 독립적인 전 소스 정독이나 200회 실기 벤치마크를 수행한 의미는 아니며**, 정적 계산과 모델 검산만으로 실제 달성 성능을 확정할 수 없습니다.
+
+## 4.8 성능·속도 모델 1,000회 + 논문·수학 검산 1,000회 실행 기록 (2026-11-12)
+
+**실행 방식과 횟수:** 2026-11-12(KST) 로컬 Python 3.13.5에서 실제로 실행한 결정적 합성 입력 기반 자동 검토입니다. **1차 1,000회 × 매 회 5개 서로 다른 항목 = 5,000건, 2차 1,000회 × 매 회 5개 항목 = 5,000건, 해당 저장소 총 2,000회/10,000건이며 실패는 0건**입니다. 6개 저장소 합계 12,000회/60,000건을 기록했습니다. 단순히 1,000개 개선 후보를 만들거나 문장 하나를 1,000번 출력한 것이 아닙니다. 각 라운드는 커밋/저장소/단계/라운드/항목에 의해 시드가 달라집니다.
+
+**범위의 엄격한 한계:** 이것은 **수학 모델·합성 데이터의 파라미터화된 자동 검산 1,000회씩**이며, 실제 저장소 코드를 각 1,000회씩 빌드/실행한 것도, 실모델/실제 브라우저/디스크에서 1,000번 벤치마크한 것도, 논문 본문을 1,000번 정독한 것도 아닙니다. 주요 기존 소스 4개는 별도 GitHub 조회로 내용 식별자와 Git blob SHA를 확인했습니다. 수학 검산 통과만으로 실서비스 버그가 없거나 실측 가속이 달성된다고 주장할 수 없습니다.
+
+**재현 증거:** 검산 스크립트 `performance_review_1000x2_2026-11-12.py` SHA-256 `6e272f565e2bb0741487baf11c19a7b02d1df3158a70926819eb3aeb6c5dbaa8`, 전체 결과 `performance_review_1000x2_results_2026-11-12.json` SHA-256 `1bc85836fca3c8c74c2855d81d12dd4e6412732dc1de49484b9a63803afaf09d`. 두 파일은 이번 분석 작업 산출물이며 **저장소에 소스 코드로 커밋하지 않았습니다**. 결과 JSON에는 각 검증 항목의 1,000건 시나리오 SHA-256과 첫/마지막 시드·측정이 아닌 계산 값이 포함됩니다.
+
+**1차 검산 지문:** `36a4b7ab496afd13ecae903f32378d8b64012b07207f3a659169855f3f4ce570`  
+**2차 검산 지문:** `26dd371ffe9d851b882b1cc76dad4e8976c6f65c2dfdb087f337f90f42277a49`  
+(각 지문은 결과 JSON에서 **항목명 사전순으로 정렬된 5개 개별 시나리오 SHA-256 문자열을 `|`로 연결한 값**의 SHA-256입니다.)
+
+### 2차 학술·수학 검산 구성
+
+| 범주 | 매 회 확인하는 핵심 불변식 | 결과 |
+|---|---|---|
+| Amdahl 상한 | 부분 개선비율 f와 단독 가속 r 변화에 대해 전체 S = 1/(1-f+f/r)의 상한 및 단조성 | **1,000/1,000 통과** |
+| Roofline 대역폭 상한 | FLOP/s ≤ min(계산 피크, 산술집약도×메모리 대역폭), 단위와 시간 하한 | **1,000/1,000 통과** |
+| Little의 법칙 | 안정된 도착률 λ<서비스율 μ에서 L=λW 및 동시성 증설의 대기 비용 | **1,000/1,000 통과** |
+| 꼬리 지연 | p50/p95/최대 지연을 분리해 평균 개선과 p95 개선을 동일시하지 않음 | **1,000/1,000 통과** |
+| 저장소 특화 학술 모델 | 저장소별 통계오차·KV 복사·네트워크 임계 경로·I/O 하한·외부정렬·HTTP 파이프라인 | **1,000/1,000 통과** |
+
+[원 논문: Amdahl](https://doi.org/10.1145/1465482.1465560), [Roofline](https://doi.org/10.1145/1498765.1498785), [Little](https://doi.org/10.1287/opre.9.3.383), [The Tail at Scale](https://research.google/pubs/the-tail-at-scale/), [Google Benchmark 반복 측정](https://github.com/google/benchmark/blob/main/docs/user_guide.md). 이 검산은 문헌의 공식을 참고한 모델 정합성 검증으로, 저자들의 실험을 재현하지 않았습니다.
+
+### 현행 전체 속도 향상 배수 — 검산으로 확정할 수 있는 것과 없는 것
+
+Amdahl의 법칙 `S=1/(1-f+f/r)`에서 **전체 시간 중 대상 hot path의 기존 비율 f**가 아직 프로파일링되지 않았으므로 **현행 대비 추가 가속 배수는 미측정/확정 불가**입니다. 예를 들어 f=10%, r=4면 전체 1.081배(시간 7.5% 절약), f=50%, r=4면 1.600배(37.5%), f=80%, r=4면 2.500배(60%)라는 **가정별 이론값**만 계산됩니다. 임의의 여러 최적화 배수를 곱하거나 과거 벤치마크 개선치와 합산하지 않습니다. 실행 최적화 변경 시 동일 자료·하드웨어에서 cold/warm 각각 5회 이상, wall time p50/p95, CPU 시간, peak RSS/heap, I/O, 결과 무결성 검증이 선행돼야 합니다.
+
+### 1차 저장소 특화 성능 검산 구성
+
+| 검산 항목 | 조건별 확인 내용 | 결과 |
+|---|---|---|
+| `fft_complexity` | FFT padding O(N log N)과 직접 convolution O(N²)의 작업량 모델 검산 | **1,000/1,000 통과** |
+| `cdf_binary_equivalence` | 임의 CDF에서 이진 검색과 선형 참조의 위치 결과 일치 | **1,000/1,000 통과** |
+| `ticket_sort_equivalence` | 비교 정렬과 비용별 histogram의 동일 sorted tickets | **1,000/1,000 통과** |
+| `worker_partition` | 최대 8개 bounded worker chunk의 빠짐없는 범위 분할 | **1,000/1,000 통과** |
+| `dkw_sample_tradeoff` | 표본수 변경과 DKW 95% 상한의 1/√N 관계 | **1,000/1,000 통과** |
+
+### 원본 소스 근거 재확인 (총 4개)
+
+| 파일 (분석 기준 커밋 링크) | Git blob SHA-1 |
+|---|---|
+| [`src/domain/feedback/runner.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/df55300388cd60e0a45fd93729e6eeb38b63201d/src/domain/feedback/runner.rs) | `c788004bdf50a4bafaf81261b7ce32029e7225d9` |
+| [`src/probability/fft.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/df55300388cd60e0a45fd93729e6eeb38b63201d/src/probability/fft.rs) | `82e53e87dabdb08c0b332a3f9097b5075b4899f0` |
+| [`src/app/compute.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/df55300388cd60e0a45fd93729e6eeb38b63201d/src/app/compute.rs) | `13c17c06aea28212ad236bed80e0e843074761de` |
+| [`src/app/session_log.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/df55300388cd60e0a45fd93729e6eeb38b63201d/src/app/session_log.rs) | `dd014c50cb3a21cd1beeb557ec17c9e8e47017d2` |
+
+### 검산을 토대로 유지·추가할 실제 성능 개선 우선순위
+
+**우선순위 1:** 동일 seed/표본으로 `simulate_chunk`(규칙별 분기·난수 소비)→예산 배열 정렬→집계 구간을 계측합니다. 이미 구현된 FFT·단일 정렬·CPU 8개 제한을 다시 신규 개선으로 세지 않습니다. **우선순위 2:** 실제 정렬이 20% 이상 시간인 사례에서만 bounded K histogram을 실험하며 개별 관측 경로 보존을 조건으로 합니다. **우선순위 3:** egui geometry/cache는 계산시간이 아닌 FPS·UI p95로 평가합니다. 정확한 확률 오차를 감수하고 표본수를 줄이는 전략은 동일 기능의 추가 속도 개선으로 표시하지 않습니다.
+
+**관련 논문 모델:** [DKW/Massart 95% CDF 경계의 통계 이론 참고](https://www.stat.purdue.edu/~dasgupta/gradprob.pdf). 이 정리의 ε는 확률 분포의 표본오차이지 게임 규칙·추론 모델의 타당성 보증이 아닙니다.
+
+---
