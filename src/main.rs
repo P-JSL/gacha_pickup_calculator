@@ -66,13 +66,10 @@ fn main() -> eframe::Result {
     let (stop_flush, flush_done) = std::sync::mpsc::channel::<()>();
     let flushing_logger = Arc::clone(&logger);
     let flusher = std::thread::spawn(move || {
-        loop {
-            match flush_done.recv_timeout(std::time::Duration::from_millis(100)) {
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    flushing_logger.flush_if_due();
-                }
-                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
+        while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
+            flush_done.recv_timeout(std::time::Duration::from_millis(100))
+        {
+            flushing_logger.flush_if_due();
         }
         flushing_logger.flush_now();
     });
