@@ -156,6 +156,79 @@ pub(super) fn estimate_with_workers(setup: &GameSetup, mode: RateMode, model: &F
     estimate_with_workers_cancel(setup, mode, model, requested_workers, None)
 }
 
+/// In-place MSD radix partition for integer (initial budget, raw draws).
+/// Memory is O(256 * key_bytes) instead of allocating another N scenarios.
+/// For small partitions, Rust's optimized comparison sort is faster.
+fn sort_scenarios_by_funding(scenarios: &mut [RefundScenario]) {
+    const INSERTION_THRESHOLD: usize = 128;
+    const RADIX_THRESHOLD: usize = 16_384;
+    if scenarios.len() < RADIX_THRESHOLD {
+        scenarios.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+        return;
+    }
+    let mut max_budget = 0usize;
+    let mut max_raw = 0usize;
+    for trial in scenarios.iter() {
+        max_budget = max_budget.max(trial.initial_flexible_required);
+        max_raw = max_raw.max(trial.raw_pulls);
+    }
+    // Most gacha budgets fit in 2 bytes. Skip all zero leading key bytes.
+    let mut bytes = Vec::with_capacity(2 * std::mem::size_of::<usize>());
+    for (budget, maximum) in [(true, max_budget), (false, max_raw)] {
+        let width = (usize::BITS - maximum.leading_zeros()).div_ceil(8) as usize;
+        for index in (0..width).rev() {
+            bytes.push((budget, index * 8));
+        }
+    }
+    if bytes.is_empty() { return; }
+
+    fn recurse(items: &mut [RefundScenario], bytes: &[(bool, usize)], depth: usize) {
+        if depth >= bytes.len() || items.len() <= 1 { return; }
+        if items.len() <= INSERTION_THRESHOLD {
+            items.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+            return;
+        }
+        let (budget, shift) = bytes[depth];
+        let digit = |item: &RefundScenario| -> usize {
+            let value = if budget { item.initial_flexible_required } else { item.raw_pulls };
+            (value >> shift) & 255
+        };
+        let mut counts = [0usize; 256];
+        for item in items.iter() { counts[digit(item)] += 1; }
+        let mut starts = [0usize; 256];
+        let mut cumulative = 0usize;
+        for (index, count) in counts.iter().enumerate() {
+            starts[index] = cumulative;
+            cumulative += count;
+        }
+        let mut cursors = starts;
+        // American-flag distribution swaps each record directly into its
+        // bucket. No per-trial clone, scratch vector, or double-buffer.
+        for bucket in 0..256 {
+            let end = starts[bucket] + counts[bucket];
+            while cursors[bucket] < end {
+                let destination = digit(&items[cursors[bucket]]);
+                if destination == bucket {
+                    cursors[bucket] += 1;
+                } else {
+                    items.swap(cursors[bucket], cursors[destination]);
+                    cursors[destination] += 1;
+                }
+            }
+        }
+        if depth + 1 < bytes.len() {
+            for bucket in 0..256 {
+                let start = starts[bucket];
+                let end = start + counts[bucket];
+                if end > start + 1 {
+                    recurse(&mut items[start..end], bytes, depth + 1);
+                }
+            }
+        }
+    }
+    recurse(scenarios, &bytes, 0);
+}
+
 fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &FeedbackConfig,
                                 requested_workers: usize,
                                 cancellation: Option<(&AtomicU64, u64)>)
@@ -203,6 +276,28 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
 
     // The public v1.x contract exposes all raw trial observations. Construct
     // only those required arrays; avoid duplicate intermediate path storage.
+    finalize_estimate(scenarios, totals, setup, model, EstimateProfile {
+        workers, profile, allocation_ns, sample_ns, total_started,
+    })
+}
+
+
+
+struct EstimateProfile {
+    workers: usize,
+    profile: bool,
+    allocation_ns: u128,
+    sample_ns: u128,
+    total_started: std::time::Instant,
+}
+
+fn finalize_estimate(
+    mut scenarios: Vec<RefundScenario>, totals: TrialTotals,
+    setup: &GameSetup, model: &FeedbackConfig, timing: EstimateProfile,
+) -> Result<FeedbackEstimate, String> {
+    let EstimateProfile {
+        workers, profile, allocation_ns, sample_ns, total_started,
+    } = timing;
     let mut budgets = Vec::new();
     let mut raw_pulls = Vec::new();
     budgets.try_reserve_exact(model.samples).map_err(|_| {
@@ -216,8 +311,7 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
         raw_pulls.push(scenario.raw_pulls);
     }
     let sorting_started = std::time::Instant::now();
-    scenarios.sort_unstable_by_key(|scenario|
-        (scenario.initial_flexible_required, scenario.raw_pulls));
+    sort_scenarios_by_funding(&mut scenarios);
     let sorting_ns = sorting_started.elapsed().as_nanos();
     // Sorting scenarios by budget already orders the budget CDF. Avoid a
     // redundant second O(N log N) sort for large trial counts.
@@ -254,3 +348,178 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
         average_record_disc_units_earned: totals.record_discs as f64 / n })
 }
 
+
+/// Adaptive strategy scheduling: one bounded worker pool consumes interleaved
+/// fixed-index trial chunks from all three waveband strategies. Idle workers
+/// take the next unfinished chunk instead of being permanently reserved for
+/// one strategy. RNG is indexed by trial, not worker/scheduling order.
+struct StrategyTask<'a> {
+    strategy: usize,
+    first: usize,
+    slots: &'a mut [RefundScenario],
+}
+
+pub fn estimate_waveband_strategies(
+    setup: &GameSetup, mode: RateMode, config: &FeedbackConfig,
+    worker_budget: usize, cancellation: Option<(&AtomicU64, u64)>,
+) -> Result<Vec<FeedbackEstimate>, String> {
+    if setup.game != Game::WutheringWaves {
+        return Err("명조의 산호 교환 전략에만 공용 작업자 풀을 적용할 수 있습니다.".to_owned());
+    }
+    if is_cancelled(cancellation) {
+        return Err("계산 요청이 취소되었습니다.".to_owned());
+    }
+    setup.character.validate_inputs()?;
+    setup.weapon.validate_inputs()?;
+    let models: [FeedbackConfig; 3] = std::array::from_fn(|index| {
+        let mut model = config.clone();
+        model.wuwa_waveband_max = index;
+        model
+    });
+    for model in &models {
+        model.validate()?;
+        for (banner, other_rate) in [
+            (&setup.character, model.character_other_five_star_rate),
+            (&setup.weapon, model.weapon_other_five_star_rate),
+        ] {
+            if let BannerRule::FeaturedCounter { featured_rate, .. } = &banner.rule {
+                if *featured_rate + other_rate > 1.0 + f64::EPSILON {
+                    return Err("픽업·비픽업 최고 등급 기본 확률의 합은 100%를 넘을 수 없습니다.".into());
+                }
+            }
+        }
+    }
+    let count = config.samples;
+    let mut storage = Vec::with_capacity(3);
+    for _ in 0..3 {
+        let mut trials = Vec::new();
+        trials.try_reserve_exact(count).map_err(|_| {
+            "명조 환급 전략의 시뮬레이션 결과 메모리를 확보할 수 없습니다.".to_owned()
+        })?;
+        trials.resize_with(count, RefundScenario::default);
+        storage.push(trials);
+    }
+    let available = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let workers = worker_budget.clamp(1, MAX_MONTE_CARLO_WORKERS)
+        .min(available).min((count.saturating_mul(3) / MIN_SAMPLES_PER_WORKER).max(1));
+    const CHUNK: usize = 4_096;
+    let chunks_per_strategy = count.div_ceil(CHUNK);
+    let started = std::time::Instant::now();
+
+    let totals: [TrialTotals; 3] = std::thread::scope(|scope| {
+        let (sender, receiver) = std::sync::mpsc::channel::<StrategyTask<'_>>();
+        // Workers own Arc clones, so the receiver outlives every scoped
+        // callback without borrowing a short-lived local Mutex.
+        let receiver = std::sync::Arc::new(std::sync::Mutex::new(receiver));
+        let mut handles = Vec::with_capacity(workers);
+        for _ in 0..workers {
+            let receiver = std::sync::Arc::clone(&receiver);
+            let models = &models;
+            handles.push(scope.spawn(move || -> Result<[TrialTotals; 3], String> {
+                let mut partial = std::array::from_fn(|_| TrialTotals::default());
+                loop {
+                    // Lock only for dequeue; Monte Carlo work executes unlocked.
+                    let incoming = receiver.lock()
+                        .unwrap_or_else(|poison| poison.into_inner()).recv();
+                    let Ok(task) = incoming else { break; };
+                    let Some(done) = simulate_chunk(
+                        task.slots, task.first, setup, mode,
+                        &models[task.strategy], cancellation,
+                    ) else {
+                        return Err("계산 요청이 취소되었습니다.".to_owned());
+                    };
+                    partial[task.strategy].merge(done);
+                }
+                Ok(partial)
+            }));
+        }
+
+        // Round-robin chunks prevent long strategy zero from monopolizing
+        // the queue. Any free CPU worker can claim any strategy's next chunk.
+        let mut chunks = storage.iter_mut()
+            .map(|trials| trials.chunks_mut(CHUNK)).collect::<Vec<_>>();
+        for index in 0..chunks_per_strategy {
+            for (strategy, queue) in chunks.iter_mut().enumerate() {
+                if let Some(slots) = queue.next() {
+                    sender.send(StrategyTask {
+                        strategy, first: index * CHUNK, slots,
+                    }).map_err(|_| "명조 공유 작업자 큐가 종료되었습니다.".to_owned())?;
+                }
+            }
+        }
+        drop(sender);
+        let mut collected = std::array::from_fn(|_| TrialTotals::default());
+        for handle in handles {
+            let partial = handle.join()
+                .map_err(|_| "명조 공용 시뮬레이션 작업자가 중단되었습니다.".to_owned())??;
+            for (dest, src) in collected.iter_mut().zip(partial) {
+                dest.merge(src);
+            }
+        }
+        Ok::<_, String>(collected)
+    })?;
+
+    if is_cancelled(cancellation) {
+        return Err("계산 요청이 취소되었습니다.".to_owned());
+    }
+    let sampling_ms = started.elapsed().as_millis();
+    let mut estimates = Vec::with_capacity(3);
+    for (strategy, (trials, totals)) in storage.into_iter().zip(totals).enumerate() {
+        estimates.push(finalize_estimate(
+            trials, totals, setup, &models[strategy], EstimateProfile {
+                workers, profile: false, allocation_ns: 0, sample_ns: 0,
+                total_started: std::time::Instant::now(),
+            },
+        )?);
+    }
+    let elapsed = started.elapsed().as_millis();
+    eprintln!(
+        "GACHA_WUWA_SHARED_POOL samples={} workers={} chunks_per_strategy={} sampling_ms={} total_ms={}",
+        count, workers, chunks_per_strategy, sampling_ms, elapsed,
+    );
+    Ok(estimates)
+}
+
+#[cfg(test)]
+mod radix_sort_regression {
+    use super::*;
+
+    #[test]
+    fn integer_radix_preserves_entire_scenarios_and_lexicographic_budget_order() {
+        for size in [0usize, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
+            let mut input = (0..size).map(|i| RefundScenario {
+                raw_pulls: i.wrapping_mul(47) % 4_800,
+                initial_flexible_required: i.wrapping_mul(41) % 3_000,
+                earned_points: i,
+                ..RefundScenario::default()
+            }).collect::<Vec<_>>();
+            let mut reference = input.clone();
+            reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+            sort_scenarios_by_funding(&mut input);
+            let keys = |items: &[RefundScenario]| items.iter()
+                .map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>();
+            assert_eq!(keys(&input), keys(&reference), "size={size}");
+            let mut original_ids = input.iter().map(|s| s.earned_points).collect::<Vec<_>>();
+            original_ids.sort_unstable();
+            assert_eq!(original_ids, (0..size).collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn radix_handles_wide_usize_keys_and_many_equal_pairs() {
+        let mut trials = (0..50_000).map(|i| RefundScenario {
+            raw_pulls: (i % 17) + (usize::MAX - 8_000),
+            initial_flexible_required: if i % 3 == 0 { usize::MAX - 1 } else { i % 3 },
+            earned_points: i,
+            ..RefundScenario::default()
+        }).collect::<Vec<_>>();
+        let mut reference = trials.clone();
+        reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+        sort_scenarios_by_funding(&mut trials);
+        assert_eq!(trials.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+            .collect::<Vec<_>>(),
+            reference.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>());
+    }
+}

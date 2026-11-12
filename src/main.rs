@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Color32, RichText};
 use egui_plot::{Legend, Line, Plot, PlotPoints};
-use gacha_pickup_calculator::feedback::{estimate_with_options, FeedbackConfig, FeedbackEstimate, SuccessfulBudgetMeans, BudgetSuccessBreakdown};
+use gacha_pickup_calculator::feedback::{estimate_with_options, estimate_waveband_strategies, FeedbackConfig, FeedbackEstimate, SuccessfulBudgetMeans, BudgetSuccessBreakdown};
 #[cfg(test)]
 use gacha_pickup_calculator::feedback::estimate;
 use gacha_pickup_calculator::games::{Game, GameSetup};
@@ -61,6 +61,18 @@ fn main() -> eframe::Result {
         previous_hook(panic);
     }));
     logger.info("APPLICATION_START", "Starting native UI and calculation worker");
+    // Periodic writer is independent of UI redraws. Worker progress is
+    // available on disk within the batching interval even when minimized.
+    let (stop_flush, flush_done) = std::sync::mpsc::channel::<()>();
+    let flushing_logger = Arc::clone(&logger);
+    let flusher = std::thread::spawn(move || {
+        while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
+            flush_done.recv_timeout(std::time::Duration::from_millis(100))
+        {
+            flushing_logger.flush_if_due();
+        }
+        flushing_logger.flush_now();
+    });
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1536.0, 864.0])
@@ -75,6 +87,9 @@ fn main() -> eframe::Result {
         Err(error) => logger.error("SESSION_END", format!("Native runtime failed: {error}")),
     }
     logger.report_io_stats();
+    let _ = stop_flush.send(());
+    let _ = flusher.join();
+    logger.flush_now();
     outcome
 }
 // Regression tests use the binary's actual private UI/application interfaces.

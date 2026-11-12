@@ -77,53 +77,18 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
     let (feedback, wuwa_strategies) = if request.feedback_config.enabled
         && request.setup.game == Game::WutheringWaves
     {
-        // Keep the total worker budget bounded across three independent
-        // waveband strategies; nested unbounded pools oversubscribe CPUs.
-        let strategies = if cpu_budget >= 3 && request.feedback_config.samples >= 4_096 {
-            std::thread::scope(|scope| {
-                let mut handles = Vec::with_capacity(3);
-                for max_wavebands in 0..3 {
-                    let mut variant = request.feedback_config.clone();
-                    variant.wuwa_waveband_max = max_wavebands;
-                    let worker_limit = cpu_budget / 3 + usize::from(max_wavebands < cpu_budget % 3);
-                    handles.push(scope.spawn(move || {
-                        let started = std::time::Instant::now();
-                        let result = estimate_with_options(
-                            &request.setup, request.mode, &variant, worker_limit, cancellation
-                        ).map(Arc::new);
-                        session_log::info("WUWA_STRATEGY_TIMING", format!(
-                            "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
-                            request.generation, max_wavebands, worker_limit, variant.samples,
-                            started.elapsed().as_millis(),
-                            if result.is_ok() { "ok" } else { "cancelled_or_failed" }
-                        ));
-                        result
-                    }));
-                }
-                handles.into_iter().map(|handle| {
-                    handle.join()
-                        .map_err(|_| "명조 환급 전략 작업이 중단되었습니다.".to_owned())?
-                }).collect::<Result<Vec<Arc<FeedbackEstimate>>, String>>()
-            })?
-        } else {
-            let mut strategies = Vec::with_capacity(3);
-            for max_wavebands in 0..3 {
-                let mut variant = request.feedback_config.clone();
-                variant.wuwa_waveband_max = max_wavebands;
-                let started = std::time::Instant::now();
-                let result = estimate_with_options(
-                    &request.setup, request.mode, &variant, cpu_budget, cancellation
-                );
-                session_log::info("WUWA_STRATEGY_TIMING", format!(
-                    "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
-                    request.generation, max_wavebands, cpu_budget, variant.samples,
-                    started.elapsed().as_millis(),
-                    if result.is_ok() { "ok" } else { "cancelled_or_failed" }
-                ));
-                strategies.push(Arc::new(result?));
-            }
-            strategies
-        };
+        // Interleave fixed-seed trial chunks from all waveband policies in a
+        // single bounded worker queue. No nested pools, no idle reserved cores.
+        let started = std::time::Instant::now();
+        let strategies = estimate_waveband_strategies(
+            &request.setup, request.mode, &request.feedback_config,
+            cpu_budget, cancellation,
+        )?.into_iter().map(Arc::new).collect::<Vec<_>>();
+        session_log::info("WUWA_SHARED_POOL", format!(
+            "generation={} strategies={} requested_workers={} samples_per_strategy={} elapsed_ms={}",
+            request.generation, strategies.len(), cpu_budget,
+            request.feedback_config.samples, started.elapsed().as_millis(),
+        ));
         // Share the selected observation set: do not clone up to 1M paths.
         let selected = Arc::clone(&strategies[request.feedback_config.wuwa_waveband_max.min(2)]);
         (Some(selected), Some(strategies))

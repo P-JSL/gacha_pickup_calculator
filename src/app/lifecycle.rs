@@ -205,6 +205,11 @@ impl eframe::App for Calculator {
         }
         if let Some(logger) = session_log::current() {
             self.log_view.show(ctx, logger);
+            if logger.flush_if_due() {
+                // The next frame flushes buffered logs even if the user is
+                // idle and the calculation worker has not finished.
+                ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            }
         }
         if self.ci_capture && !self.ci_ui_ready_reported {
             self.ci_ui_ready_reported = true;

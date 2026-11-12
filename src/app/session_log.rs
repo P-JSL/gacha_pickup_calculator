@@ -4,12 +4,15 @@
 use eframe::egui;
 use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 const VISIBLE_LINES: usize = 20_000;
+const LOG_BUFFER_BYTES: usize = 16 * 1024;
+const LOG_BATCH_LINES: usize = 32;
+const LOG_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 
 static CURRENT_SESSION: OnceLock<Arc<SessionLogger>> = OnceLock::new();
 
@@ -41,7 +44,9 @@ struct LogIoStats {
 }
 
 struct LogState {
-    file: Option<File>,
+    file: Option<BufWriter<File>>,
+    last_flush: Instant,
+    pending_records: usize,
     lines: VecDeque<String>,
     revision: u64,
     warning: Option<String>,
@@ -103,7 +108,9 @@ impl SessionLogger {
             path,
             started: Instant::now(),
             state: Mutex::new(LogState {
-                file, lines: VecDeque::new(), revision: 0, warning,
+                file: file.map(|file| BufWriter::with_capacity(LOG_BUFFER_BYTES, file)),
+                last_flush: Instant::now(), pending_records: 0,
+                lines: VecDeque::new(), revision: 0, warning,
                 io: LogIoStats::default(),
             }),
         };
@@ -139,27 +146,69 @@ impl SessionLogger {
         );
         if let Some(file) = &mut state.file {
             let started = Instant::now();
-            let write_result = writeln!(file, "{line}");
+            let result = writeln!(file, "{line}");
             let write_ns = started.elapsed().as_nanos();
-            let started = Instant::now();
-            // Keep the existing per-event flush contract; batching is
-            // conditional on explicitly measured cost and acceptable loss.
-            let result = write_result.and_then(|_| file.flush());
-            let flush_ns = started.elapsed().as_nanos();
             state.io.writes = state.io.writes.saturating_add(1);
             state.io.write_ns = state.io.write_ns.saturating_add(write_ns);
-            state.io.flush_ns = state.io.flush_ns.saturating_add(flush_ns);
-            if let Err(error) = result {
-                state.io.errors = state.io.errors.saturating_add(1);
-                state.file = None;
-                state.warning = Some(format!(
-                    "로그 기록이 중단되어 이후 메시지는 메모리에만 보관됩니다: {error}"
-                ));
+            match result {
+                Ok(()) => {
+                    state.pending_records += 1;
+                    // Critical events and user-visible final results are
+                    // durable to the OS immediately; ordinary INFO events
+                    // are bounded by 32 records or 250 ms until flush.
+                    let critical = level != "INFO"
+                        || matches!(code, "SESSION_START" | "SESSION_END" | "PANIC"
+                            | "CALC_RESULT" | "CALC_RESULT_STAGES" | "LOG_IO_SUMMARY");
+                    if critical || state.pending_records >= LOG_BATCH_LINES
+                        || state.last_flush.elapsed() >= LOG_FLUSH_INTERVAL
+                    {
+                        Self::flush_locked(&mut state);
+                    }
+                }
+                Err(error) => {
+                    state.io.errors = state.io.errors.saturating_add(1);
+                    state.file = None;
+                    state.pending_records = 0;
+                    state.warning = Some(format!(
+                        "로그 기록이 중단되어 이후 메시지는 메모리에만 보관됩니다: {error}"
+                    ));
+                }
             }
         }
         state.lines.push_back(line);
         if state.lines.len() > VISIBLE_LINES { state.lines.pop_front(); }
         state.revision = state.revision.wrapping_add(1);
+    }
+
+    fn flush_locked(state: &mut LogState) {
+        if state.pending_records == 0 { return; }
+        let started = Instant::now();
+        let result = state.file.as_mut().map(|file| file.flush());
+        state.io.flush_ns = state.io.flush_ns.saturating_add(started.elapsed().as_nanos());
+        state.last_flush = Instant::now();
+        state.pending_records = 0;
+        if let Some(Err(error)) = result {
+            state.io.errors = state.io.errors.saturating_add(1);
+            state.file = None;
+            state.warning = Some(format!(
+                "로그 배치 저장이 실패하여 이후 메시지는 메모리에만 보관됩니다: {error}"
+            ));
+        }
+    }
+
+    /// Regular app repaints flush buffered INFO records at most 250 ms later;
+    /// forced application shutdown and panic log events flush immediately.
+    pub(crate) fn flush_if_due(&self) -> bool {
+        let mut state = self.state.lock().unwrap_or_else(|poison| poison.into_inner());
+        if state.pending_records > 0 && state.last_flush.elapsed() >= LOG_FLUSH_INTERVAL {
+            Self::flush_locked(&mut state);
+        }
+        state.pending_records > 0
+    }
+
+    pub(crate) fn flush_now(&self) {
+        let mut state = self.state.lock().unwrap_or_else(|poison| poison.into_inner());
+        Self::flush_locked(&mut state);
     }
 
     /// Called on shutdown; records cumulative I/O costs without recursively
@@ -300,6 +349,7 @@ mod tests {
         let logger = SessionLogger::start_at(path.clone());
         logger.info("CALC_STARTED", "generation=2");
         logger.info("SESSION_END", "window closed");
+        logger.flush_now();
         let content = fs::read_to_string(&path).unwrap();
         assert!(!content.contains("OLD SESSION SECRET"));
         assert!(content.contains("[SESSION_START]"));
@@ -324,6 +374,7 @@ mod tests {
         assert!(!log_path.exists());
         let first = SessionLogger::start_at(log_path.clone());
         first.info("TEST_CALC", "one run");
+        first.flush_now();
         assert!(log_path.is_file());
         assert!(fs::read_to_string(&log_path).unwrap().contains("[TEST_CALC]"));
         drop(first);
@@ -351,12 +402,35 @@ mod tests {
             })
         }).collect::<Vec<_>>();
         for join in clones { join.join().unwrap(); }
+        logger.flush_now();
         let file = fs::read_to_string(&path).unwrap();
         assert_eq!(file.matches("[WORKER]").count(), 120);
         let io = logger.state.lock().unwrap().io;
         assert_eq!(io.writes, 121);
         assert_eq!(io.errors, 0);
         assert_eq!(logger.snapshot().1.len(), 121);
+        drop(logger);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn normal_log_batches_remain_live_in_memory_and_flush_on_demand() {
+        let path = std::env::temp_dir().join(format!(
+            "gacha-batched-{}-{}.log", std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let logger = SessionLogger::start_at(path.clone());
+        for index in 0..20 {
+            logger.info("PROGRESS", format!("step={index}"));
+        }
+        assert_eq!(logger.snapshot().1.iter()
+            .filter(|line| line.contains("[PROGRESS]")).count(), 20);
+        assert!(logger.state.lock().unwrap().pending_records > 0);
+        logger.flush_now();
+        assert_eq!(fs::read_to_string(&path).unwrap().matches("[PROGRESS]").count(), 20);
+        assert_eq!(logger.state.lock().unwrap().pending_records, 0);
+        logger.warn("FAIL", "flushed warning");
+        assert!(fs::read_to_string(&path).unwrap().contains("[FAIL]"));
         drop(logger);
         fs::remove_file(path).unwrap();
     }

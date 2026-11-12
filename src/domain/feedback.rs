@@ -94,7 +94,7 @@ impl Wallet {
 #[path = "feedback/rolls.rs"] mod rolls;
 #[path = "feedback/runner.rs"] mod runner;
 use rolls::*;
-pub use runner::{estimate, estimate_with_options};
+pub use runner::{estimate, estimate_with_options, estimate_waveband_strategies};
 #[cfg(test)]
 use runner::estimate_with_workers;
 #[cfg(test)]
