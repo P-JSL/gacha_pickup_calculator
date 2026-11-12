@@ -1,14 +1,14 @@
 # Gacha Pickup Calculator
 
-**현재 버전: v1.0.18** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
+**현재 버전: v1.0.19** · Windows x64 · 붕괴: 스타레일 / 명조 / 스텔라 소라 / 이환
 
 캐릭터와 전용 장비를 목표 수량까지 획득하는 데 필요한 뽑기권·재화, 목표 달성 확률, **환급 재투입 후 성공률**을 계산하는 데스크톱 프로그램입니다.
 
 ## 다운로드 및 설치
 
-- [v1.0.18 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.18/gacha-pickup-calculator-windows-x64-v1.0.18.zip)
-- [v1.0.18 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.18/gacha_pickup_calculator.exe)
-- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.18/gacha-pickup-calculator-screenshots-v1.0.18.zip)
+- [v1.0.19 전체 패키지(Windows x64 ZIP)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.19/gacha-pickup-calculator-windows-x64-v1.0.19.zip)
+- [v1.0.19 실행 파일(EXE)](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.19/gacha_pickup_calculator.exe)
+- [실행 화면 미리보기](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.19/gacha-pickup-calculator-screenshots-v1.0.19.zip)
 - [최신 배포 및 변경 사항](https://github.com/P-JSL/gacha_pickup_calculator/releases/latest)
 
 1. **전체 패키지 ZIP**을 내려받아 압축을 해제합니다. EXE와 `Image` 폴더를 같은 위치에 둡니다.
@@ -16,6 +16,8 @@
 3. 게임·목표 캐릭터/장비와 목표 수량, 현재 천장/픽업 확정 상태, 보유 뽑기권과 재화를 입력합니다.
 4. 입력을 모두 마친 후 **Run Simulation**을 클릭합니다. 입력 도중에는 자동 재계산하지 않습니다.
 5. 대시보드 맨 위의 **캐릭터 + 전용 장비 최종 달성 확률**을 확인합니다. 이 값은 보유 뽑기권을 먼저 사용하고 생성된 환급을 다시 사용하여 두 목표를 모두 달성할 확률입니다. 그 아래에서 평균 필요 뽑기와 생성 환급, 스타레일의 3단계 결과 및 상세 그래프를 확인합니다. 입력을 변경한 뒤에는 **Run Simulation**을 다시 눌러야 새 확률이 표시됩니다.
+
+**v1.0.19 성능 개선:** 환급 결과의 제자리 정수 기수 정렬, 명조 3개 산호 교환 전략의 공용 동적 작업 큐, 최대 192개 GPU 이미지 텍스처 LRU 캐시 및 16 KiB 배치 로그를 적용했습니다. 캐릭터·장비 확률식/환급 규칙과 입력 완료 후 **Run Simulation** 실행 방식은 유지합니다.
 
 **배포용 이미지 경량화:** 679개 이미지의 실제 PNG 합계는 16.69 MB에서 2.87 MB로 **82.8% 감소**했습니다. 파일명과 이미지 식별자는 유지하며, 화면 로딩 시 낮아진 해상도를 Lanczos3로 확대하고 약하게 선명도를 보정합니다. 손실된 원본 디테일을 복원하는 AI 업스케일링은 아니며, 기존 이미지 원본은 저장소에 보존됩니다.
 
@@ -37,7 +39,7 @@
 
 - **Windows / Linux:** `<실행 파일이 있는 폴더>/log/session.log` (예: `D:\GachaCalculator\log\session.log`)
 - ZIP 압축 해제 폴더에 `log/` 디렉터리가 포함되며, 첫 실행 시 그 안에 `session.log`를 생성합니다. **현재 작업 디렉터리와 무관하게 EXE 파일 위치**를 기준으로 저장합니다.
-- 로그는 UTC 시각·프로그램 시작 후 경과시간·레벨·세대번호와 함께 기록하며, 파일은 계산 시작·단계별 진행·성공률/환급·실패·종료까지 실시간 저장합니다.
+- 로그는 UTC 시각·프로그램 시작 후 경과시간·레벨·세대번호를 포함합니다. 프로그램 내부 로그 창은 계산 중에도 즉시 갱신됩니다. 일반 INFO 로그는 최대 32건 또는 약 250ms flush 주기(별도 100ms 검사)를 적용하고, 오류·경고·최종 계산 결과·시작/종료 로그는 즉시 flush합니다. 강제 종료 시 마지막 미flush INFO 기록은 유실될 수 있습니다.
 - GUI는 최신 20,000줄을 표시하고 **전체 현재 세션 로그는 파일**에 보관합니다. 로그 파일에 쓸 수 없을 때에는 메모리에 임시 기록하고 화면에 오류를 표시합니다.
 - 한 번의 시뮬레이션은 최대 백만 건 이상의 난수 추첨을 포함할 수 있으므로 매 추첨의 개별 RNG 값은 기록하지 않습니다. 대신 DP 모델, 입력 조건, Monte Carlo 샘플 수, 환급 집계, 최종 확률과 오류를 기록합니다.
 
@@ -49,7 +51,7 @@
 
 프로그램은 새 버전이 있으면 알려주지만 **EXE를 자동으로 교체하지 않습니다.** 게임 카탈로그·이미지는 검증된 GitHub 데이터가 있을 때 별도로 갱신될 수 있습니다. 오프라인에서는 기존 데이터로 동작합니다.
 
-다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.18/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.18.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
+다운로드 검증용 [SHA-256 목록](https://github.com/P-JSL/gacha_pickup_calculator/releases/download/v1.0.19/SHA256SUMS.txt)을 제공하며, Windows PowerShell에서 `Get-FileHash .\gacha-pickup-calculator-windows-x64-v1.0.19.zip -Algorithm SHA256` 명령으로 비교할 수 있습니다.
 
 문제 제보 및 기능 요청은 [GitHub Issues](https://github.com/P-JSL/gacha_pickup_calculator/issues)에 남길 수 있습니다.
 
