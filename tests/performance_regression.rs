@@ -211,8 +211,8 @@ fn benchmark_histogram_candidate_preserves_marginal_cdf() {
         *count = running;
     }
     let counting_ns = started.elapsed().as_nanos();
-    for budget in 0..K {
-        assert_eq!(sorted.partition_point(|&v| v <= budget), counts[budget]);
+    for (budget, &cumulative_count) in counts.iter().enumerate() {
+        assert_eq!(sorted.partition_point(|&v| v <= budget), cumulative_count);
     }
     println!(
         "PERF_SORT_STUDY n={N} k={K} sort_ns={sorting_ns} count_ns={counting_ns} \
