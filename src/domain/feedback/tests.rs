@@ -721,6 +721,45 @@
     }
 
     #[test]
+    fn full_goals_guarantee_and_maxed_four_stars_preserve_seeded_trial_contracts() {
+        // G-01: both first-pickup states and full goals in every game.
+        // A fixed trial seed must not depend on CPU worker count.
+        for game in Game::ALL {
+            for first_guaranteed in [false, true] {
+                let mut setup = GameSetup::new(game);
+                setup.set_targets(game.max_character_copies(),
+                    game.max_weapon_copies());
+                setup.character.guaranteed = first_guaranteed;
+                setup.weapon.guaranteed = first_guaranteed;
+                let mut model = FeedbackConfig::for_game(game);
+                model.samples = 73;
+                model.four_star_maxed_share = 1.0;
+                let single = estimate_with_workers(&setup, RateMode::PublishedOnly,
+                    &model, 1).unwrap();
+                let parallel = estimate_with_workers(&setup, RateMode::PublishedOnly,
+                    &model, 4).unwrap();
+                assert_eq!(single.scenarios, parallel.scenarios,
+                    "{game:?}, guaranteed={first_guaranteed}");
+                assert_eq!(single.budgets, parallel.budgets);
+                assert_eq!(single.raw_pulls, parallel.raw_pulls);
+                assert_eq!(single.average_raw.to_bits(), parallel.average_raw.to_bits());
+                assert_eq!(single.total_returned_points_average.to_bits(),
+                    parallel.total_returned_points_average.to_bits());
+                assert_eq!(single.scenarios.len(), model.samples);
+                assert!(single.budgets.windows(2).all(|v| v[0] <= v[1]));
+                assert!(single.scenarios.iter().all(|trial| {
+                    trial.raw_pulls == trial.initial_flexible_required
+                        + trial.points_funded_pulls + trial.dedicated_used
+                }));
+                let zero_budget = single.probability(0).0;
+                let full_budget = single.probability(usize::MAX).0;
+                assert!((0.0..=1.0).contains(&zero_budget));
+                assert_eq!(full_budget, 1.0);
+            }
+        }
+    }
+
+    #[test]
     fn million_sample_limit_is_validated_without_allocating_a_million_paths() {
         let mut model = FeedbackConfig::for_game(Game::StarRail);
         model.samples = MAX_SAMPLES;
