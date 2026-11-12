@@ -1,9 +1,19 @@
 use super::*;
 
 type ImageResult = (u64, String, Option<egui::ColorImage>);
+/// Upper bound on retained GPU textures across character/weapon catalogs.
+const MAX_CATALOG_TEXTURES: usize = 192;
+
+fn least_recently_used_key<'a>(
+    keys: impl Iterator<Item = &'a String>, last_used: &HashMap<String, u64>,
+) -> Option<String> {
+    keys.min_by_key(|key| last_used.get(*key).copied().unwrap_or(0)).cloned()
+}
 pub(crate) struct CatalogUi {
     textures: HashMap<String, Option<egui::TextureHandle>>,
     queued: HashSet<String>,
+    texture_usage: HashMap<String, u64>,
+    access_tick: u64,
     send_url: Sender<(u64, String)>,
     generation: u64,
     recv_image: Receiver<ImageResult>,
@@ -37,6 +47,7 @@ impl CatalogUi {
         }
         Self {
             textures: HashMap::new(), queued: HashSet::new(),
+            texture_usage: HashMap::new(), access_tick: 0,
             send_url, recv_image, generation: 0,
         }
     }
@@ -120,6 +131,8 @@ impl CatalogUi {
             let texture = decoded.map(|img| {
                 ctx.load_texture(format!("catalog:{}", url), img, egui::TextureOptions::LINEAR)
             });
+            self.access_tick = self.access_tick.wrapping_add(1);
+            self.texture_usage.insert(url.clone(), self.access_tick);
             self.textures.insert(url, texture);
             processed += 1;
         }
@@ -128,18 +141,37 @@ impl CatalogUi {
         if processed > 0 {
             crate::charts::profile_ui_span("catalog_texture_upload", started);
         }
+        // Drop cold handles, never the active decoded image pipeline or
+        // verified data. TextureHandle drop releases its egui texture reference.
+        let mut evicted = 0usize;
+        while self.textures.len() > MAX_CATALOG_TEXTURES {
+            let Some(key) = least_recently_used_key(
+                self.textures.keys(), &self.texture_usage,
+            ) else { break; };
+            self.textures.remove(&key);
+            self.texture_usage.remove(&key);
+            evicted += 1;
+        }
+        if evicted > 0 {
+            crate::session_log::info("CATALOG_CACHE_EVICT", format!(
+                "evicted={evicted} max_textures={MAX_CATALOG_TEXTURES} remaining={}",
+                self.textures.len()
+            ));
+        }
     }
 
     /// Drop previous-version textures and suppress late image-worker responses.
     pub(crate) fn invalidate_after_update(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.textures.clear();
+        self.texture_usage.clear();
         self.queued.clear();
     }
 
     /// Failed icon requests can be retried without clearing successfully cached images.
     pub(crate) fn retry_failed(&mut self) {
         self.textures.retain(|_, texture| texture.is_some());
+        self.texture_usage.retain(|key, _| self.textures.contains_key(key));
     }
 
     pub(crate) fn image(&mut self, ui: &mut egui::Ui, entry: &Entry, size: f32) {
@@ -151,6 +183,8 @@ impl CatalogUi {
         };
         let role = if entry.kind == Kind::Character { "c" } else { "w" };
         let key = format!("{game}/{role}-{}.png", entry.id);
+        self.access_tick = self.access_tick.wrapping_add(1);
+        self.texture_usage.insert(key.clone(), self.access_tick);
         if !self.textures.contains_key(&key) && !self.queued.contains(&key) {
             self.queued.insert(key.clone());
             if self.send_url.send((self.generation, key.clone())).is_err() {
@@ -247,3 +281,21 @@ pub(crate) fn picker(
     selected
 }
 
+
+#[cfg(test)]
+mod cache_eviction_tests {
+    use super::*;
+
+    #[test]
+    fn chooses_oldest_texture_even_with_pending_or_missing_access_record() {
+        let mut recent = HashMap::new();
+        recent.insert("A".to_owned(), 100);
+        recent.insert("B".to_owned(), 4);
+        recent.insert("C".to_owned(), 99);
+        let keys = ["A", "B", "C"].into_iter().map(str::to_owned).collect::<Vec<_>>();
+        assert_eq!(least_recently_used_key(keys.iter(), &recent), Some("B".to_owned()));
+        recent.remove("B");
+        assert_eq!(least_recently_used_key(keys.iter(), &recent), Some("B".to_owned()));
+        assert_eq!(least_recently_used_key(keys[..0].iter(), &recent), None);
+    }
+}
