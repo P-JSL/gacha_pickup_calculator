@@ -61,6 +61,21 @@ fn main() -> eframe::Result {
         previous_hook(panic);
     }));
     logger.info("APPLICATION_START", "Starting native UI and calculation worker");
+    // Periodic writer is independent of UI redraws. Worker progress is
+    // available on disk within the batching interval even when minimized.
+    let (stop_flush, flush_done) = std::sync::mpsc::channel::<()>();
+    let flushing_logger = Arc::clone(&logger);
+    let flusher = std::thread::spawn(move || {
+        loop {
+            match flush_done.recv_timeout(std::time::Duration::from_millis(100)) {
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    flushing_logger.flush_if_due();
+                }
+                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        flushing_logger.flush_now();
+    });
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1536.0, 864.0])
@@ -75,6 +90,8 @@ fn main() -> eframe::Result {
         Err(error) => logger.error("SESSION_END", format!("Native runtime failed: {error}")),
     }
     logger.report_io_stats();
+    let _ = stop_flush.send(());
+    let _ = flusher.join();
     logger.flush_now();
     outcome
 }
