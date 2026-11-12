@@ -269,3 +269,59 @@ Amdahl의 법칙 `S=1/(1-f+f/r)`에서 **전체 시간 중 대상 hot path의 �
 **관련 논문 모델:** [DKW/Massart 95% CDF 경계의 통계 이론 참고](https://www.stat.purdue.edu/~dasgupta/gradprob.pdf). 이 정리의 ε는 확률 분포의 표본오차이지 게임 규칙·추론 모델의 타당성 보증이 아닙니다.
 
 ---
+
+## 4.9 DIVERSE PERFORMANCE REVIEW — 1,000 feasibility + 1,000 cross-disciplinary evaluations (2026-11-12)
+
+### Scope and how the 1,000 rounds were actually run
+
+This is a **new method-diversity audit**, not 1,000 new optimizations. A reproducible Python scenario engine evaluated **10 distinct code-anchored alternatives × 10 workloads × 10 independent constraints = 1,000 feasibility cases**, and a second **10 alternatives × 10 workloads × 10 different research/theory lenses = 1,000 cross-disciplinary cases**, for **2,000 evaluated tuples per repository**. Across six repositories: 12,000 evaluated tuples. Each phase used distinct tuple keys, regenerated a stable SHA-256 and passed uniqueness/assertion checks; repeating the script gave the same summary SHA-256. `run_diverse_1000.py` SHA-256 `caecadb0696142bca8de43e1ae440152015459e8e90e8c418e9909c8a1b82de9`, `summary_6repos.json` SHA-256 `23e3ab0a3a456c954dc7f42a0df115dd9ad26fb81b6aa73c4b74850121fd98d0`.
+
+Crucial limitation: these are **automatic engineering-model evaluations over synthetic scenario parameters**, not 2,000 independent human deep reviews, 2,000 actual code executions, 2,000 program benchmarks, or independent proofs that the alternatives will be faster. The linked existing files were checked against the repository tree. **No candidate speedup is measured or guaranteed.** A "prototype" label only means a plausible experiment subject to correctness gates.
+
+10 workload families include cold start, warm small data, medium, million-item, repeated operations, high RTT, memory pressure, UI churn, slow disk and oversubscribed workloads. The 10 feasibility dimensions are exact-output parity, no new dependency, cross-platform support, bounded memory, tail latency, cold start, cancellation, crash recovery, throughput and I/O overhead.
+
+### Ten **different** research lenses (not another Amdahl/Roofline/Little loop)
+
+1. [Work stealing / dependency span](https://doi.org/10.1145/324133.324234)
+2. [Cache-oblivious memory hierarchy](https://www.fftw.org/~athena/abstracts/abstract12.html)
+3. [Bloom negative-prefilter tradeoff](https://doi.org/10.1145/362686.362692)
+4. [Roaring compressed bitmap indexes](https://doi.org/10.1002/spe.2402)
+5. [Boyer–Moore substring search](https://doi.org/10.1145/359842.359859)
+6. [Common random numbers for controlled comparisons](https://doi.org/10.1287/mnsc.41.12.1935)
+7. [HTTP strong Range validators / RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html)
+8. [Top-Down microarchitectural stalls](https://doi.org/10.1109/ISPASS.2014.6844459)
+9. [INP interaction responsiveness](https://web.dev/articles/inp)
+
+We evaluated theoretical **relevance**, not automatic applicability. In particular Bloom (only safe as a negative prefilter), Roaring (posting density), string search and web INP are marked **not-relevant** when a method does not involve those resources. Amortization tests the break-even condition *repeats × saved cost > one-time setup*; work/span bounds parallel tasks; cache models distinguish L1/L2 traffic from total FLOPs; BDP = RTT × goodput informs stream window sizing; paired random numbers reduce **benchmark-estimator variance**, not runtime. These models are not interchangeable or universal optimization formulas.
+
+### Audited outcomes: methodological screening, not runtime pass rates
+
+| Phase (1,000 distinct cases each) | Result distribution | Interpretation |
+|---|---|---|
+| Feasibility | prototype-after-profiling 88; conditional-prototype 512; guard-required 85; low-priority 209; measure-first 6; reject-contract-change 100; existing-not-additional 0 | A scenario may be a good experiment, **not an implemented optimization** |
+| Research lenses | useful 290; indirect 310; not-relevant 400 | Marks applicability of a mathematical viewpoint, **not observed wins** |
+
+Feasibility SHA-256: `eaff0167caabbecbdb821f4b9c1a35d10f32cf7935b3d00fa42df93f5aa29d86`. Research-lens SHA-256: `e625a9a29de5f8738071e8e6dc4cb2974eb2e5c66f34def1f151e7ac738ab1f9`. These hashes cover the generated 1,000-row canonical JSON arrays for the given repository. Machine-readable details are supplied in the separately delivered evidence ZIP, **not committed to this repository**.
+
+### Ten concrete alternatives, feasibility conditions and counterexamples
+
+| ID | Alternative | Verified existing source anchor | Assessment | Only meaningful when | Rejection / regression gate |
+|---|---|---|---|---|---|
+| G-ALT-01 | Rule-specific sampling loops | [`src/domain/feedback/runner.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/domain/feedback/runner.rs) | **Prototype after profiling** | If branch misses dominate sample ns | Keep exact RNG consumption and per-trial outcomes |
+| G-ALT-02 | Compact trial records / SoA | [`src/domain/feedback/results.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/domain/feedback/results.rs) | **Conditional** | If 100k–1M paths exceed cache/RSS budget | Quantile must still return its original path |
+| G-ALT-03 | Integer-cost histogram vs sort | [`src/domain/feedback/runner.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/domain/feedback/runner.rs) | **Conditional** | Only for proven finite small ticket range K; O(N+K) vs O(N log N) | Huge K and loss of scenario association invalidate it |
+| G-ALT-04 | Amortized prefix statistics | [`src/domain/feedback/results.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/domain/feedback/results.rs) | **Conditional** | Repeated queries q with q×saved_lookup_cost > setup_cost | One query loses; float reduction order may differ |
+| G-ALT-05 | FFT crossover autotuning | [`src/probability/fft.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/probability/fft.rs) | **Prototype after profiling** | Dense/sparse PMF threshold should be benchmarked per size | Mass conservation, accuracy, exact dispatch preserved |
+| G-ALT-06 | Deterministic dynamic chunk scheduling | [`src/app/compute.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/app/compute.rs) | **Conditional** | Unbalanced per-trial work and idle cores | No oversubscription or seeded trajectory changes |
+| G-ALT-07 | Graph geometry memoization | [`src/ui/charts.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/ui/charts.rs) | **Prototype after profiling** | Only when actual egui frame p95 is mesh-bound | Invalidate per calculation, zoom and viewport |
+| G-ALT-08 | Visible-window texture prefetch | [`src/data/catalog/ui.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/data/catalog/ui.rs) | **Conditional; partially existing** | Image upload stalls despite current worker cache | Strict cache cap; prefetch must not block UI |
+| G-ALT-09 | Bounded batch session log I/O | [`src/app/session_log.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/app/session_log.rs) | **Conditional** | Only if flush latency is significant part of total run | No missing/unsorted messages or changed log path |
+| G-ALT-10 | Fewer Monte Carlo trials | [`src/domain/feedback/runner.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/a5ad86b7a7dc0abe3af7b535f4babaeb253a3b49/src/domain/feedback/runner.rs) | **Reject under exact-results contract** | A separate user-selected error/precision mode is possible | Sample error increases; not a behavior-preserving speedup |
+
+### Decisions for the next experimental optimization cycle
+
+**First experiments:** (1) instrument per-trial sampling/branch misses and sort separately; (2) compare compact storage with exact path-preserving quantile retrieval; (3) measure egui p95 independent of calculation elapsed. **Counterexamples:** histogram can be slower when K≫N, prefix sums lose with one query, and making sampling 'faster' by reducing N changes the accuracy contract. For a comparative benchmark use *paired seeds / common random numbers* to reduce noise in the **comparison**; this does not accelerate the production simulation.
+
+Relevant new research perspective: Common random numbers (Nelson–Matejcik 1995), cache-oblivious layouts (Frigo et al.), work stealing (Blumofe–Leiserson), Top-Down CPU counters (Yasin), amortized prefix reuse.
+
+**Go/no-go before implementation:** collect source/benchmark SHA, build flags, hardware, workload sizes, current E2E wall-time and step breakdown (including p50/p95), CPU cycles, peak RSS/JS heap, I/O bytes, and strict result parity. Run baseline and candidate in randomized alternating order, minimum five complete runs each; preserve all existing public interfaces, persistence semantics and output contracts. A reduction in operation count or a theoretical upper bound **does not prove any whole-program speedup**.
