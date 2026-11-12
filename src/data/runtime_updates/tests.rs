@@ -79,6 +79,30 @@
         assert_eq!(read_bounded_cache(&path, 11).unwrap(), "replacement");
         fs::remove_dir_all(root).unwrap();
     }
+    #[cfg(windows)]
+    #[test]
+    fn failed_windows_cache_swap_retains_the_original_verified_bytes() {
+        let root = std::env::temp_dir().join(format!(
+            "gacha-win-replace-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let destination = root.join("active-revision");
+        fs::write(&destination, b"verified-original").unwrap();
+        // Simulate a stopped/crashed staging worker: no replacement exists.
+        let missing = root.join("missing-stage.tmp");
+        assert!(super::cache::replace_staged_windows(&destination, &missing).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"verified-original");
+        // A successful write does not leave a non-verified window with no
+        // active revision, and the same path can be updated repeatedly.
+        write_atomic(&destination, b"validated-next").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"validated-next");
+        write_atomic(&destination, b"validated-third").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"validated-third");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn rejects_unexpected_release_versions_and_unsafe_urls() {
         assert!(newer_version("v0.2.3", "0.2.2"));
