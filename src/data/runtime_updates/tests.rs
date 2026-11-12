@@ -107,6 +107,56 @@
         assert!(parse_bundle(catalog, &broken, manifest, rev, PathBuf::new()).is_err());
     }
     #[test]
+    fn incomplete_candidate_and_corrupt_active_cache_are_never_published() {
+        // G-03: stage two revisions in an isolated cache root without
+        // mutating process environment variables or making network calls.
+        let root = std::env::temp_dir().join(format!(
+            "gacha-cache-stage-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .unwrap().as_nanos(),
+        ));
+        let good = "a".repeat(40);
+        let candidate = "b".repeat(40);
+        let good_root = root.join("revisions").join(&good);
+        let bad_root = root.join("revisions").join(&candidate);
+        fs::create_dir_all(&good_root).unwrap();
+        fs::create_dir_all(&bad_root).unwrap();
+        let catalog = include_str!("../../catalog_data.tsv");
+        let pairs = include_str!("../../signature_pairs.tsv");
+        let manifest = include_str!("../../../Image/SHA256SUMS.txt");
+        for (name, content) in [
+            ("catalog.tsv", catalog),
+            ("pairs.tsv", pairs),
+            ("manifest.txt", manifest),
+        ] {
+            fs::write(good_root.join(name), content).unwrap();
+        }
+        fs::write(root.join("active-revision"), &good).unwrap();
+        let verified = super::cache::read_active_bundle_from(&root).unwrap().unwrap();
+        assert_eq!(verified.revision, good);
+
+        // Simulate download termination after partial staging. The active
+        // marker still identifies the last verified snapshot.
+        fs::write(bad_root.join("catalog.tsv"), catalog).unwrap();
+        fs::write(bad_root.join("pairs.tsv"), pairs).unwrap();
+        fs::write(bad_root.join("manifest.txt"), "invalid manifest\n").unwrap();
+        assert_eq!(super::cache::read_active_bundle_from(&root)
+            .unwrap().unwrap().revision, good);
+
+        // Even if the marker is externally corrupted or redirected to a
+        // partial candidate, no invalid content is returned as verified.
+        write_atomic(&root.join("active-revision"), candidate.as_bytes()).unwrap();
+        assert!(super::cache::read_active_bundle_from(&root).is_err());
+        write_atomic(&root.join("active-revision"), good.as_bytes()).unwrap();
+        assert_eq!(super::cache::read_active_bundle_from(&root)
+            .unwrap().unwrap().revision, good);
+
+        fs::write(good_root.join("catalog.tsv"), "invalid\n").unwrap();
+        assert!(super::cache::read_active_bundle_from(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn bounded_cache_rejects_oversize_non_utf8_and_symlink_files() {
         let root = std::env::temp_dir().join(format!(
             "gacha-cache-test-{}-{}", std::process::id(),
