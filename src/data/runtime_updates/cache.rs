@@ -48,15 +48,21 @@ pub(super) fn read_bounded_cache(path: &Path, max_bytes: usize) -> Result<String
     String::from_utf8(bytes).map_err(|e| format!("캐시 파일 UTF-8 오류: {e}"))
 }
 
-pub(super) fn active_revision() -> Option<String> {
-    let revision = read_bounded_cache(&cache_root().join("active-revision"), 128).ok()?;
+fn active_revision_from(root: &Path) -> Option<String> {
+    let revision = read_bounded_cache(&root.join("active-revision"), 128).ok()?;
     let sha = revision.trim();
     is_commit_sha(sha).then(|| sha.to_owned())
 }
 
 pub(super) fn read_active_bundle() -> Result<Option<VerifiedBundle>, String> {
-    let Some(revision) = active_revision() else { return Ok(None); };
-    let root = revision_path(&revision);
+    read_active_bundle_from(&cache_root())
+}
+
+/// Isolated root for failure-injection testing. An invalid active marker is
+/// ignored, and any corrupt referenced bundle is rejected before publishing.
+pub(super) fn read_active_bundle_from(cache: &Path) -> Result<Option<VerifiedBundle>, String> {
+    let Some(revision) = active_revision_from(cache) else { return Ok(None); };
+    let root = cache.join("revisions").join(&revision);
     let catalog = read_bounded_cache(&root.join("catalog.tsv"), MAX_TEXT)?;
     let pairs = read_bounded_cache(&root.join("pairs.tsv"), MAX_TEXT)?;
     let manifest = read_bounded_cache(&root.join("manifest.txt"), MAX_TEXT)?;
