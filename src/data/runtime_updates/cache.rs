@@ -48,15 +48,21 @@ pub(super) fn read_bounded_cache(path: &Path, max_bytes: usize) -> Result<String
     String::from_utf8(bytes).map_err(|e| format!("캐시 파일 UTF-8 오류: {e}"))
 }
 
-pub(super) fn active_revision() -> Option<String> {
-    let revision = read_bounded_cache(&cache_root().join("active-revision"), 128).ok()?;
+fn active_revision_from(root: &Path) -> Option<String> {
+    let revision = read_bounded_cache(&root.join("active-revision"), 128).ok()?;
     let sha = revision.trim();
     is_commit_sha(sha).then(|| sha.to_owned())
 }
 
 pub(super) fn read_active_bundle() -> Result<Option<VerifiedBundle>, String> {
-    let Some(revision) = active_revision() else { return Ok(None); };
-    let root = revision_path(&revision);
+    read_active_bundle_from(&cache_root())
+}
+
+/// Isolated root for failure-injection testing. An invalid active marker is
+/// ignored, and any corrupt referenced bundle is rejected before publishing.
+pub(super) fn read_active_bundle_from(cache: &Path) -> Result<Option<VerifiedBundle>, String> {
+    let Some(revision) = active_revision_from(cache) else { return Ok(None); };
+    let root = cache.join("revisions").join(&revision);
     let catalog = read_bounded_cache(&root.join("catalog.tsv"), MAX_TEXT)?;
     let pairs = read_bounded_cache(&root.join("pairs.tsv"), MAX_TEXT)?;
     let manifest = read_bounded_cache(&root.join("manifest.txt"), MAX_TEXT)?;
@@ -96,6 +102,93 @@ pub(super) fn fetch_and_stage(revision: &str) -> Result<VerifiedBundle, String> 
     Ok(bundle)
 }
 
+/// Replace a staged file without deleting the last known-good Windows cache.
+/// ReplaceFileW can fail at several stages; providing a backup name prevents
+/// the replacement from destroying the original on the documented 1176/1177
+/// error paths. If recovery itself fails, leave the backup intact and report
+/// an error instead of claiming the update was published.
+#[cfg(windows)]
+pub(super) fn replace_staged_windows(path: &Path, temporary: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use std::io::ErrorKind;
+    use std::ptr;
+
+    #[link(name = "Kernel32")]
+    unsafe extern "system" {
+        fn ReplaceFileW(
+            replaced: *const u16,
+            replacement: *const u16,
+            backup: *const u16,
+            flags: u32,
+            exclude: *mut core::ffi::c_void,
+            reserved: *mut core::ffi::c_void,
+        ) -> i32;
+    }
+
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return fs::rename(temporary, path)
+                .map_err(|e| format!("새 캐시 파일 확정 실패: {e}"));
+        }
+        Err(error) => return Err(format!("기존 캐시 파일 확인 실패: {error}")),
+    };
+    if !meta.file_type().is_file() {
+        return Err("교체 대상 캐시가 일반 파일이 아닙니다.".to_owned());
+    }
+
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let mut backup = None;
+    for attempt in 0..32 {
+        let candidate = path.with_extension(format!(
+            "backup-{}-{stamp:x}-{attempt}", std::process::id()));
+        match fs::symlink_metadata(&candidate) {
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                backup = Some(candidate);
+                break;
+            }
+            Ok(_) => continue,
+            Err(e) => return Err(format!("백업 파일 경로 검사 실패: {e}")),
+        }
+    }
+    let backup = backup.ok_or("고유한 백업 캐시 파일명을 만들 수 없습니다.")?;
+    let wide = |path: &Path| -> Vec<u16> {
+        path.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
+    };
+    let original_wide = wide(path);
+    let replacement_wide = wide(temporary);
+    let backup_wide = wide(&backup);
+    // The files live on the same volume. Do not use IGNORE_ACL_ERRORS.
+    let succeeded = unsafe {
+        ReplaceFileW(
+            original_wide.as_ptr(), replacement_wide.as_ptr(),
+            backup_wide.as_ptr(), 0, ptr::null_mut(), ptr::null_mut()
+        ) != 0
+    };
+    if succeeded {
+        if let Err(error) = fs::remove_file(&backup) {
+            crate::session_log::warn("CACHE_BACKUP_CLEANUP", format!(
+                "교체 성공 후 과거 캐시 백업 정리 실패 ({}): {error}",
+                backup.display()
+            ));
+        }
+        return Ok(());
+    }
+
+    let error = std::io::Error::last_os_error();
+    // Documented 1177 can move the old target into backup and leave the
+    // original name absent. Restore it when safe; if another process created
+    // that path, leave the trusted backup intact for explicit recovery.
+    if !path.exists() && backup.is_file() {
+        fs::rename(&backup, path).map_err(|restore_error| format!(
+            "캐시 교체 실패({error}); 기존 캐시 복구 실패({restore_error}); 백업: {}",
+            backup.display()
+        ))?;
+    }
+    Err(format!("캐시 교체 실패; 기존 파일 유지 또는 백업 복구: {error}"))
+}
+
 pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path.parent().ok_or("저장 경로에 상위 디렉터리가 없습니다.")?;
     fs::create_dir_all(parent).map_err(|e| format!("저장 경로 생성 실패: {e}"))?;
@@ -127,13 +220,12 @@ pub(super) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         file.write_all(bytes).map_err(|e| format!("임시 캐시 저장 실패: {e}"))?;
         file.sync_all().map_err(|e| format!("임시 캐시 동기화 실패: {e}"))?;
         drop(file);
-        // Unix rename atomically replaces a regular file. Windows does not
-        // replace existing destinations, so remove only after staging succeeds.
+        // POSIX rename atomically replaces. On Windows, replace using
+        // ReplaceFileW + an old-file backup rather than remove-then-rename.
         #[cfg(windows)]
-        if path.exists() {
-            fs::remove_file(path).map_err(|e| format!("기존 캐시 교체 실패: {e}"))?;
-        }
-        fs::rename(&temporary, path).map_err(|e| format!("캐시 확정 실패: {e}"))
+        { replace_staged_windows(path, &temporary) }
+        #[cfg(not(windows))]
+        { fs::rename(&temporary, path).map_err(|e| format!("캐시 확정 실패: {e}")) }
     })();
     if result.is_err() { let _ = fs::remove_file(&temporary); }
     result

@@ -235,6 +235,48 @@ mod parallel_result_tests {
     }
 
     #[test]
+    fn rapid_recalculation_generations_reject_obsolete_requests_without_changing_current_result() {
+        // G-02: Run A, edit/cancel it, Run B, cancel again, then Run C.
+        // Older workers may still have a response in the channel, but only
+        // the active generation is eligible to produce current results.
+        let mut setup = GameSetup::new(Game::StarRail);
+        setup.set_targets(1, 1);
+        let mut config = FeedbackConfig::for_game(Game::StarRail);
+        config.samples = 64;
+        let active = Arc::new(AtomicU64::new(1));
+        let make = |generation| CalculationRequest {
+            generation,
+            setup: setup.clone(),
+            mode: RateMode::PublishedOnly,
+            feedback_config: config.clone(),
+            active_generation: Arc::clone(&active),
+        };
+
+        let first = make(1);
+        let baseline = compute_with_cpu_budget(&first, 1).unwrap();
+        active.store(2, Ordering::Relaxed);
+        assert!(compute_with_cpu_budget(&first, 1).is_err());
+
+        let cancelled = make(2);
+        active.store(3, Ordering::Relaxed);
+        assert!(compute_with_cpu_budget(&cancelled, 1).is_err());
+
+        let current = make(3);
+        let latest = compute_with_cpu_budget(&current, 1).unwrap();
+        assert_eq!(baseline.raw_shared.pmf, latest.raw_shared.pmf);
+        assert_eq!(baseline.feedback.as_ref().unwrap().scenarios,
+                   latest.feedback.as_ref().unwrap().scenarios);
+
+        // Another edit immediately invalidates a finished response, but
+        // never changes the saved values of the next successful generation.
+        active.store(4, Ordering::Relaxed);
+        assert!(compute_with_cpu_budget(&current, 1).is_err());
+        let resumed = compute_with_cpu_budget(&make(4), 1).unwrap();
+        assert_eq!(resumed.feedback.as_ref().unwrap().budgets,
+                   latest.feedback.as_ref().unwrap().budgets);
+    }
+
+    #[test]
     fn obsolete_generation_skips_computation_before_allocating_scenarios() {
         let mut setup = GameSetup::new(Game::WutheringWaves);
         setup.set_targets(1, 1);

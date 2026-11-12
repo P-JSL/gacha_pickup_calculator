@@ -169,6 +169,15 @@ mod tests {
         let mut modified = sample.to_vec();
         modified.push(0);
         assert!(verify_image_bytes("HSR/c-1003.png", &modified).is_err());
+
+        // G-04: a byte-for-byte substitution with the SAME length and the
+        // exact same valid PNG header must not be trusted either.
+        let mut same_size = sample.to_vec();
+        let position = same_size.len() - 1;
+        same_size[position] ^= 0x01;
+        assert_eq!(same_size.len(), sample.len());
+        assert!(same_size.starts_with(sample.get(..8).unwrap()));
+        assert!(verify_image_bytes("HSR/c-1003.png", &same_size).is_err());
     }
 
     #[test]

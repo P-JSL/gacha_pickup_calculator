@@ -42,6 +42,59 @@
     }
 
     #[test]
+    fn commit_attestation_accepts_reordered_whitespace_and_escaped_message() {
+        let sha = "a".repeat(40);
+        let reordered = format!(
+            r#"{{
+                "author":{{"login":"P-JSL","id":1}},
+                "commit":{{
+                    "message":"safe text: \u2603 and \"verification\"",
+                    "verification":{{"reason":"valid","verified":true}},
+                    "committer":{{"email":"noreply@github.com","name":"GitHub"}}
+                }},
+                "sha":"{sha}",
+                "extra":[null, false, 12.5, {{"nested":"ok"}}]
+            }}"#
+        );
+        assert!(verified_github_commit(&reordered, &sha));
+    }
+
+    #[test]
+    fn commit_attestation_does_not_trust_same_tokens_in_unrelated_objects() {
+        let sha = "a".repeat(40);
+        let spoofed = format!(
+            r#"{{
+                "sha":"{sha}",
+                "author":{{"login":"attacker"}},
+                "commit":{{
+                    "verification":{{"verified":false,"reason":"invalid"}},
+                    "committer":{{"name":"attacker","email":"other@example.org"}}
+                }},
+                "untrusted":{{
+                    "verification":{{"verified":true,"reason":"valid"}},
+                    "committer":{{"name":"GitHub","email":"noreply@github.com"}},
+                    "author":{{"login":"P-JSL"}}
+                }}
+            }}"#
+        );
+        assert!(!verified_github_commit(&spoofed, &sha));
+        let good = format!(
+            r#"{{"sha":"{sha}","commit":{{"verification":{{"verified":true,"reason":"valid"}},"committer":{{"name":"GitHub","email":"noreply@github.com"}}}},"author":{{"login":"P-JSL"}}}}"#
+        );
+        assert!(verified_github_commit(&good, &sha));
+        for malicious in [
+            good.replacen(&format!(r#""sha":"{sha}""#),
+                &format!(r#""sha":"{sha}","sha":"{}""#, "b".repeat(40)), 1),
+            good.replace(r#""verified":true"#, r#""verified":true,"verified":false"#),
+            good.replace(r#""login":"P-JSL""#, r#""login":"P-JSL","login":"attacker""#),
+            format!("{good}{{}}"),
+            good.replace(r#""login":"P-JSL""#, r#""log\u0069n":"P-JSL""#),
+        ] {
+            assert!(!verified_github_commit(&malicious, &sha), "{malicious}");
+        }
+    }
+
+    #[test]
     fn rejects_poisoned_or_partial_candidate_data() {
         let catalog = include_str!("../../catalog_data.tsv");
         let pairs = include_str!("../../signature_pairs.tsv");
@@ -53,6 +106,56 @@
         let broken = pairs.replace("hsr\t1511\t23065\t", "hsr\t1511\t999999\t");
         assert!(parse_bundle(catalog, &broken, manifest, rev, PathBuf::new()).is_err());
     }
+    #[test]
+    fn incomplete_candidate_and_corrupt_active_cache_are_never_published() {
+        // G-03: stage two revisions in an isolated cache root without
+        // mutating process environment variables or making network calls.
+        let root = std::env::temp_dir().join(format!(
+            "gacha-cache-stage-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .unwrap().as_nanos(),
+        ));
+        let good = "a".repeat(40);
+        let candidate = "b".repeat(40);
+        let good_root = root.join("revisions").join(&good);
+        let bad_root = root.join("revisions").join(&candidate);
+        fs::create_dir_all(&good_root).unwrap();
+        fs::create_dir_all(&bad_root).unwrap();
+        let catalog = include_str!("../../catalog_data.tsv");
+        let pairs = include_str!("../../signature_pairs.tsv");
+        let manifest = include_str!("../../../Image/SHA256SUMS.txt");
+        for (name, content) in [
+            ("catalog.tsv", catalog),
+            ("pairs.tsv", pairs),
+            ("manifest.txt", manifest),
+        ] {
+            fs::write(good_root.join(name), content).unwrap();
+        }
+        fs::write(root.join("active-revision"), &good).unwrap();
+        let verified = super::cache::read_active_bundle_from(&root).unwrap().unwrap();
+        assert_eq!(verified.revision, good);
+
+        // Simulate download termination after partial staging. The active
+        // marker still identifies the last verified snapshot.
+        fs::write(bad_root.join("catalog.tsv"), catalog).unwrap();
+        fs::write(bad_root.join("pairs.tsv"), pairs).unwrap();
+        fs::write(bad_root.join("manifest.txt"), "invalid manifest\n").unwrap();
+        assert_eq!(super::cache::read_active_bundle_from(&root)
+            .unwrap().unwrap().revision, good);
+
+        // Even if the marker is externally corrupted or redirected to a
+        // partial candidate, no invalid content is returned as verified.
+        write_atomic(&root.join("active-revision"), candidate.as_bytes()).unwrap();
+        assert!(super::cache::read_active_bundle_from(&root).is_err());
+        write_atomic(&root.join("active-revision"), good.as_bytes()).unwrap();
+        assert_eq!(super::cache::read_active_bundle_from(&root)
+            .unwrap().unwrap().revision, good);
+
+        fs::write(good_root.join("catalog.tsv"), "invalid\n").unwrap();
+        assert!(super::cache::read_active_bundle_from(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn bounded_cache_rejects_oversize_non_utf8_and_symlink_files() {
         let root = std::env::temp_dir().join(format!(
@@ -79,6 +182,30 @@
         assert_eq!(read_bounded_cache(&path, 11).unwrap(), "replacement");
         fs::remove_dir_all(root).unwrap();
     }
+    #[cfg(windows)]
+    #[test]
+    fn failed_windows_cache_swap_retains_the_original_verified_bytes() {
+        let root = std::env::temp_dir().join(format!(
+            "gacha-win-replace-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                .unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let destination = root.join("active-revision");
+        fs::write(&destination, b"verified-original").unwrap();
+        // Simulate a stopped/crashed staging worker: no replacement exists.
+        let missing = root.join("missing-stage.tmp");
+        assert!(super::cache::replace_staged_windows(&destination, &missing).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"verified-original");
+        // A successful write does not leave a non-verified window with no
+        // active revision, and the same path can be updated repeatedly.
+        write_atomic(&destination, b"validated-next").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"validated-next");
+        write_atomic(&destination, b"validated-third").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"validated-third");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn rejects_unexpected_release_versions_and_unsafe_urls() {
         assert!(newer_version("v0.2.3", "0.2.2"));

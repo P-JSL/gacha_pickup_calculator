@@ -2,6 +2,37 @@
     use super::*;
 
     #[test]
+    fn near_eight_mebibyte_many_short_rows_have_a_bounded_row_count() {
+        // Both cases are below the 8 MiB file limit. Only 200,000
+        // nonblank, noncomment data rows are allowed; the parser now checks
+        // this while streaming, before building any per-row index.
+        let mut csv = String::with_capacity(1_000_050);
+        csv.push_str("duration,event\n");
+        for _ in 0..200_000 { csv.push_str("1,1\n"); }
+        assert!(csv.len() < 8 * 1024 * 1024);
+        let accepted = parse_observation_csv(&csv, 90).unwrap();
+        assert_eq!(accepted.observations, 200_000);
+        assert_eq!(accepted.events, 200_000);
+        csv.push_str("1,1\n");
+        assert!(parse_observation_csv(&csv, 90)
+            .unwrap_err().contains("200,000"));
+    }
+
+    #[test]
+    fn streaming_csv_preserves_comments_bom_column_boundary_and_line_numbers() {
+        let mut csv = format!("\u{feff}duration,event,{}\n",
+            (0..62).map(|i| format!("extra_{i}")).collect::<Vec<_>>().join(","));
+        csv.push_str("# dropped comment\n\n");
+        csv.push_str(&format!("2,1,{}\n",
+            (0..62).map(|_| "0").collect::<Vec<_>>().join(",")));
+        let d = parse_observation_csv(&csv, 90).unwrap();
+        assert_eq!(d.observations, 1);
+        assert_eq!(d.events, 1);
+        csv.push_str("broken,row\n");
+        assert!(parse_observation_csv(&csv, 90).unwrap_err().contains("5행"));
+    }
+
+    #[test]
     fn reject_excessive_columns_and_duplicate_case_insensitive_headers() {
         let many = format!("pity,count,{}\n1,1\n",
             (0..63).map(|i| format!("extra_{i}")).collect::<Vec<_>>().join(","));
