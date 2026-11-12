@@ -102,7 +102,7 @@ pub(super) fn fetch_and_stage(revision: &str) -> Result<VerifiedBundle, String> 
 /// error paths. If recovery itself fails, leave the backup intact and report
 /// an error instead of claiming the update was published.
 #[cfg(windows)]
-fn replace_staged_windows(path: &Path, temporary: &Path) -> Result<(), String> {
+pub(super) fn replace_staged_windows(path: &Path, temporary: &Path) -> Result<(), String> {
     use std::os::windows::ffi::OsStrExt;
     use std::io::ErrorKind;
     use std::ptr;
