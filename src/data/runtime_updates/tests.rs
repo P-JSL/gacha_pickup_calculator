@@ -42,6 +42,59 @@
     }
 
     #[test]
+    fn commit_attestation_accepts_reordered_whitespace_and_escaped_message() {
+        let sha = "a".repeat(40);
+        let reordered = format!(
+            r#"{{
+                "author":{{"login":"P-JSL","id":1}},
+                "commit":{{
+                    "message":"safe text: \u2603 and \"verification\"",
+                    "verification":{{"reason":"valid","verified":true}},
+                    "committer":{{"email":"noreply@github.com","name":"GitHub"}}
+                }},
+                "sha":"{sha}",
+                "extra":[null, false, 12.5, {{"nested":"ok"}}]
+            }}"#
+        );
+        assert!(verified_github_commit(&reordered, &sha));
+    }
+
+    #[test]
+    fn commit_attestation_does_not_trust_same_tokens_in_unrelated_objects() {
+        let sha = "a".repeat(40);
+        let spoofed = format!(
+            r#"{{
+                "sha":"{sha}",
+                "author":{{"login":"attacker"}},
+                "commit":{{
+                    "verification":{{"verified":false,"reason":"invalid"}},
+                    "committer":{{"name":"attacker","email":"other@example.org"}}
+                }},
+                "untrusted":{{
+                    "verification":{{"verified":true,"reason":"valid"}},
+                    "committer":{{"name":"GitHub","email":"noreply@github.com"}},
+                    "author":{{"login":"P-JSL"}}
+                }}
+            }}"#
+        );
+        assert!(!verified_github_commit(&spoofed, &sha));
+        let good = format!(
+            r#"{{"sha":"{sha}","commit":{{"verification":{{"verified":true,"reason":"valid"}},"committer":{{"name":"GitHub","email":"noreply@github.com"}}}},"author":{{"login":"P-JSL"}}}}"#
+        );
+        assert!(verified_github_commit(&good, &sha));
+        for malicious in [
+            good.replacen(&format!(r#""sha":"{sha}""#),
+                &format!(r#""sha":"{sha}","sha":"{}""#, "b".repeat(40)), 1),
+            good.replace(r#""verified":true"#, r#""verified":true,"verified":false"#),
+            good.replace(r#""login":"P-JSL""#, r#""login":"P-JSL","login":"attacker""#),
+            format!("{good}{{}}"),
+            good.replace(r#""login":"P-JSL""#, r#""log\u0069n":"P-JSL""#),
+        ] {
+            assert!(!verified_github_commit(&malicious, &sha), "{malicious}");
+        }
+    }
+
+    #[test]
     fn rejects_poisoned_or_partial_candidate_data() {
         let catalog = include_str!("../../catalog_data.tsv");
         let pairs = include_str!("../../signature_pairs.tsv");
