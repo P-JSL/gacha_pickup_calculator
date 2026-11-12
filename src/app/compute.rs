@@ -92,7 +92,7 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
                             &request.setup, request.mode, &variant, worker_limit, cancellation
                         ).map(Arc::new);
                         session_log::info("WUWA_STRATEGY_TIMING", format!(
-                            "generation={} wavebands={} workers={} samples={} elapsed_ms={} outcome={}",
+                            "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
                             request.generation, max_wavebands, worker_limit, variant.samples,
                             started.elapsed().as_millis(),
                             if result.is_ok() { "ok" } else { "cancelled_or_failed" }
@@ -115,7 +115,7 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
                     &request.setup, request.mode, &variant, cpu_budget, cancellation
                 );
                 session_log::info("WUWA_STRATEGY_TIMING", format!(
-                    "generation={} wavebands={} workers={} samples={} elapsed_ms={} outcome={}",
+                    "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
                     request.generation, max_wavebands, cpu_budget, variant.samples,
                     started.elapsed().as_millis(),
                     if result.is_ok() { "ok" } else { "cancelled_or_failed" }
