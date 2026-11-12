@@ -287,7 +287,7 @@ mod radix_sort_regression {
 
     #[test]
     fn integer_radix_preserves_entire_scenarios_and_lexicographic_budget_order() {
-        for size in [0, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
+        for size in [0usize, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
             let mut input = (0..size).map(|i| RefundScenario {
                 raw_pulls: i.wrapping_mul(47) % 4_800,
                 initial_flexible_required: i.wrapping_mul(41) % 3_000,
