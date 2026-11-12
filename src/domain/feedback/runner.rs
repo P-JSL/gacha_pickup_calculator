@@ -156,6 +156,79 @@ pub(super) fn estimate_with_workers(setup: &GameSetup, mode: RateMode, model: &F
     estimate_with_workers_cancel(setup, mode, model, requested_workers, None)
 }
 
+/// In-place MSD radix partition for integer (initial budget, raw draws).
+/// Memory is O(256 * key_bytes) instead of allocating another N scenarios.
+/// For small partitions, Rust's optimized comparison sort is faster.
+fn sort_scenarios_by_funding(scenarios: &mut [RefundScenario]) {
+    const INSERTION_THRESHOLD: usize = 128;
+    const RADIX_THRESHOLD: usize = 16_384;
+    if scenarios.len() < RADIX_THRESHOLD {
+        scenarios.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+        return;
+    }
+    let mut max_budget = 0usize;
+    let mut max_raw = 0usize;
+    for trial in scenarios.iter() {
+        max_budget = max_budget.max(trial.initial_flexible_required);
+        max_raw = max_raw.max(trial.raw_pulls);
+    }
+    // Most gacha budgets fit in 2 bytes. Skip all zero leading key bytes.
+    let mut bytes = Vec::with_capacity(2 * std::mem::size_of::<usize>());
+    for (budget, maximum) in [(true, max_budget), (false, max_raw)] {
+        let width = (usize::BITS - maximum.leading_zeros()).div_ceil(8) as usize;
+        for index in (0..width).rev() {
+            bytes.push((budget, index * 8));
+        }
+    }
+    if bytes.is_empty() { return; }
+
+    fn recurse(items: &mut [RefundScenario], bytes: &[(bool, usize)], depth: usize) {
+        if depth >= bytes.len() || items.len() <= 1 { return; }
+        if items.len() <= INSERTION_THRESHOLD {
+            items.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+            return;
+        }
+        let (budget, shift) = bytes[depth];
+        let digit = |item: &RefundScenario| -> usize {
+            let value = if budget { item.initial_flexible_required } else { item.raw_pulls };
+            (value >> shift) & 255
+        };
+        let mut counts = [0usize; 256];
+        for item in items.iter() { counts[digit(item)] += 1; }
+        let mut starts = [0usize; 256];
+        let mut cumulative = 0usize;
+        for (index, count) in counts.iter().enumerate() {
+            starts[index] = cumulative;
+            cumulative += count;
+        }
+        let mut cursors = starts;
+        // American-flag distribution swaps each record directly into its
+        // bucket. No per-trial clone, scratch vector, or double-buffer.
+        for bucket in 0..256 {
+            let end = starts[bucket] + counts[bucket];
+            while cursors[bucket] < end {
+                let destination = digit(&items[cursors[bucket]]);
+                if destination == bucket {
+                    cursors[bucket] += 1;
+                } else {
+                    items.swap(cursors[bucket], cursors[destination]);
+                    cursors[destination] += 1;
+                }
+            }
+        }
+        if depth + 1 < bytes.len() {
+            for bucket in 0..256 {
+                let start = starts[bucket];
+                let end = start + counts[bucket];
+                if end > start + 1 {
+                    recurse(&mut items[start..end], bytes, depth + 1);
+                }
+            }
+        }
+    }
+    recurse(scenarios, &bytes, 0);
+}
+
 fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &FeedbackConfig,
                                 requested_workers: usize,
                                 cancellation: Option<(&AtomicU64, u64)>)
@@ -216,8 +289,7 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
         raw_pulls.push(scenario.raw_pulls);
     }
     let sorting_started = std::time::Instant::now();
-    scenarios.sort_unstable_by_key(|scenario|
-        (scenario.initial_flexible_required, scenario.raw_pulls));
+    sort_scenarios_by_funding(&mut scenarios);
     let sorting_ns = sorting_started.elapsed().as_nanos();
     // Sorting scenarios by budget already orders the budget CDF. Avoid a
     // redundant second O(N log N) sort for large trial counts.
@@ -254,3 +326,47 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
         average_record_disc_units_earned: totals.record_discs as f64 / n })
 }
 
+
+#[cfg(test)]
+mod radix_sort_regression {
+    use super::*;
+
+    #[test]
+    fn integer_radix_preserves_entire_scenarios_and_lexicographic_budget_order() {
+        for size in [0, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
+            let mut input = (0..size).map(|i| RefundScenario {
+                raw_pulls: i.wrapping_mul(47) % 4_800,
+                initial_flexible_required: i.wrapping_mul(41) % 3_000,
+                earned_points: i,
+                ..RefundScenario::default()
+            }).collect::<Vec<_>>();
+            let mut reference = input.clone();
+            reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+            sort_scenarios_by_funding(&mut input);
+            let keys = |items: &[RefundScenario]| items.iter()
+                .map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>();
+            assert_eq!(keys(&input), keys(&reference), "size={size}");
+            let mut original_ids = input.iter().map(|s| s.earned_points).collect::<Vec<_>>();
+            original_ids.sort_unstable();
+            assert_eq!(original_ids, (0..size).collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn radix_handles_wide_usize_keys_and_many_equal_pairs() {
+        let mut trials = (0..50_000).map(|i| RefundScenario {
+            raw_pulls: (i % 17) + (usize::MAX - 8_000),
+            initial_flexible_required: if i % 3 == 0 { usize::MAX - 1 } else { i % 3 },
+            earned_points: i,
+            ..RefundScenario::default()
+        }).collect::<Vec<_>>();
+        let mut reference = trials.clone();
+        reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+        sort_scenarios_by_funding(&mut trials);
+        assert_eq!(trials.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+            .collect::<Vec<_>>(),
+            reference.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>());
+    }
+}
