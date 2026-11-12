@@ -1,5 +1,37 @@
 use super::*;
 
+/// Optional G-08 GUI instrumentation: collect bounded stage samples and
+/// emit a log summary only after enough observations. This measures time
+/// spent submitting chart geometry or textures, NOT GPU present time.
+pub(crate) fn profile_ui_span(stage: &'static str, started: std::time::Instant) {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*ENABLED.get_or_init(|| std::env::var("GACHA_PROFILE_UI").as_deref() == Ok("1")) {
+        return;
+    }
+    static SAMPLES: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<&'static str, Vec<u128>>>
+    > = std::sync::OnceLock::new();
+    let elapsed = started.elapsed().as_micros();
+    let mut samples = SAMPLES.get_or_init(|| std::sync::Mutex::new(
+        std::collections::HashMap::new()
+    )).lock().unwrap_or_else(|poison| poison.into_inner());
+    let series = samples.entry(stage).or_default();
+    series.push(elapsed);
+    let target = if stage == "catalog_texture_upload" { 8 } else { 64 };
+    if series.len() < target { return; }
+    series.sort_unstable();
+    let count = series.len();
+    let median = series[count / 2];
+    let p95 = series[((count as f64 * 0.95).ceil() as usize)
+        .saturating_sub(1).min(count - 1)];
+    let maximum = series[count - 1];
+    series.clear();
+    drop(samples);
+    crate::session_log::info("UI_STAGE_PROFILE", format!(
+        "stage={stage} samples={count} median_us={median} p95_us={p95} max_us={maximum}"
+    ));
+}
+
 /// Each chart has its own X-range. Character and secondary-banner curves
 /// therefore cannot be compressed into a shared 2000-pull wide axis.
 #[derive(Clone, Copy)]
@@ -93,6 +125,7 @@ pub(crate) fn chart_tooltip_lines(
 /// The same fill, grid, axes, scaling and series colors are used on Windows
 /// and Linux. No OS-native chart controls or persistence are involved.
 pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_>], appearance: UiPreferences, language: Language) {
+    let stage_started = std::time::Instant::now();
     let end = chart_domain_end(series);
     let width = ui.available_width().max(100.0);
     let height = if width < 650.0 { 136.0 } else { 187.0 };
@@ -230,6 +263,7 @@ pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_
             }
         });
     }
+    profile_ui_span("chart_geometry", stage_started);
 }
 
 pub(crate) fn page_intro(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
