@@ -441,10 +441,12 @@ pub fn estimate_waveband_strategies(
 
     let totals: [TrialTotals; 3] = std::thread::scope(|scope| {
         let (sender, receiver) = std::sync::mpsc::channel::<StrategyTask<'_>>();
-        let receiver = std::sync::Mutex::new(receiver);
+        // Workers own Arc clones, so the receiver outlives every scoped
+        // callback without borrowing a short-lived local Mutex.
+        let receiver = std::sync::Arc::new(std::sync::Mutex::new(receiver));
         let mut handles = Vec::with_capacity(workers);
         for _ in 0..workers {
-            let receiver = &receiver;
+            let receiver = std::sync::Arc::clone(&receiver);
             let models = &models;
             handles.push(scope.spawn(move || -> Result<[TrialTotals; 3], String> {
                 let mut partial = std::array::from_fn(|_| TrialTotals::default());
