@@ -87,18 +87,196 @@ pub(super) fn fetch_head_sha() -> Result<String, String> {
     if !is_commit_sha(&sha) { return Err("Git 참조 형식 오류".to_owned()); }
     Ok(sha)
 }
+// A small bounded JSON reader for GitHub commit attestation. This avoids a
+// security-sensitive substring search without adding a new dependency.
+// It validates the whole response, checks nesting/duplicate keys, and rejects
+// ambiguous escaped field names. GitHub's API uses plain ASCII field names.
+enum AttestationValue<'a> {
+    Object(Vec<(&'a str, AttestationValue<'a>)>),
+    Text(&'a str),
+    Boolean(bool),
+    Other,
+}
+
+impl<'a> AttestationValue<'a> {
+    fn field(&self, name: &str) -> Option<&Self> {
+        match self {
+            Self::Object(fields) => fields.iter()
+                .find(|(field, _)| *field == name).map(|(_, value)| value),
+            _ => None,
+        }
+    }
+    fn text(&self) -> Option<&str> {
+        if let Self::Text(value) = self { Some(value) } else { None }
+    }
+    fn boolean(&self) -> Option<bool> {
+        if let Self::Boolean(value) = self { Some(*value) } else { None }
+    }
+}
+
+struct AttestationJson<'a> {
+    bytes: &'a [u8],
+    cursor: usize,
+}
+impl<'a> AttestationJson<'a> {
+    fn parse(body: &'a str) -> Option<AttestationValue<'a>> {
+        let mut parser = Self { bytes: body.as_bytes(), cursor: 0 };
+        let value = parser.value(0)?;
+        parser.whitespace();
+        (parser.cursor == parser.bytes.len()).then_some(value)
+    }
+    fn whitespace(&mut self) {
+        while matches!(self.bytes.get(self.cursor),
+            Some(b' ' | b'\t' | b'\r' | b'\n')) {
+            self.cursor += 1;
+        }
+    }
+    fn take(&mut self, byte: u8) -> bool {
+        if self.bytes.get(self.cursor) == Some(&byte) {
+            self.cursor += 1;
+            true
+        } else { false }
+    }
+    fn word(&mut self, literal: &[u8]) -> bool {
+        if self.bytes.get(self.cursor..self.cursor + literal.len()) == Some(literal) {
+            self.cursor += literal.len();
+            true
+        } else { false }
+    }
+    fn string(&mut self, key: bool) -> Option<&'a str> {
+        if !self.take(b'"') { return None; }
+        let start = self.cursor;
+        while let Some(&byte) = self.bytes.get(self.cursor) {
+            match byte {
+                b'"' => {
+                    let end = self.cursor;
+                    self.cursor += 1;
+                    return std::str::from_utf8(&self.bytes[start..end]).ok();
+                }
+                b'\\' => {
+                    // An escaped object key could duplicate a security-relevant
+                    // field under a different spelling: fail closed.
+                    if key { return None; }
+                    self.cursor += 1;
+                    let escaped = *self.bytes.get(self.cursor)?;
+                    self.cursor += 1;
+                    match escaped {
+                        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => {}
+                        b'u' => {
+                            for _ in 0..4 {
+                                if !self.bytes.get(self.cursor)?.is_ascii_hexdigit() {
+                                    return None;
+                                }
+                                self.cursor += 1;
+                            }
+                        }
+                        _ => return None,
+                    }
+                }
+                0..=31 => return None,
+                _ => self.cursor += 1,
+            }
+        }
+        None
+    }
+    fn number(&mut self) -> bool {
+        self.take(b'-');
+        if !self.take(b'0') {
+            if !matches!(self.bytes.get(self.cursor), Some(b'1'..=b'9')) {
+                return false;
+            }
+            self.cursor += 1;
+            while matches!(self.bytes.get(self.cursor), Some(b'0'..=b'9')) {
+                self.cursor += 1;
+            }
+        }
+        if self.take(b'.') {
+            if !matches!(self.bytes.get(self.cursor), Some(b'0'..=b'9')) {
+                return false;
+            }
+            while matches!(self.bytes.get(self.cursor), Some(b'0'..=b'9')) {
+                self.cursor += 1;
+            }
+        }
+        if self.take(b'e') || self.take(b'E') {
+            if !self.take(b'+') { self.take(b'-'); }
+            if !matches!(self.bytes.get(self.cursor), Some(b'0'..=b'9')) {
+                return false;
+            }
+            while matches!(self.bytes.get(self.cursor), Some(b'0'..=b'9')) {
+                self.cursor += 1;
+            }
+        }
+        true
+    }
+    fn value(&mut self, depth: usize) -> Option<AttestationValue<'a>> {
+        if depth > 48 { return None; }
+        self.whitespace();
+        let byte = *self.bytes.get(self.cursor)?;
+        match byte {
+            b'{' => {
+                self.cursor += 1;
+                self.whitespace();
+                let mut fields = Vec::new();
+                if self.take(b'}') { return Some(AttestationValue::Object(fields)); }
+                loop {
+                    self.whitespace();
+                    let name = self.string(true)?;
+                    if fields.iter().any(|(previous, _)| *previous == name) {
+                        return None;
+                    }
+                    self.whitespace();
+                    if !self.take(b':') { return None; }
+                    let value = self.value(depth + 1)?;
+                    fields.push((name, value));
+                    self.whitespace();
+                    if self.take(b'}') { break; }
+                    if !self.take(b',') { return None; }
+                }
+                Some(AttestationValue::Object(fields))
+            }
+            b'[' => {
+                self.cursor += 1;
+                self.whitespace();
+                if self.take(b']') { return Some(AttestationValue::Other); }
+                loop {
+                    self.value(depth + 1)?;
+                    self.whitespace();
+                    if self.take(b']') { break; }
+                    if !self.take(b',') { return None; }
+                }
+                Some(AttestationValue::Other)
+            }
+            b'"' => Some(AttestationValue::Text(self.string(false)?)),
+            b't' if self.word(b"true") => Some(AttestationValue::Boolean(true)),
+            b'f' if self.word(b"false") => Some(AttestationValue::Boolean(false)),
+            b'n' if self.word(b"null") => Some(AttestationValue::Other),
+            b'-' | b'0'..=b'9' if self.number() => Some(AttestationValue::Other),
+            _ => None,
+        }
+    }
+}
+
 /// Require GitHub's verified commit signature and the repository's expected
 /// signing/author identity. This is an additional online GitHub trust check,
 /// not a standalone vendor signature or protection against an admin takeover.
 pub(super) fn verified_github_commit(response: &str, expected_sha: &str) -> bool {
-    // Exact JSON fields from GitHub's REST commits API; extra data such as the
-    // commit message is JSON escaped and cannot introduce a raw field token.
-    // Reject responses missing any field instead of failing open.
-    let prefix = format!("{{\"sha\":\"{expected_sha}\"");
-    response.starts_with(&prefix)
-        && response.contains("\"verification\":{\"verified\":true,\"reason\":\"valid\"")
-        && response.contains("\"committer\":{\"name\":\"GitHub\",\"email\":\"noreply@github.com\"")
-        && response.contains("\"author\":{\"login\":\"P-JSL\"")
+    if !is_commit_sha(expected_sha) { return false; }
+    let Some(root) = AttestationJson::parse(response) else { return false; };
+    let commit = root.field("commit");
+    let verification = commit.and_then(|c| c.field("verification"));
+    let committer = commit.and_then(|c| c.field("committer"));
+    root.field("sha").and_then(AttestationValue::text) == Some(expected_sha)
+        && verification.and_then(|v| v.field("verified"))
+            .and_then(AttestationValue::boolean) == Some(true)
+        && verification.and_then(|v| v.field("reason"))
+            .and_then(AttestationValue::text) == Some("valid")
+        && committer.and_then(|c| c.field("name"))
+            .and_then(AttestationValue::text) == Some("GitHub")
+        && committer.and_then(|c| c.field("email"))
+            .and_then(AttestationValue::text) == Some("noreply@github.com")
+        && root.field("author").and_then(|a| a.field("login"))
+            .and_then(AttestationValue::text) == Some("P-JSL")
 }
 
 pub(super) fn verify_remote_commit(revision: &str) -> Result<(), String> {
