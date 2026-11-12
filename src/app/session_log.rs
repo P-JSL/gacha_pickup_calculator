@@ -31,11 +31,21 @@ pub(crate) fn error(code: &str, message: impl AsRef<str>) {
 }
 
 
+#[derive(Clone, Copy, Default)]
+struct LogIoStats {
+    writes: u64,
+    lock_wait_ns: u128,
+    write_ns: u128,
+    flush_ns: u128,
+    errors: u64,
+}
+
 struct LogState {
     file: Option<File>,
     lines: VecDeque<String>,
     revision: u64,
     warning: Option<String>,
+    io: LogIoStats,
 }
 
 pub(crate) struct SessionLogger {
@@ -94,6 +104,7 @@ impl SessionLogger {
             started: Instant::now(),
             state: Mutex::new(LogState {
                 file, lines: VecDeque::new(), revision: 0, warning,
+                io: LogIoStats::default(),
             }),
         };
         logger.info("SESSION_START", format!(
@@ -121,9 +132,25 @@ impl SessionLogger {
         let safe = description.as_ref().replace(['\r', '\n'], " ");
         let safe = safe.chars().take(2_000).collect::<String>();
         let line = format!("[{timestamp}] [+{elapsed_ms:>8}ms] [{level}] [{code}] {safe}");
+        let lock_started = Instant::now();
         let mut state = self.state.lock().unwrap_or_else(|poison| poison.into_inner());
+        state.io.lock_wait_ns = state.io.lock_wait_ns.saturating_add(
+            lock_started.elapsed().as_nanos()
+        );
         if let Some(file) = &mut state.file {
-            if let Err(error) = writeln!(file, "{line}").and_then(|_| file.flush()) {
+            let started = Instant::now();
+            let write_result = writeln!(file, "{line}");
+            let write_ns = started.elapsed().as_nanos();
+            let started = Instant::now();
+            // Keep the existing per-event flush contract; batching is
+            // conditional on explicitly measured cost and acceptable loss.
+            let result = write_result.and_then(|_| file.flush());
+            let flush_ns = started.elapsed().as_nanos();
+            state.io.writes = state.io.writes.saturating_add(1);
+            state.io.write_ns = state.io.write_ns.saturating_add(write_ns);
+            state.io.flush_ns = state.io.flush_ns.saturating_add(flush_ns);
+            if let Err(error) = result {
+                state.io.errors = state.io.errors.saturating_add(1);
                 state.file = None;
                 state.warning = Some(format!(
                     "로그 기록이 중단되어 이후 메시지는 메모리에만 보관됩니다: {error}"
@@ -133,6 +160,18 @@ impl SessionLogger {
         state.lines.push_back(line);
         if state.lines.len() > VISIBLE_LINES { state.lines.pop_front(); }
         state.revision = state.revision.wrapping_add(1);
+    }
+
+    /// Called on shutdown; records cumulative I/O costs without recursively
+    /// logging from inside the writer lock.
+    pub(crate) fn report_io_stats(&self) {
+        let stats = self.state.lock().unwrap_or_else(|poison| poison.into_inner()).io;
+        self.info("LOG_IO_SUMMARY", format!(
+            "writes={} lock_wait_ms={:.3} write_ms={:.3} flush_ms={:.3} errors={}",
+            stats.writes, stats.lock_wait_ns as f64 / 1e6,
+            stats.write_ns as f64 / 1e6, stats.flush_ns as f64 / 1e6,
+            stats.errors
+        ));
     }
 
     fn revision(&self) -> u64 {
@@ -314,6 +353,9 @@ mod tests {
         for join in clones { join.join().unwrap(); }
         let file = fs::read_to_string(&path).unwrap();
         assert_eq!(file.matches("[WORKER]").count(), 120);
+        let io = logger.state.lock().unwrap().io;
+        assert_eq!(io.writes, 121);
+        assert_eq!(io.errors, 0);
         assert_eq!(logger.snapshot().1.len(), 121);
         drop(logger);
         fs::remove_file(path).unwrap();
