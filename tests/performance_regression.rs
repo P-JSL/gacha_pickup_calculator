@@ -175,7 +175,7 @@ fn benchmark_full_game_worker_matrix() {
                 }
                 durations.sort_by(f64::total_cmp);
                 println!(
-                    "PERF_MATRIX game={game:?} samples={samples} workers={workers} \
+                    "PERF_MATRIX game={game:?} samples={samples} requested_workers={workers} \
                      repeats=3 median_ms={:.3} p95_ms={:.3} process_vmhwm_kib={:?} digest_equal=true",
                     durations[1], durations[2], process_high_water_kib()
                 );
