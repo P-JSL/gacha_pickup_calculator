@@ -276,7 +276,7 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
 
     // The public v1.x contract exposes all raw trial observations. Construct
     // only those required arrays; avoid duplicate intermediate path storage.
-    finalize_estimate(scenarios, totals, model, workers, profile,
+    finalize_estimate(scenarios, totals, setup, model, workers, profile,
         allocation_ns, sample_ns, total_started)
 }
 
@@ -326,7 +326,8 @@ mod radix_sort_regression {
 }
 
 fn finalize_estimate(
-    mut scenarios: Vec<RefundScenario>, totals: TrialTotals, model: &FeedbackConfig,
+    mut scenarios: Vec<RefundScenario>, totals: TrialTotals,
+    setup: &GameSetup, model: &FeedbackConfig,
     workers: usize, profile: bool, allocation_ns: u128, sample_ns: u128,
     total_started: std::time::Instant,
 ) -> Result<FeedbackEstimate, String> {
@@ -496,7 +497,7 @@ pub fn estimate_waveband_strategies(
     let mut estimates = Vec::with_capacity(3);
     for (strategy, (trials, totals)) in storage.into_iter().zip(totals).enumerate() {
         estimates.push(finalize_estimate(
-            trials, totals, &models[strategy], workers, false,
+            trials, totals, setup, &models[strategy], workers, false,
             0, 0, std::time::Instant::now(),
         )?);
     }
