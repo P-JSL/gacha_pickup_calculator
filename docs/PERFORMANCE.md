@@ -34,6 +34,7 @@ GACHA_PERF_MATRIX=1 GACHA_PROFILE_MONTE_CARLO=1 cargo test --locked --release --
 - `GACHA_PERF_MATRIX=1`을 **설정하지 않으면** 고비용 전체 행렬 벤치마크는 실행되지 않습니다. 기본 CI에는 기존 100,000건 성능 회귀 벤치마크가 유지됩니다.
 - `VmHWM`은 해당 프로세스의 최대 RSS이며 개별 함수의 peak heap은 아닙니다. Windows에서는 별도 외부 프로파일러 없이는 값을 제공하지 않습니다.
 - p95 표본은 조건당 3회로 제한됩니다. 이는 **초기 탐색용**이고 정밀한 분포 추정은 충분한 반복과 동일 CPU·전원 정책·빌드·입력으로 다시 실행해야 합니다.
+- 벤치마크의 `requested_workers`는 요청한 상한입니다. 실제 작업자 수는 `available_parallelism()` 및 최소 작업자당 표본 수 정책에 따라 더 작을 수 있으며, 내부 `GACHA_MC_PROFILE`의 `workers`가 실제 수를 나타냅니다.
 - 코어 사용률, 입력 시드, 타이밍, RSS, 커밋 SHA를 기록한 뒤 기준선과 수정본을 **동일 환경**에서 측정해야 개선 배수에 의미가 있습니다.
 
 ### G-06: 정렬과 예산 계산
