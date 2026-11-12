@@ -10,23 +10,25 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
     if text.len() > 8 * 1024 * 1024 {
         return Err("CSV는 8 MiB 이하만 허용합니다.".into());
     }
-    let lines: Vec<(usize, &str)> = text.lines()
+    // Stream validated rows rather than first allocating a Vec for every
+    // non-empty line. The 200,000-row limit must bound peak memory *before*
+    // processing untrusted input (even when the file is under 8 MiB).
+    let mut lines = text.lines()
         .enumerate()
         .map(|(i, s)| (i + 1, s.trim().trim_start_matches('\u{feff}')))
-        .filter(|(_, s)| !s.is_empty() && !s.starts_with('#'))
-        .collect();
-    if lines.len() < 2 {
+        .filter(|(_, s)| !s.is_empty() && !s.starts_with('#'));
+    let (_, header) = lines.next()
+        .ok_or("CSV에 헤더와 최소 한 건의 데이터가 필요합니다.")?;
+    let mut data_lines = lines.peekable();
+    if data_lines.peek().is_none() {
         return Err("CSV에 헤더와 최소 한 건의 데이터가 필요합니다.".into());
     }
-    if lines.len() > 200_001 {
-        return Err("한 번에 최대 200,000개 행만 가져올 수 있습니다.".into());
-    }
-    let delimiter = if lines[0].1.contains('\t') { '\t' } else { ',' };
+    let delimiter = if header.contains('\t') { '\t' } else { ',' };
     // Only a small, explicit schema is supported. Cap the number of fields
     // before allocating user-controlled header strings; previously duplicate
     // detection also required O(columns²) comparisons.
     const MAX_COLUMNS: usize = 64;
-    let columns: Vec<String> = lines[0].1.split(delimiter)
+    let columns: Vec<String> = header.split(delimiter)
         .take(MAX_COLUMNS + 1)
         .map(|s| s.trim().trim_matches('"').to_ascii_lowercase())
         .collect();
@@ -73,7 +75,12 @@ pub fn parse_observation_csv(text: &str, hard: usize) -> Result<ObservationDatas
     let mut observations = 0_u64;
     let mut last_pity = 0_usize;
     let mut previous_pity = 0_usize;
-    for (line_no, line) in lines.into_iter().skip(1) {
+    let mut row_count = 0_usize;
+    for (line_no, line) in data_lines {
+        row_count += 1;
+        if row_count > 200_000 {
+            return Err("한 번에 최대 200,000개 행만 가져올 수 있습니다.".into());
+        }
         let fields: Vec<&str> = line.split(delimiter)
             .map(|s| s.trim().trim_matches('"'))
             .collect();
