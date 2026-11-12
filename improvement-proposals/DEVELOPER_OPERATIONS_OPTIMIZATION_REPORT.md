@@ -2,9 +2,9 @@
 
 **저장소:** [P-JSL/gacha_pickup_calculator](https://github.com/P-JSL/gacha_pickup_calculator)  
 **소스 분석 기준:** `main` / [`eedc576b2d67e04976ecf475341721a4dcce1a2b`](https://github.com/P-JSL/gacha_pickup_calculator/commit/eedc576b2d67e04976ecf475341721a4dcce1a2b)  
-**보고서 작성일:** 2026-11-11 (KST)  
+**보고서 초판:** 2026-11-11 (KST) · **교차 검증 갱신:** 2026-11-12 (KST)  
 **대상:** 개발자 · 운영자 · 릴리스 담당자  
-**개선 후보:** 4개 (우선순위·수정 위치·구현·검증·원복 기준 포함)  
+**누적 기존 IMP 개선 과제:** 7개 (초판 4개 포함, 별도 비성능 Q 제어/검토 항목 10개)  
 **상태:** 분석·구현 제안만 작성. 실제 소스 최적화·동적 성능 측정·프로그램 배포는 수행하지 않음.  
 > 문서 내 장·절 번호는 원래 6개 저장소 통합 보고서의 번호를 보존한 것입니다. 코드 근거 링크는 작성 시점의 커밋으로 고정했습니다.
 
@@ -325,3 +325,47 @@ Feasibility SHA-256: `eaff0167caabbecbdb821f4b9c1a35d10f32cf7935b3d00fa42df93f5a
 Relevant new research perspective: Common random numbers (Nelson–Matejcik 1995), cache-oblivious layouts (Frigo et al.), work stealing (Blumofe–Leiserson), Top-Down CPU counters (Yasin), amortized prefix reuse.
 
 **Go/no-go before implementation:** collect source/benchmark SHA, build flags, hardware, workload sizes, current E2E wall-time and step breakdown (including p50/p95), CPU cycles, peak RSS/JS heap, I/O bytes, and strict result parity. Run baseline and candidate in randomized alternating order, minimum five complete runs each; preserve all existing public interfaces, persistence semantics and output contracts. A reduction in operation count or a theoretical upper bound **does not prove any whole-program speedup**.
+
+## 4.10 NON-PERFORMANCE QUALITY / SECURITY / RELIABILITY REVIEW — 1,000 + 1,000 scenario screenings (2026-11-12)
+
+### Review protocol and scientific scope
+
+**Actual screening performed, 2026-11-12:** 10 source-anchored controls × 10 synthetic failure classes × 10 operating contexts = **1,000 phase-I combinations**; then the same 10 controls × 10 distinct assurance methods × 10 quality attributes = **1,000 phase-II combinations**. This is **2,000 evaluated scenarios per repository, 12,000 across six repositories**, with deterministic uniqueness/consistency checks and an identical output digest on the second execution. Each permutation is a **model-based screening row**, not an application test, an independent human code review, a vulnerability finding, or proof of compliance.
+
+Phase I contexts: malformed input, corrupted persistence, denied access, simultaneous edits, cancellation, stale version, network/authentication failure, untrusted content, platform mismatch and partial publication, crossed against Windows/Linux/offline/low-disk/concurrent/fresh install/upgrade/restart/restricted account/untrusted-network environments. Phase II methods: property-based testing, metamorphic testing, state-machine verification, fault injection, STRIDE, NIST SSDF, OWASP ASVS, SLSA provenance, WCAG 2.2, and differential testing. A technique is classified **not applicable** when it has no natural relevance; the same standards are **not** force-fitted to every control. 'Existing' means a targeted protection exists in the linked source, **not** the entire threat is solved; 'proposal' is an experiment, **not** a discovered vulnerability.
+
+Evidence: Python model `review_nonperformance_1000x2.py` SHA-256 `3168cd9f7c938c391ff057280fab9a88fd61b86d42b5fba732d564627d22c5da`, summary JSON SHA-256 `e823ec751b255943238598c3a4289f67482d3d8019d5b8bb3e443425a157131b`. The local evidence package includes all 12,000 JSONL records; the files are not committed to this repository. **No target project code was executed, built or modified by this report revision.**
+
+Research/verification frameworks: [NIST SP 800-218 SSDF](https://csrc.nist.gov/pubs/sp/800/218/final), [OWASP ASVS 5.0](https://asvs.owasp.org/), [SLSA 1.2 provenance](https://slsa.dev/spec/v1.2/provenance), [WCAG 2.2](https://www.w3.org/TR/WCAG22/), [QuickCheck property-based testing (ICFP 2000)](https://doi.org/10.1145/351240.351266), [ISO/IEC 25010:2023 quality model](https://www.iso.org/standard/78176.html). These are requirements/checking approaches, **not certifications held by the programs**.
+
+### Repository-specific results and source-claim status
+
+- Phase I: **820 lower-priority combinations; 120 exercises of existing safeguards; 60 new test proposals (not 60 bugs)**. These classifications sum to 1,000 and are scenario labels **not distinct problems**.
+- Phase II: **60 recommended trials; 505 context-dependent; 435 not relevant** (1,000 combinations, not compliance certifications).
+- Controls: **10**. Existing safeguards are listed to prevent recommending them as missing features. 'Confirmed mismatch' means an observed source/config discrepancy, **not a confirmed runtime exploit**.
+
+| ID | Non-performance contract | Source status | Source anchor | Failure scenario | Verification acceptance criterion |
+|---|---|---|---|---|---|
+| Q-G01 | Probability and refund accounting | **existing** | [`src/domain/feedback/rolls.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/domain/feedback/rolls.rs) | Cross-game payout, pity and repeated-refund state transitions | Fixed-seed property test; no unexpected refunds or negative balance |
+| Q-G02 | Stale-result isolation | **existing** | [`src/app/controller_session/calculation.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/app/controller_session/calculation.rs) | Rapid successive requests and cancellations | Only latest generation renders; no stale worker overwrites |
+| Q-G03 | Bounds on pity/rates | **existing** | [`tests/v1_contracts.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/tests/v1_contracts.rs) | Malformed and extreme values, NaN where relevant | Reject invalid input before probability calculation |
+| Q-G04 | Remote catalog trust boundary | **existing** | [`src/data/runtime_updates.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/data/runtime_updates.rs) | Signed commit, untrusted manifest or transport failure | Do not publish unverified bundle; signed commit alone is not threat elimination |
+| Q-G05 | Image and CSV integrity | **existing** | [`src/data/security.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/data/security.rs) | Image rename/symlink and same-size content tampering | Reject hash mismatch, path alias and replaced asset |
+| Q-G06 | Session log lifecycle | **existing** | [`src/app/session_log.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/app/session_log.rs) | Symlink, readonly directory, restart, 20k visible buffer | No unsafe truncation; warning on memory-only fallback |
+| Q-G07 | Corrupt catalog rollback | **proposal** | [`src/data/runtime_updates/cache.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/data/runtime_updates/cache.rs) | Damaged cache and partial update during restart | Last verified bundle remains selected or explicit safe failure |
+| Q-G08 | Character/secondary gear mapping | **proposal** | [`src/data/catalog.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/data/catalog.rs) | Catalog version migration and missing signature item | No mismatched character/weapon, stable UI IDs |
+| Q-G09 | Accessible UI navigation | **proposal** | [`src/ui/dashboard.rs`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/src/ui/dashboard.rs) | Keyboard-only, screen reader, high contrast, resized GUI | All simulation controls accessible; labels and focus state consistent |
+| Q-G10 | Release provenance chain | **proposal** | [`.github/workflows/rust.yml`](https://github.com/P-JSL/gacha_pickup_calculator/blob/857a78b530594cf1d147bdd2a29cdaadb1374621/.github/workflows/rust.yml) | Source SHA, image catalog SHA and Windows ZIP integrity | Build artifacts bound to source and repeatably verified |
+
+### Cross-check and replacement ledger: old claims vs current code / other repositories
+
+1. The earlier front-matter '4 proposals' was the initial snapshot. There are now **7 historical IMP-G proposals plus 10 Q-G controls** (existing protections and new tests, not 17 confirmed defects).
+2. A signed GitHub commit only authenticates within the trust model currently implemented; it does not eliminate upstream-account compromise. Catalog integrity and executable update are **separate systems**.
+3. The per-session log at `log/session.log` is **not** the `activity.jsonl` mechanism documented for `myapps`. Input changes invalidate output; they do not trigger Monte Carlo automatically.
+
+### Decisions and follow-on tests (non-performance only)
+
+- **Priority P0:** resolve source-confirmed mismatches or potential data-loss pathways first; preserve existing guardrails rather than replacing them with superficially shorter code. Raise code-only changes in separate reviewed PRs.
+- **Priority P1:** fault-injection, property-based and differential tests for cancellation, concurrency, corruption, update rollback and release/source parity; document the exact failure oracle and cleanup behavior.
+- **Priority P2:** accessibility, diagnosability, user documentation and source-to-build provenance; run keyboard/screen-reader acceptance where a desktop/web UI exists.
+- **No claim of completed implementation:** the model review establishes a *risk-informed test plan*, not completed remediation, runtime security testing or proof of ISO/ASVS/SLSA certification.
