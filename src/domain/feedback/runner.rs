@@ -276,61 +276,28 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
 
     // The public v1.x contract exposes all raw trial observations. Construct
     // only those required arrays; avoid duplicate intermediate path storage.
-    finalize_estimate(scenarios, totals, setup, model, workers, profile,
-        allocation_ns, sample_ns, total_started)
+    finalize_estimate(scenarios, totals, setup, model, EstimateProfile {
+        workers, profile, allocation_ns, sample_ns, total_started,
+    })
 }
 
 
-#[cfg(test)]
-mod radix_sort_regression {
-    use super::*;
 
-    #[test]
-    fn integer_radix_preserves_entire_scenarios_and_lexicographic_budget_order() {
-        for size in [0usize, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
-            let mut input = (0..size).map(|i| RefundScenario {
-                raw_pulls: i.wrapping_mul(47) % 4_800,
-                initial_flexible_required: i.wrapping_mul(41) % 3_000,
-                earned_points: i,
-                ..RefundScenario::default()
-            }).collect::<Vec<_>>();
-            let mut reference = input.clone();
-            reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
-            sort_scenarios_by_funding(&mut input);
-            let keys = |items: &[RefundScenario]| items.iter()
-                .map(|s| (s.initial_flexible_required, s.raw_pulls))
-                .collect::<Vec<_>>();
-            assert_eq!(keys(&input), keys(&reference), "size={size}");
-            let mut original_ids = input.iter().map(|s| s.earned_points).collect::<Vec<_>>();
-            original_ids.sort_unstable();
-            assert_eq!(original_ids, (0..size).collect::<Vec<_>>());
-        }
-    }
-
-    #[test]
-    fn radix_handles_wide_usize_keys_and_many_equal_pairs() {
-        let mut trials = (0..50_000).map(|i| RefundScenario {
-            raw_pulls: (i % 17) + (usize::MAX - 8_000),
-            initial_flexible_required: if i % 3 == 0 { usize::MAX - 1 } else { i % 3 },
-            earned_points: i,
-            ..RefundScenario::default()
-        }).collect::<Vec<_>>();
-        let mut reference = trials.clone();
-        reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
-        sort_scenarios_by_funding(&mut trials);
-        assert_eq!(trials.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
-            .collect::<Vec<_>>(),
-            reference.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
-                .collect::<Vec<_>>());
-    }
+struct EstimateProfile {
+    workers: usize,
+    profile: bool,
+    allocation_ns: u128,
+    sample_ns: u128,
+    total_started: std::time::Instant,
 }
 
 fn finalize_estimate(
     mut scenarios: Vec<RefundScenario>, totals: TrialTotals,
-    setup: &GameSetup, model: &FeedbackConfig,
-    workers: usize, profile: bool, allocation_ns: u128, sample_ns: u128,
-    total_started: std::time::Instant,
+    setup: &GameSetup, model: &FeedbackConfig, timing: EstimateProfile,
 ) -> Result<FeedbackEstimate, String> {
+    let EstimateProfile {
+        workers, profile, allocation_ns, sample_ns, total_started,
+    } = timing;
     let mut budgets = Vec::new();
     let mut raw_pulls = Vec::new();
     budgets.try_reserve_exact(model.samples).map_err(|_| {
@@ -499,8 +466,10 @@ pub fn estimate_waveband_strategies(
     let mut estimates = Vec::with_capacity(3);
     for (strategy, (trials, totals)) in storage.into_iter().zip(totals).enumerate() {
         estimates.push(finalize_estimate(
-            trials, totals, setup, &models[strategy], workers, false,
-            0, 0, std::time::Instant::now(),
+            trials, totals, setup, &models[strategy], EstimateProfile {
+                workers, profile: false, allocation_ns: 0, sample_ns: 0,
+                total_started: std::time::Instant::now(),
+            },
         )?);
     }
     let elapsed = started.elapsed().as_millis();
@@ -509,4 +478,48 @@ pub fn estimate_waveband_strategies(
         count, workers, chunks_per_strategy, sampling_ms, elapsed,
     );
     Ok(estimates)
+}
+
+#[cfg(test)]
+mod radix_sort_regression {
+    use super::*;
+
+    #[test]
+    fn integer_radix_preserves_entire_scenarios_and_lexicographic_budget_order() {
+        for size in [0usize, 1, 127, 128, 255, 16_383, 16_384, 100_000] {
+            let mut input = (0..size).map(|i| RefundScenario {
+                raw_pulls: i.wrapping_mul(47) % 4_800,
+                initial_flexible_required: i.wrapping_mul(41) % 3_000,
+                earned_points: i,
+                ..RefundScenario::default()
+            }).collect::<Vec<_>>();
+            let mut reference = input.clone();
+            reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+            sort_scenarios_by_funding(&mut input);
+            let keys = |items: &[RefundScenario]| items.iter()
+                .map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>();
+            assert_eq!(keys(&input), keys(&reference), "size={size}");
+            let mut original_ids = input.iter().map(|s| s.earned_points).collect::<Vec<_>>();
+            original_ids.sort_unstable();
+            assert_eq!(original_ids, (0..size).collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn radix_handles_wide_usize_keys_and_many_equal_pairs() {
+        let mut trials = (0..50_000).map(|i| RefundScenario {
+            raw_pulls: (i % 17) + (usize::MAX - 8_000),
+            initial_flexible_required: if i % 3 == 0 { usize::MAX - 1 } else { i % 3 },
+            earned_points: i,
+            ..RefundScenario::default()
+        }).collect::<Vec<_>>();
+        let mut reference = trials.clone();
+        reference.sort_unstable_by_key(|s| (s.initial_flexible_required, s.raw_pulls));
+        sort_scenarios_by_funding(&mut trials);
+        assert_eq!(trials.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+            .collect::<Vec<_>>(),
+            reference.iter().map(|s| (s.initial_flexible_required, s.raw_pulls))
+                .collect::<Vec<_>>());
+    }
 }
