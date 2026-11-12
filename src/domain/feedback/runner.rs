@@ -436,6 +436,7 @@ pub fn estimate_waveband_strategies(
     let workers = worker_budget.clamp(1, MAX_MONTE_CARLO_WORKERS)
         .min(available).min((count.saturating_mul(3) / MIN_SAMPLES_PER_WORKER).max(1));
     const CHUNK: usize = 4_096;
+    let chunks_per_strategy = count.div_ceil(CHUNK);
     let started = std::time::Instant::now();
 
     let totals: [TrialTotals; 3] = std::thread::scope(|scope| {
@@ -468,7 +469,6 @@ pub fn estimate_waveband_strategies(
         // the queue. Any free CPU worker can claim any strategy's next chunk.
         let mut chunks = storage.iter_mut()
             .map(|trials| trials.chunks_mut(CHUNK)).collect::<Vec<_>>();
-        let chunks_per_strategy = count.div_ceil(CHUNK);
         for index in 0..chunks_per_strategy {
             for (strategy, queue) in chunks.iter_mut().enumerate() {
                 if let Some(slots) = queue.next() {
