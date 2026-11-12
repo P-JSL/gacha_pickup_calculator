@@ -1,6 +1,6 @@
 # GitHub Actions 변경 범위별 검증 정책
 
-**적용 기준: v1.0.12** · [워크플로](../.github/workflows/rust.yml)
+**검증 기준: v1.0.18 (배포 계약은 이후 변경 시 재확인)** · [워크플로](../.github/workflows/rust.yml)
 
 ## 목적
 
@@ -29,6 +29,7 @@ CI 캡처용 관찰 기능은 `GACHA_CI_SIMULATION_EVENTS=1`에서만 활성화�
 - Windows/Linux 빌드와 테스트를 분리하고 RustSec, 성능, PNG 무결성, 이미지 스캔을 독립 실행합니다.
 - Linux GUI 캡처는 Linux 실행 파일 빌드 완료 후 시작합니다.
 - 정식 릴리즈는 모든 필요한 검증이 성공해야 진행하며, 태그가 이미 존재하는 경우 무단으로 덮어쓰지 않습니다.
-- 자산 5종(.exe, Windows ZIP, 소스 ZIP, 화면 캡처 ZIP, SHA256SUMS)을 확인하고 GitHub 출처 증명을 검증한 뒤 Draft를 게시합니다.
+- 사용자용 릴리즈 자산 **4종**(.exe, Windows ZIP, 화면 캡처 ZIP, SHA256SUMS)을 확인하고 GitHub 출처 증명을 검증한 뒤 Draft를 게시합니다. 중복 소스 ZIP은 별도로 업로드하지 않습니다. GitHub 기본 소스 아카이브는 별개입니다.
+- Windows ZIP의 `log/` 폴더와 내장 이미지 매니페스트·실제 이미지 SHA를 검증하며, 이전 실행의 `log/session.log`는 릴리즈에 포함하지 않습니다.
 
 [릴리즈 보안 가이드](SECURE_RELEASE.md) · [v1.0.12 검증](https://github.com/P-JSL/gacha_pickup_calculator/actions/runs/42464003186).
