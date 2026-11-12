@@ -87,9 +87,17 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
                     variant.wuwa_waveband_max = max_wavebands;
                     let worker_limit = cpu_budget / 3 + usize::from(max_wavebands < cpu_budget % 3);
                     handles.push(scope.spawn(move || {
-                        estimate_with_options(
+                        let started = std::time::Instant::now();
+                        let result = estimate_with_options(
                             &request.setup, request.mode, &variant, worker_limit, cancellation
-                        ).map(Arc::new)
+                        ).map(Arc::new);
+                        session_log::info("WUWA_STRATEGY_TIMING", format!(
+                            "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
+                            request.generation, max_wavebands, worker_limit, variant.samples,
+                            started.elapsed().as_millis(),
+                            if result.is_ok() { "ok" } else { "cancelled_or_failed" }
+                        ));
+                        result
                     }));
                 }
                 handles.into_iter().map(|handle| {
@@ -102,9 +110,17 @@ fn compute_with_cpu_budget(request: &CalculationRequest, budget: usize)
             for max_wavebands in 0..3 {
                 let mut variant = request.feedback_config.clone();
                 variant.wuwa_waveband_max = max_wavebands;
-                strategies.push(Arc::new(estimate_with_options(
+                let started = std::time::Instant::now();
+                let result = estimate_with_options(
                     &request.setup, request.mode, &variant, cpu_budget, cancellation
-                )?));
+                );
+                session_log::info("WUWA_STRATEGY_TIMING", format!(
+                    "generation={} wavebands={} worker_limit={} samples={} elapsed_ms={} outcome={}",
+                    request.generation, max_wavebands, cpu_budget, variant.samples,
+                    started.elapsed().as_millis(),
+                    if result.is_ok() { "ok" } else { "cancelled_or_failed" }
+                ));
+                strategies.push(Arc::new(result?));
             }
             strategies
         };

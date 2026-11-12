@@ -112,6 +112,8 @@ impl CatalogUi {
     }
 
     pub(crate) fn pump(&mut self, ctx: &egui::Context) {
+        let started = std::time::Instant::now();
+        let mut processed = 0usize;
         while let Ok((generation, url, decoded)) = self.recv_image.try_recv() {
             if generation != self.generation { continue; }
             self.queued.remove(&url);
@@ -119,6 +121,12 @@ impl CatalogUi {
                 ctx.load_texture(format!("catalog:{}", url), img, egui::TextureOptions::LINEAR)
             });
             self.textures.insert(url, texture);
+            processed += 1;
+        }
+        // No stale uploads are counted, and the timing path is inert unless
+        // GACHA_PROFILE_UI=1. GPU raster/present is outside this scope.
+        if processed > 0 {
+            crate::charts::profile_ui_span("catalog_texture_upload", started);
         }
     }
 

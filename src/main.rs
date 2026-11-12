@@ -74,6 +74,7 @@ fn main() -> eframe::Result {
         Ok(()) => logger.info("SESSION_END", "Native application exited normally"),
         Err(error) => logger.error("SESSION_END", format!("Native runtime failed: {error}")),
     }
+    logger.report_io_stats();
     outcome
 }
 // Regression tests use the binary's actual private UI/application interfaces.

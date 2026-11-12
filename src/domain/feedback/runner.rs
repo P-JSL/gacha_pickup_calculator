@@ -163,11 +163,18 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
     if is_cancelled(cancellation) {
         return Err("계산 요청이 취소되었습니다.".to_owned());
     }
+    // Opt-in stage profiling only. Never change RNG draw order, sorting, or
+    // the public FeedbackEstimate representation to collect these timings.
+    let profile = std::env::var_os("GACHA_PROFILE_MONTE_CARLO")
+        .is_some_and(|value| value == "1");
+    let total_started = std::time::Instant::now();
     let mut scenarios = Vec::new();
     scenarios.try_reserve_exact(model.samples).map_err(|_| {
         "시뮬레이션 결과 배열을 위한 메모리를 확보할 수 없습니다.".to_owned()
     })?;
     scenarios.resize_with(model.samples, RefundScenario::default);
+    let allocation_ns = total_started.elapsed().as_nanos();
+    let sample_started = std::time::Instant::now();
     let workers = requested_workers.max(1).min(model.samples);
     let chunk_size = model.samples.div_ceil(workers);
     let partials = if workers == 1 {
@@ -192,6 +199,7 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
     if is_cancelled(cancellation) {
         return Err("계산 요청이 취소되었습니다.".to_owned());
     }
+    let sample_ns = sample_started.elapsed().as_nanos();
 
     // The public v1.x contract exposes all raw trial observations. Construct
     // only those required arrays; avoid duplicate intermediate path storage.
@@ -207,8 +215,10 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
     for scenario in &scenarios {
         raw_pulls.push(scenario.raw_pulls);
     }
+    let sorting_started = std::time::Instant::now();
     scenarios.sort_unstable_by_key(|scenario|
         (scenario.initial_flexible_required, scenario.raw_pulls));
+    let sorting_ns = sorting_started.elapsed().as_nanos();
     // Sorting scenarios by budget already orders the budget CDF. Avoid a
     // redundant second O(N log N) sort for large trial counts.
     for scenario in &scenarios {
@@ -218,6 +228,18 @@ fn estimate_with_workers_cancel(setup: &GameSetup, mode: RateMode, model: &Feedb
     // Integer aggregation makes the public means bit-identical for every
     // worker count; floating-point division happens only once per metric.
     let n = model.samples as f64;
+    if profile {
+        let total_ns = total_started.elapsed().as_nanos();
+        eprintln!(
+            "GACHA_MC_PROFILE game={:?} samples={} workers={} alloc_ns={} sample_ns={} sort_ns={} remainder_ns={} total_ns={} retained_bytes={}",
+            setup.game, model.samples, workers, allocation_ns, sample_ns, sorting_ns,
+            total_ns.saturating_sub(allocation_ns + sample_ns + sorting_ns),
+            total_ns, model.samples.saturating_mul(
+                std::mem::size_of::<RefundScenario>()
+                    + 2 * std::mem::size_of::<usize>()
+            ),
+        );
+    }
     Ok(FeedbackEstimate { budgets, raw_pulls, scenarios,
         average_raw: totals.raw as f64 / n,
         average_initial_flexible: totals.flexible as f64 / n,
