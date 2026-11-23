@@ -23,7 +23,7 @@ use i18n::{Language, LanguagePreference, t};
 
 
 // Explicit module boundaries, with only crate-private internal interfaces.
-// Keep the public library entrypoints and the eframe lifecycle unchanged.
+// Keep public library entrypoints unchanged; adapt the UI to eframe's current lifecycle.
 #[path = "ui/navigation.rs"] mod navigation;
 #[path = "ui/charts.rs"] mod charts;
 #[path = "ui/funding_view.rs"] mod funding_view;

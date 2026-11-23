@@ -1,7 +1,8 @@
 use super::*;
 
 impl eframe::App for Calculator {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         let previous_view = self.view_mode;
         let previous_game = self.setup.game;
         // The preceding frame already painted the new worker result. Report
@@ -13,29 +14,29 @@ impl eframe::App for Calculator {
             }
         }
         self.poll_results();
-        if self.updates.poll(ctx) {
+        if self.updates.poll(&ctx) {
             session_log::info("DATA_UPDATE", format!(
                 "Update manager status changed: {}", self.updates.message
             ));
             self.catalog_ui.invalidate_after_update();
         }
-        self.catalog_ui.pump(ctx);
+        self.catalog_ui.pump(&ctx);
         // Compact dashboard edits and detailed settings use the same worker generation.
         // Reserve a full-height left rail first, as in the reference image.
-        self.sidebar(ctx);
-        if self.header(ctx) {
+        self.sidebar(ui);
+        if self.header(ui) {
             self.invalidate_calculation();
         }
         // Reserve a usable central editing width. The optional right sidebar
         // collapses on smaller windows rather than overlapping input controls.
         if self.view_mode == ViewMode::Calculator && self.ui_preferences.show_result_panel
-            && ctx.available_rect().width() >= 1_270.0 {
-            self.workspace_results_panel(ctx);
+            && ui.available_rect_before_wrap().width() >= 1_270.0 {
+            self.workspace_results_panel(ui);
         }
         let mut settings_changed = false;
         egui::CentralPanel::default()
             .frame(egui::Frame::default().fill(BG).inner_margin(18))
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
@@ -155,12 +156,12 @@ impl eframe::App for Calculator {
             // one more only when CI needs to observe the rendered result.
             ctx.request_repaint();
         }
-        self.show_catalog_picker(ctx);
+        self.show_catalog_picker(&ctx);
         if self.show_history {
             egui::Window::new(t(self.language(), "Simulation History"))
                 .open(&mut self.show_history)
                 .default_size(egui::vec2(470.0, 330.0))
-                .resizable(true).show(ctx, |ui| {
+                .resizable(true).show(&ctx, |ui| {
                     ui.label(RichText::new(
                         "현재 실행에서 계산한 최근 결과입니다. 종료 시 초기화됩니다."
                     ).color(MUTED).size(11.0));
@@ -182,7 +183,7 @@ impl eframe::App for Calculator {
         }
         if self.show_help {
             egui::Window::new(t(self.language(), "Rules, confidence and sources"))
-                .open(&mut self.show_help).resizable(true).show(ctx, |ui| {
+                .open(&mut self.show_help).resizable(true).show(&ctx, |ui| {
                     ui.heading(self.setup.game.label());
                     ui.label(self.setup.game.special_notes());
                     ui.separator();
@@ -204,7 +205,7 @@ impl eframe::App for Calculator {
             ));
         }
         if let Some(logger) = session_log::current() {
-            self.log_view.show(ctx, logger);
+            self.log_view.show(&ctx, logger);
             if logger.flush_if_due() {
                 // The next frame flushes buffered logs even if the user is
                 // idle and the calculation worker has not finished.
@@ -237,7 +238,7 @@ pub(crate) fn configure_dark_desktop(ctx: &egui::Context) {
     // Windows light OS theme won't reintroduce light native widget styling.
     ctx.set_visuals_of(egui::Theme::Dark, visuals.clone());
     ctx.set_visuals(visuals);
-    ctx.style_mut(|style| {
+    ctx.global_style_mut(|style| {
         style.spacing.item_spacing = egui::vec2(7.0, 5.0);
         style.spacing.button_padding = egui::vec2(9.0, 4.0);
         style.spacing.interact_size.y = 25.0;
