@@ -38,6 +38,8 @@ jobs:
             echo "::error::Unmaintained package still present in lockfile dependency graph"
             exit 1
           fi
+      - name: Confirm maintained font parsing stack
+        run: cargo tree --locked -i skrifa
       - name: Check Rust targets
         run: cargo check --locked --all-targets
       - name: Run Rust tests
