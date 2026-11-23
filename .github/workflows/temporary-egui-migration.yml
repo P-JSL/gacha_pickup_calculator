@@ -1,0 +1,46 @@
+# Temporary branch-only helper for generating a Cargo-authored lockfile and checking the migration.
+# Remove this workflow before merging into main.
+name: Temporary egui font and backend migration validation
+
+on:
+  push:
+    branches:
+      - chore/migrate-egui-skrifa-remove-paste-20261123
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        with:
+          components: clippy
+      - name: Resolve dependency graph and regenerate Cargo.lock
+        run: cargo metadata --format-version 1 > /dev/null
+      - name: Commit Cargo-generated lockfile to migration branch
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- Cargo.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock
+            git commit -m "chore(deps): regenerate lockfile for egui 0.34 migration"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Assert retired dependencies are absent from resolved graph
+        run: |
+          cargo tree --locked --target all > "$RUNNER_TEMP/graph.txt"
+          if grep -E '(^|[[:space:]])(paste|ttf-parser) v[0-9]' "$RUNNER_TEMP/graph.txt"; then
+            echo "::error::Unmaintained package still present in lockfile dependency graph"
+            exit 1
+          fi
+      - name: Check Rust targets
+        run: cargo check --locked --all-targets
+      - name: Run Rust tests
+        run: cargo test --locked --all-targets
+      - name: Check Rust lints
+        run: cargo clippy --locked --all-targets -- -D warnings
