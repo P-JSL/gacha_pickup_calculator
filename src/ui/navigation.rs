@@ -143,7 +143,7 @@ pub(crate) fn paint_navigation_art(ui: &egui::Ui) {
 pub(crate) fn truncated_selection(ui: &egui::Ui, name: &str, button_width: f32) -> String {
     let font = egui::FontId::proportional(13.0);
     let max_width = (button_width - 35.0).max(5.0);
-    let fits = |s: &str| ui.fonts(|fonts| {
+    let fits = |s: &str| ui.fonts_mut(|fonts| {
         fonts.layout_no_wrap(s.to_owned(), font.clone(), Color32::WHITE).size().x <= max_width
     });
     if fits(name) { return name.to_owned(); }

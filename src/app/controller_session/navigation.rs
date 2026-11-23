@@ -50,11 +50,11 @@ impl Calculator {
     }
 
     /// Compact reference-style header with functional search and utilities.
-    pub(crate) fn header(&mut self, ctx: &egui::Context) -> bool {
+    pub(crate) fn header(&mut self, ui: &mut egui::Ui) -> bool {
         let mut dirty = false;
-        egui::TopBottomPanel::top("header")
+        egui::Panel::top("header")
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(egui::Margin { left: 15, right: 15, top: 15, bottom: 0 }))
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 ui.add_space(30.0);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
@@ -106,7 +106,7 @@ impl Calculator {
                                 ui.label(format!("현재 세션 기록 {}건", self.history.len()));
                                 if ui.button(t(self.language(), "View all history")).clicked() {
                                     self.show_history = true;
-                                    ui.close_menu();
+                                    ui.close();
                                 }
                             });
                             ui.menu_button("☆", |ui| {
@@ -118,7 +118,7 @@ impl Calculator {
                                             dirty = true;
                                         }
                                         self.view_mode = ViewMode::Calculator;
-                                        ui.close_menu();
+                                        ui.close();
                                     }
                                 }
                             });
@@ -145,13 +145,13 @@ impl Calculator {
         dirty
     }
 
-    pub(crate) fn sidebar(&mut self, ctx: &egui::Context) {
+    pub(crate) fn sidebar(&mut self, ui: &mut egui::Ui) {
         let language = self.language();
-        egui::SidePanel::left("workspace_sidebar")
+        egui::Panel::left("workspace_sidebar")
             .resizable(false)
-            .exact_width(222.0)
+            .exact_size(222.0)
             .frame(egui::Frame::default().fill(SIDEBAR).inner_margin(11))
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 paint_navigation_art(ui);
                 ui.add_space(136.0);
                 for (view, label) in [

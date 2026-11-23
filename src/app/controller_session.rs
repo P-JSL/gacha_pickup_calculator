@@ -134,7 +134,7 @@ impl Calculator {
         for choice in LanguagePreference::ALL {
             if ui.selectable_label(choice == active, choice.display(self.system_language, language)).clicked() {
                 self.set_language(choice);
-                ui.close_menu();
+                ui.close();
             }
         }
     }

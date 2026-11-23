@@ -2,13 +2,13 @@ use super::*;
 
 impl Calculator {
     /// User-facing summary and session history, attached to the right edge on wide screens.
-    pub(crate) fn workspace_results_panel(&mut self, ctx: &egui::Context) {
+    pub(crate) fn workspace_results_panel(&mut self, ui: &mut egui::Ui) {
         let language = self.language();
-        egui::SidePanel::right("workspace_results")
+        egui::Panel::right("workspace_results")
             .resizable(false)
-            .exact_width(313.0)
+            .exact_size(313.0)
             .frame(egui::Frame::default().fill(BG).inner_margin(10))
-            .show(ctx, |ui| {
+            .show_inside(ui, |ui| {
                 ui.add_space(8.0);
                 egui::Frame::group(ui.style())
                     .fill(Color32::from_rgb(15, 42, 62))

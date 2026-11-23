@@ -236,7 +236,7 @@ pub(crate) fn draw_probability_chart(ui: &mut egui::Ui, series: &[ChartSeries<'_
         // unbroken CJK labels past the plot's right edge.
         let available_width = (graph.width() - 22.0).max(24.0);
         let galleys: Vec<_> = rows.iter().map(|(label, color)| {
-            ui.fonts(|fonts| fonts.layout(label.clone(), tooltip_font.clone(),
+            ui.fonts_mut(|fonts| fonts.layout(label.clone(), tooltip_font.clone(),
                 *color, available_width))
         }).collect();
         let text_width = galleys.iter().map(|galley| galley.size().x)
